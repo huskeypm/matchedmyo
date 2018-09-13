@@ -9,7 +9,8 @@ import cv2
 import painter 
 import numpy as np 
 import matplotlib.pylab as plt 
-import twoDtense as tdt
+### commented out for webserver application
+#import twoDtense as tdt
 
 
 ##

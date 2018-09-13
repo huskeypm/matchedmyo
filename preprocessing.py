@@ -32,7 +32,7 @@ def normalizeToStriations(img, subsectionIdxs,filterSize):
   print "Normalizing myocyte to striations"
   
   ### Load in filter that will be used to smooth the subsection
-  WTfilterName = "./myoimages/singleTTFilter.png"
+  WTfilterName = "/opt/webserver/matchedmyo/myoimages/singleTTFilter.png"
   WTfilter = util.ReadImg(WTfilterName,renorm=True)
   # divide by the sum so that we are averaging across the filter
   WTfilter /= np.sum(WTfilter)

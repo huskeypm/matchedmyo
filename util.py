@@ -8,7 +8,8 @@ import scipy.signal as sig
 import scipy.fftpack as fftp
 import imutils
 import operator
-import tensorflow as tf
+### commented out for webserver application
+#import tensorflow as tf
  
 
 root = "myoimages/"

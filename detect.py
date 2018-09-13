@@ -30,6 +30,7 @@ def DisplayHits(img,threshed,
 class empty:pass    
 def docalc(img,
            mf,
+           maskName=None,
            lobemf=None,
            #corrThresh=0.,
            #s=1.,
@@ -53,6 +54,14 @@ def docalc(img,
 
     results = bD.DetectFilter(inputs,paramDict,iters=iters,display=debug)
 
+    ### Read/Construct Mask
+    if maskName != None:
+      mask = util.ReadImg(maskName)
+      binaryMask = mask.copy().astype(np.float32)
+      binaryMask[binaryMask != np.max(binaryMask)] = 0.0
+      binaryMask[binaryMask != 0] = 1.0
+   
+
     pasteFilter = True
     if pasteFilter:
 
@@ -61,10 +70,29 @@ def docalc(img,
       imgDim = np.shape(img)
       results.threshed = painter.doLabel(results,dx=MFx,dy=MFy,thresh=paramDict['snrThresh'])
       #coloredImageHolder[:,:,filterChannel] = filterChannelHolder
-    
+  
+    if maskName != None:  
+      ### Apply Mask
+      results.threshed *= binaryMask
+      results.threshed[results.threshed != 0] = 255
+
+    ### Construct colored image for display
+    cImg = np.asarray((img.copy(),
+                       img.copy(),
+                       img.copy()),dtype=np.float32)
+    cImg = np.rollaxis(cImg,0,start=3)
+    cImg *= 255. #/ np.max(cImg)
+    cImg = cImg.astype(np.uint8)
+
+    ### Mark Results on Display Image
+    TTchannel = 0
+    cImg[:,:,TTchannel][results.threshed == 255] = 255
+
     print "Writing file %s"%fileName
     #plt.figure()
-    DisplayHits(img,results.threshed,smooth=smooth)
+    #DisplayHits(img,results.threshed,smooth=smooth)
+    plt.figure()
+    plt.imshow(cImg)
     plt.gcf().savefig(fileName,dpi=300)
 
 
@@ -126,29 +154,45 @@ def simpleYaml(ymlName):
 ###
 ### updated yaml call
 ###
-def updatedSimpleYaml(ymlName):
+def updatedSimpleYaml(ymlName,outFileName,imgFileName,maskFileName):
   print "Adapt to accept filter mode argument?"
   with open(ymlName) as fp:
     data = yaml.load(fp)
   print "Reading %s" % ymlName
 
-  if 'outName' in data:
-    outName = data['outName']
+  #if 'outName' in data:
+  #  outName = data['outName']
+  #else:
+  #  outName = 'hits.png'
+
+  if 'imgName' in data:
+    imgName = data['imgName']
+
+  if 'mfName' in data:
+    mfName = data['mfName']
   else:
-    outName = 'hits.png'
+    mfName = "/opt/webserver/matchedmyo/myoimages/newSimpleWTFilter.png"
   
-  updatedSimple(data['imgName'],
-                data['mfName'],
+  updatedSimple(imgFileName,
+                mfName,
+                maskFileName,
                 data['filterTwoSarcomereSize'],
                 data['thresh'],
                 debug=data['debug'],
-                outName=outName
+                outName=outFileName
                 )
 
 ###
 ###  Updated YAML routine to lightly preprocess image
 ###
-def updatedSimple(imgName,mfName,filterTwoSarcomereSize,threh,debug=False,smooth=4,outName="hits.png"):
+def updatedSimple(imgName,
+                  mfName,
+                  maskName,
+                  filterTwoSarcomereSize,
+                  thresh,
+                  debug=False,
+                  smooth=4,
+                  outName="hits.png"):
   '''
   Updated routine for the athena web server that utilizes WT punishment filter.
 
@@ -166,7 +210,7 @@ def updatedSimple(imgName,mfName,filterTwoSarcomereSize,threh,debug=False,smooth
   imgDims = np.shape(img)
   #mf = util.LoadFilter("./myoimages/newSimpleWTFilter")
   mf = util.LoadFilter(mfName)
-  mfPunishment = util.LoadFilter("./myoimages/newSimpleWTPunishmentFilter.png")
+  mfPunishment = util.LoadFilter("/opt/webserver/matchedmyo/myoimages/newSimpleWTPunishmentFilter.png")
 
   ### Lightly preprocess the image
   # reorient image using PCA
@@ -192,6 +236,7 @@ def updatedSimple(imgName,mfName,filterTwoSarcomereSize,threh,debug=False,smooth
 
   docalc(img,
          mf,
+         maskName=maskName,
          paramDict=paramDict,
          debug=debug,
          iters=[-25,-20,-15,-10,-5,0,5,10,15,20,25],

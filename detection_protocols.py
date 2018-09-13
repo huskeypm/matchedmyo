@@ -9,9 +9,9 @@ import sys
 import os
 import util
 import matplotlib.pylab as plt
-dir_path = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(dir_path+"/gpu/")
-import simple_GPU_MF as sMF
+#dir_path = os.path.dirname(os.path.realpath(__file__))
+#sys.path.append(dir_path+"/gpu/")
+#import simple_GPU_MF as sMF
 class empty:pass
 
 # This script determines detections by integrating the correlation response
