@@ -248,7 +248,7 @@ def reorient(img):
   if dVect[0] >= 0:
     xAx = [1,0]
   else:
-    xAx[-1,0]
+    xAx = [-1,0]
 
   ### compute degrees off center from the direction vector
   dOffCenter = (180./np.pi) * np.arccos(np.dot(xAx,dVect)/np.linalg.norm(dVect))
@@ -414,7 +414,7 @@ def applyCLAHE(img,filterTwoSarcomereSize):
   return clahedImage
 ###############################################################################
 ###
-### Main Routine
+### Main Routines
 ###
 ###############################################################################
 
@@ -450,6 +450,53 @@ def processMask(fileName,degreesOffCenter,resizeScale):
   resized = cv2.resize(reoriented,None,fx=resizeScale,fy=resizeScale,interpolation=cv2.INTER_CUBIC)
   cv2.imwrite(fileName[:-4]+"_processed_mask"+fileName[-4:],resized)
 
+def preprocessTissue():
+  '''
+  Function to preprocess the original tissue level image
+  '''
+
+  #root = "/net/share/pmke226/DataLocker/cardiac/Sachse/171127_tissue/"
+  root = "./myoimages/"
+  fileName = "tissue.tif"
+
+
+  ### read in image
+  tissueImg = cv2.imread(root+fileName)
+  tissueImg = cv2.cvtColor(tissueImg,cv2.COLOR_BGR2GRAY)
+
+  ### rescale to filter size
+  imgTwoSarcSize = 22
+  filterTwoSarcSize = 25
+  scale = float(filterTwoSarcSize) / float(imgTwoSarcSize)
+  resizedTissueImg = cv2.resize(tissueImg,None,fx=scale,fy=scale,interpolation=cv2.INTER_CUBIC)
+
+  ### smooth the large image
+  ## This caused a weird ringing effect so I'm opting to do this after the CLAHE
+  #smoothedTissueImg = cv2.blur(resizedTissueImg,(3,3))
+
+  ### applying a much more global CLAHE routine to kill dye imbalance
+  tissueDims = np.shape(resizedTissueImg)
+  claheTileSize = int(1./8. * tissueDims[0])
+  CLAHEDtissueImg = applyCLAHE(resizedTissueImg,claheTileSize)
+
+  ### smooth the CLAHED image
+  kernelSize = (3,3)
+  smoothedTissueImg = cv2.blur(CLAHEDtissueImg,kernelSize)
+
+  ### apply an intensity ceiling and floor to apply contrast stretching
+  floorValue = 6
+  ceilingValue = 10
+  clippedTissueImg = smoothedTissueImg
+  clippedTissueImg[clippedTissueImg < floorValue] = floorValue
+  clippedTissueImg[clippedTissueImg > ceilingValue] = ceilingValue
+  clippedTissueImg -= floorValue
+  clippedTissueImg = clippedTissueImg.astype(np.float32)
+  clippedTissueImg *= 255. / np.max(clippedTissueImg)
+  clippedTissueImg = clippedTissueImg.astype(np.uint8)
+
+  ### save image
+  cv2.imwrite("./myoimages/preprocessedTissue.png",clippedTissueImg)
+
 def preprocessAll():
   '''
   function meant to preprocess all of the images needed for data reproduction
@@ -467,6 +514,9 @@ def preprocessAll():
     filterTwoSarcomereSize = 25
     # perform preprocessing on image
     preprocess(root+name,filterTwoSarcomereSize)
+  
+  ### now we preprocess the tissue image
+  preprocessTissue()
 
 def preprocessDirectory(directoryName,filterTwoSarcomereSize=25):
   '''
@@ -523,6 +573,9 @@ if __name__ == "__main__":
       except:
         filterTwoSarcomereSize = 25
       preprocess(fileName,filterTwoSarcomereSize)
+      quit()
+    if (arg=="-preprocessTissue"):
+      preprocessTissue()
       quit()
     if (arg=="-preprocessAll"):
       preprocessAll()
