@@ -346,13 +346,7 @@ if __name__ == "__main__":
       quit()
   
     # general test with yaml
-    if(arg=="-simpleYaml"):             
-      ymlName=sys.argv[i+1] 
-      simpleYaml(ymlName)
-      quit()
-
-    # updated version of simple yaml
-    if(arg=="-updatedSimpleYaml"):
+    if(arg=="-simpleYaml"):
       ymlName = sys.argv[i+1]
       updatedSimpleYaml(ymlName)
       quit()
