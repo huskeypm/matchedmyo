@@ -19,7 +19,6 @@ import matchedFilter as mF
 import optimizer
 import painter
 import preprocessing as pp
-import tensorflow_mf as tmf
 import twoDtense as tdt
 import tissue
 import util

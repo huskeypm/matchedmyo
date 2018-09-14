@@ -16,7 +16,7 @@ def matchedFilter(
   parsevals=False,
   demean=True
   ):
-  useCV2 = True
+  useCV2 = False
   if useCV2:
     ### TRYING OUT NEW CV2 CONVOLUTION CODE
     h = cv2.filter2D(dimg,-1,daFilter)
