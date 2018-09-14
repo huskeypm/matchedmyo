@@ -508,8 +508,7 @@ def preprocessAll():
               "MI_D_78.png",
               "MI_M_45.png",
               "MI_P_16.png",
-              "Sham_11.png",
-              "Sham_M_65.png"]
+              "Sham_11.png"]
   for name in imgNames:
     filterTwoSarcomereSize = 25
     # perform preprocessing on image

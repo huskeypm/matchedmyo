@@ -24,7 +24,8 @@ def DisplayHits(img,threshed,
         sadf=mf.matchedFilter(threshed,daround,parsevals=False,demean=False)
 
         # merge two fields 
-        du.StackGrayRedAlpha(img,sadf,alpha=0.5)
+        #du.StackGrayRedAlpha(img,sadf,alpha=0.5)
+        du.StackGrayBlueAlpha(img,sadf,alpha=0.5)
 
 
 class empty:pass    
