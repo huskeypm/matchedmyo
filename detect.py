@@ -68,13 +68,17 @@ def docalc(img,
       MFy,MFx = util.measureFilterDimensions(mf)
       filterChannel = 0
       imgDim = np.shape(img)
+      # creates a boolean placeholder for hits
       results.threshed = painter.doLabel(results,dx=MFx,dy=MFy,thresh=paramDict['snrThresh'])
+      print np.max(results.threshed)
+      print np.min(results.threshed)
       #coloredImageHolder[:,:,filterChannel] = filterChannelHolder
   
     if maskName != None:  
       ### Apply Mask
       results.threshed *= binaryMask
-      results.threshed[results.threshed != 0] = 255
+
+    #results.threshed[results.threshed != 0] = 255
 
     ### Construct colored image for display
     cImg = np.asarray((img.copy(),
@@ -85,16 +89,25 @@ def docalc(img,
     cImg = cImg.astype(np.uint8)
 
     ### Mark Results on Display Image
-    TTchannel = 0
-    cImg[:,:,TTchannel][results.threshed == 255] = 255
+    # TTchannel is different since matplotlib has RGB color scheme
+    TTchannel = 2
+    cImg[:,:,TTchannel][results.threshed == 1] = 255
 
     print "Writing file %s"%fileName
     #plt.figure()
     #DisplayHits(img,results.threshed,smooth=smooth)
+
     plt.figure()
     plt.imshow(cImg)
     plt.gcf().savefig(fileName,dpi=300)
 
+    #plt.figure()
+    #plt.imshow(results.stackedHits)
+    #plt.gcf().savefig(fileName,dpi=300)
+
+    #plt.figure()
+    #plt.imshow(results.threshed)
+    #plt.gcf().savefig(fileName,dpi=300)
 
     return inputs,results 
 
@@ -165,13 +178,13 @@ def updatedSimpleYaml(ymlName,outFileName,imgFileName,maskFileName):
   #else:
   #  outName = 'hits.png'
 
-  if 'imgName' in data:
-    imgName = data['imgName']
+  #if 'imgName' in data:
+  #  imgName = data['imgName']
 
-  if 'mfName' in data:
-    mfName = data['mfName']
-  else:
-    mfName = "/opt/webserver/matchedmyo/myoimages/newSimpleWTFilter.png"
+  #if 'mfName' in data:
+  #  mfName = data['mfName']
+  #else:
+  mfName = "/opt/webserver/matchedmyo/myoimages/newSimpleWTFilter.png"
   
   updatedSimple(imgFileName,
                 mfName,
