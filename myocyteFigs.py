@@ -20,7 +20,7 @@ import optimizer
 import painter
 import preprocessing as pp
 import tissue
-import twoDtense as tdt
+#import twoDtense as tdt
 import util
 
 ##################################

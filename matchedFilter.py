@@ -4,6 +4,7 @@ Performs basic matched filter test by FFT-correlating a measured signal with an 
 # import modules we'll need 
 import scipy.fftpack as fftp
 import numpy as np
+import cv2
 
 ##
 ## Basic steps of matched filtering process
@@ -12,8 +13,13 @@ def matchedFilter(
   dimg, # imgs wherein signal (filter) is hypothesized to exist
   daFilter,# signal 
   parsevals=False,
-  demean=True
+  demean=True,
+  useCV2=True
   ):
+  if useCV2:
+    h = cv2.filter2D(dimg,-1,daFilter)
+    return h
+
   # placeholder for 'noise' component (will refine later)
   fsC = np.ones(np.shape(dimg))
   
