@@ -247,7 +247,7 @@ def updatedSimple(imgName,
   mfPunishment = util.LoadFilter("/opt/webserver/matchedmyo/myoimages/newSimpleWTPunishmentFilter.png")
 
   ### Preprocess the image
-  img = lightlyPreprocess(img, data['filterTwoSarcomereSize'])
+  img = lightlyPreprocess(img, filterTwoSarcomereSize)
 
   ### Construct parameter dictionary
   paramDict = optimizer.ParamDict(typeDict="WT")
@@ -325,7 +325,7 @@ def fullAnalysis(yamlFile,
   ### Determine if there is a mask
   if maskFileName != None:
     masked = True
-    mask = util.ReadImg(maskName)
+    mask = util.ReadImg(maskFileName)
     mask[mask != 0] = 1
   else:
     masked = False
