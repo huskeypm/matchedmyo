@@ -8,7 +8,13 @@ import scipy.signal as sig
 import scipy.fftpack as fftp
 import imutils
 import operator
-import tensorflow as tf
+
+### Temporarily raising error with tensorflow.
+###   We should be getting rid of this soon
+try:
+  import tensorflow as tf
+except:
+  print "Tensorflow was not found on this computer. Routines with GPU implementation will not work."
  
 
 root = "myoimages/"
