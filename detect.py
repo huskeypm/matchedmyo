@@ -3,18 +3,22 @@ Wrapper for 'simplist' of MF calls
 Ultimately will be posted on athena
 """
 
-import matplotlib.pylab as plt 
-import numpy as np
-import display_util as du
-import matchedFilter as mf 
-import optimizer
-import bankDetect as bD
-import util
-import painter
 import sys
+
+import matplotlib.pylab as plt
+import numpy as np
 import yaml
+
+import bankDetect as bD
 import cv2
+import display_util as du
+import matchedFilter as mf
+import optimizer
+import painter
 import preprocessing as pp
+import util
+import myocyteFigs as myoF
+
 
 def DisplayHits(img,threshed,
                 smooth=8 # px
@@ -29,8 +33,29 @@ def DisplayHits(img,threshed,
 
 
 class empty:pass    
+def lightlyPreprocess(img,filterTwoSarcomereSize):
+  ### Lightly preprocess the image
+  imgDims = np.shape(img)
+
+  # grab subsection for resizing image. Extents are just guesses so they could be improved
+  cY, cX = int(round(float(imgDims[0]/2.))), int(round(float(imgDims[1]/2.)))
+  xExtent = 50
+  yExtent = 25
+  top = cY-yExtent; bottom = cY+yExtent; left = cX-xExtent; right = cX+xExtent
+  indexes = np.asarray([top,bottom,left,right])
+  subsection = np.asarray(img[top:bottom,left:right],dtype=np.float64)
+  subsection /= np.max(subsection)
+  img, scale, newIndexes = pp.resizeGivenSubsection(img,subsection,filterTwoSarcomereSize,indexes)
+ 
+  # intelligently threshold image using gaussian thresholding
+  img = pp.normalizeToStriations(img, newIndexes, filterTwoSarcomereSize)
+  img = np.asarray(img,dtype=np.float64)
+  img /= np.max(img)
+  return img
+
 def docalc(img,
            mf,
+           maskName=None,
            lobemf=None,
            #corrThresh=0.,
            #s=1.,
@@ -48,11 +73,16 @@ def docalc(img,
     inputs.mfOrig  = mf
     inputs.lobemf = lobemf
 
-    print "WARNING: TOO RESTRICTIVE ANGLES" 
-
-
+    #print "WARNING: TOO RESTRICTIVE ANGLES" 
 
     results = bD.DetectFilter(inputs,paramDict,iters=iters,display=debug)
+
+    ### Read/Construct Mask
+    if maskName != None:
+      mask = util.ReadImg(maskName)
+      binaryMask = mask.copy().astype(np.float32)
+      binaryMask[binaryMask != np.max(binaryMask)] = 0.0
+      binaryMask[binaryMask != 0] = 1.0
 
     pasteFilter = True
     if pasteFilter:
@@ -60,12 +90,34 @@ def docalc(img,
       MFy,MFx = util.measureFilterDimensions(mf)
       filterChannel = 0
       imgDim = np.shape(img)
+      # creates a boolean placeholder for hits
       results.threshed = painter.doLabel(results,dx=MFx,dy=MFy,thresh=paramDict['snrThresh'])
       #coloredImageHolder[:,:,filterChannel] = filterChannelHolder
     
+    if maskName != None:  
+      ### Apply Mask
+      results.threshed *= binaryMask
+
+    #results.threshed[results.threshed != 0] = 255
+
+    ### Construct colored image for display
+    cImg = np.asarray((img.copy(),
+                       img.copy(),
+                       img.copy()),dtype=np.float32)
+    cImg = np.rollaxis(cImg,0,start=3)
+    cImg *= 255. #/ np.max(cImg)
+    cImg = cImg.astype(np.uint8)
+
+    ### Mark Results on Display Image
+    # TTchannel is different since matplotlib has RGB color scheme
+    TTchannel = 2
+    cImg[:,:,TTchannel][results.threshed == 1] = 255
+
     print "Writing file %s"%fileName
     #plt.figure()
-    DisplayHits(img,results.threshed,smooth=smooth)
+    #DisplayHits(img,results.threshed,smooth=smooth)
+    plt.figure()
+    plt.imshow(cImg)
     plt.gcf().savefig(fileName,dpi=300)
 
 
@@ -127,29 +179,34 @@ def simpleYaml(ymlName):
 ###
 ### updated yaml call
 ###
-def updatedSimpleYaml(ymlName):
+def updatedSimpleYaml(ymlName,outFileName,imgFileName,maskFileName):
   print "Adapt to accept filter mode argument?"
   with open(ymlName) as fp:
     data = yaml.load(fp)
   print "Reading %s" % ymlName
 
-  if 'outName' in data:
-    outName = data['outName']
-  else:
-    outName = 'hits.png'
+  mfName = "./myoimages/newSimpleWTFilter.png"
   
-  updatedSimple(data['imgName'],
-                data['mfName'],
+  updatedSimple(imgFileName,
+                mfName,
+                maskFileName,
                 data['filterTwoSarcomereSize'],
                 data['thresh'],
                 debug=data['debug'],
-                outName=outName
+                outName=outFileName
                 )
 
 ###
 ###  Updated YAML routine to lightly preprocess image
 ###
-def updatedSimple(imgName,mfName,filterTwoSarcomereSize,threh,debug=False,smooth=4,outName="hits.png"):
+def updatedSimple(imgName,
+                  mfName,
+                  maskName,
+                  filterTwoSarcomereSize,
+                  thresh,
+                  debug=False,
+                  smooth=4,
+                  outName="hits.png"):
   '''
   Updated routine for the athena web server that utilizes WT punishment filter.
 
@@ -170,21 +227,7 @@ def updatedSimple(imgName,mfName,filterTwoSarcomereSize,threh,debug=False,smooth
   mfPunishment = util.LoadFilter("./myoimages/newSimpleWTPunishmentFilter.png")
 
   ### Lightly preprocess the image
-  # reorient image using PCA
-  #img = pp.autoReorient(img)
-  # grab subsection for resizing image. Extents are just guesses so they could be improved
-  cY, cX = int(round(float(imgDims[0]/2.))), int(round(float(imgDims[1]/2.)))
-  xExtent = 50
-  yExtent = 25
-  top = cY-yExtent; bottom = cY+yExtent; left = cX-xExtent; right = cX+xExtent
-  indexes = np.asarray([top,bottom,left,right])
-  subsection = np.asarray(img[top:bottom,left:right],dtype=np.float64)
-  subsection /= np.max(subsection)
-  img, scale, newIndexes = pp.resizeGivenSubsection(img,subsection,filterTwoSarcomereSize,indexes)
-  # intelligently threshold image using gaussian thresholding
-  img = pp.normalizeToStriations(img, newIndexes, filterTwoSarcomereSize)
-  img = np.asarray(img,dtype=np.float64)
-  img /= np.max(img)
+  img = lightlyPreprocess(img,filterTwoSarcomereSize)
 
   ### Construct parameter dictionary
   paramDict = optimizer.ParamDict(typeDict="WT")
@@ -193,6 +236,7 @@ def updatedSimple(imgName,mfName,filterTwoSarcomereSize,threh,debug=False,smooth
 
   docalc(img,
          mf,
+         maskName=maskName,
          paramDict=paramDict,
          debug=debug,
          iters=[-25,-20,-15,-10,-5,0,5,10,15,20,25],
@@ -200,11 +244,149 @@ def updatedSimple(imgName,mfName,filterTwoSarcomereSize,threh,debug=False,smooth
          fileName = outName
          )
 
+def fullAnalysis(yamlFile,
+                 outFileName,
+                 imgFileName,
+                 maskFileName=None,
+                 root="/opt/webserver/matchedmyo/"
+                 ):
+  '''
+  Function to perform the full analysis of an image based on TT, LT, and TA filtering
+  Input:
+    yamlFile -> str, name of the yaml file containing parameters to use in the analysis
+    outFileName -> str, name of the image file that will be written. This is generateed by
+                        the webserver
+    imgFileName -> str, name of the image file to be analyzed, also generated by webserver
+    maskFileName -> str or None, if str this is the name of the mask and the mask is applied.
+                    if None, no mask is applied
+  '''
+
+  with open(yamlFile) as fp:
+    data = yaml.load(fp)
+
+  ### Assign non-default values if they are specified
+  try:
+    ttRotations = data['ttRotations'] 
+  except:
+    ttRotations = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
+  try:
+    ltRotations = data['ltRotations']
+  except:
+    ltRotations = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
+  try:
+    returnAngles = data['returnAngles']
+  except:
+    returnAngles = False
+  try:
+    ttGamma = data['ttGamma']
+  except:
+    ttGamma = None
+  try:
+    ttThresh = data['ttThresh']
+  except:
+    ttThresh = None
+  try:
+    ltThresh = data['ltThresh']
+  except:
+    ltThresh = None
+  try:
+    ltStdThresh = data['ltStdThresh']
+  except:
+    ltStdThresh = None
+  try:
+    taThresh = data['taThresh']
+  except:
+    taThresh = None
+  try:
+    taStdThresh = data['taStdThresh']
+  except:
+    taStdThresh = None
+
+  ### Determine if there is a mask
+  if maskFileName != None:
+    masked = True
+    mask = util.ReadImg(maskFileName)
+    mask[mask != 0] = 1
+  else:
+    masked = False
+
+  ### Create inputs class and store greyscale image
+  inputs = empty()
+  inputs.imgOrig = util.ReadImg(imgFileName)
+  ## indicated we don't want to use a GPU
+  inputs.useGPU = False
+  
+  ### Lightly preprocess the image
+  inputs.imgOrig = lightlyPreprocess(inputs.imgOrig,data['filterTwoSarcomereSize'])
+
+  ### Perform TT Filtering
+  ttFilterName = root+'myoimages/newSimpleWTFilter.png'
+  ttPunishFilterName = root+'myoimages/newSimpleWTPunishmentFilter.png'
+  ttResults = myoF.WT_Filtering(inputs,ttRotations,ttFilterName,ttPunishFilterName,
+                                ttThresh, ttGamma, returnAngles)
+  ttStackedHits = ttResults.stackedHits
+
+  ### Perform LT Filtering
+  ltFilterName = root+'myoimages/LongitudinalFilter.png'
+  ltResults = myoF.LT_Filtering(inputs,ltRotations,ltFilterName,ltThresh,ltStdThresh,returnAngles)
+  ltStackedHits = ltResults.stackedHits
+
+  ### Perform TA Filtering
+  taFilterName = root+'myoimages/LossFilter.png'
+  taResults = myoF.Loss_Filtering(inputs,taFilterName,taThresh,taStdThresh,returnAngles)
+  taStackedHits = taResults.stackedHits
+
+  ### Make original image 3 channel for color
+  cImg = np.stack((inputs.imgOrig,
+                   inputs.imgOrig,
+                   inputs.imgOrig),axis=2)
+  cImg /= np.max(cImg)
+  cImg *= 255 *0.8 # 0.8 is to kill the brightness
+  cImg = cImg.astype(np.uint8)
+
+  ### Mark superthreshold hits for filters and convert to 8 bit format
+  taStackedHits[taStackedHits != 0] = 255
+  taStackedHits = taStackedHits.astype(np.uint8)
+  ltStackedHits[ltStackedHits != 0] = 255
+  ltStackedHits = ltStackedHits.astype(np.uint8)
+  ttStackedHits[ttStackedHits != 0] = 255
+  ttStackedHits = ttStackedHits.astype(np.uint8)
+
+  ### Mask out hits so they don't overlap. Hierarchy of hits is TA -> LT -> WT
+  ttStackedHits[taStackedHits == 255] = 0
+  ltStackedHits[taStackedHits == 255] = 0
+  ttStackedHits[ltStackedHits == 255] = 0
+
+  ### Mask the stacked hits if applicable
+  if masked:
+    taStackedHits[masked == 0] = 0
+    ltStackedHits[masked == 0] = 0
+    ttStackedHits[masked == 0] = 0
+
+  ### Run each stacked hits container through the paste filters routine to accurately show hits
+  dummy = np.zeros_like(cImg)
+  dummy = myoF.markPastedFilters(taStackedHits,ltStackedHits,ttStackedHits,dummy,
+                                 lossName=taFilterName,
+                                 ltName=ltFilterName,
+                                 wtName=ttFilterName)
+  ## apply mask if applicable
+  if masked:
+    for channel in np.shape(dummy)[2]:
+      dummy[:,:,channel][mask == 0] = 0
+  ## mark on image where hits are
+  cImg[dummy == 255] = 255
+
+  ### Save figure
+  print "Saving "+outFileName
+  plt.figure()
+  plt.imshow(myoF.switchBRChannels(cImg))
+  plt.gcf().savefig(outFileName,dpi=300)
+
 def do2DGPUFiltering():
   '''
   Prototyping right now
   '''
-  import threeDtense as tdt
+  import twoDtense as tdt
   import tissue
 
   inputs = empty()
@@ -349,7 +531,13 @@ if __name__ == "__main__":
     # general test with yaml
     if(arg=="-simpleYaml"):
       ymlName = sys.argv[i+1]
-      updatedSimpleYaml(ymlName)
+      outFileName = sys.argv[i+2]
+      imgFileName = sys.argv[i+3]
+      try:
+        maskFileName = sys.argv[i+4]
+      except:
+        maskFileName = None
+      updatedSimpleYaml(ymlName,outFileName,imgFileName,maskFileName)
       quit()
 
     if(arg=="-giveCorrelation"):
@@ -369,7 +557,3 @@ if __name__ == "__main__":
 
 
   raise RuntimeError("Arguments not understood")
-
-
-
-
