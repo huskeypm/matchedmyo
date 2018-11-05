@@ -1,14 +1,22 @@
 import sys
-import cv2
-import matplotlib
-matplotlib.use('Agg')
-import numpy as np
-import matplotlib.pylab as plt
-import tensorflow as tf
 import time
+
+import cv2
 import imutils
+import matplotlib
+import matplotlib.pylab as plt
+import numpy as np
 import scipy.fftpack as fftp
+
+### Temporarily raising error with tensorflow.
+###   We should be getting rid of this soon
+try:
+  import tensorflow as tf
+except:
+  print "Tensorflow was not found on this computer. Routines with GPU implementation will not work."
 import util
+
+matplotlib.use('Agg')
 
 
 def LoadImage(
@@ -287,7 +295,3 @@ if __name__ == "__main__":
 
 
   raise RuntimeError("Arguments not understood")
-
-
-
-

@@ -1,16 +1,25 @@
+import os
 import sys
-import os 
+import time
+
 import cv2
+import imutils
 import matplotlib
+import matplotlib.pylab as plt
 #matplotlib.use('Agg')
 import numpy as np
-import matplotlib.pylab as plt
-import tensorflow as tf
-import time
 import scipy.fftpack as fftp
-import util
-import imutils
+
 import optimizer
+import util
+
+### Temporarily raising error with tensorflow.
+###   We should be getting rid of this soon
+try:
+  import tensorflow as tf
+except:
+  print "Tensorflow was not found on this computer. Routines with GPU implementation will not work."
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 #import cPickle as Pickle
 
@@ -743,7 +752,3 @@ if __name__ == "__main__":
 
 
   raise RuntimeError("Arguments not understood")
-
-
-
-
