@@ -1425,7 +1425,7 @@ def give3DMarkedMyocyte(
     xiters -> list of ints. Rotations with which the filters will be rotated about the x axis (yz plane)
     yiters -> list of ints. Rotations with which the filters will be rotated about the y axis (xz plane)
     ziters -> list of ints. Rotations with which the filters will be rotated about the z axis (xy plane)
-    returnAngles -> Bool. Whether or not to return the angles with which the voxel experienced the greatest SNR
+    returnAngles -> Bool. Whether or not to return the angles with which the hit experienced the greatest SNR
                       NOTE: Do I need to delete this? Not like I'll be able to get a colormap for this
     returnPastedFilter -> Bool. Whether or not to paste filter sized unit cells where detections occur.
                             This translates to much more intuitive hit markings.

@@ -21,6 +21,16 @@ except:
 
 root = "myoimages/"
 
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Functions for Convenience
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
 def myplot(img,fileName=None,clim=None):
   plt.axis('equal')
   plt.pcolormesh(img, cmap='gray')
@@ -66,7 +76,7 @@ def ReadImg(fileName,cvtColor=True,renorm=False,bound=False):
   if renorm:
     img = img / np.float(np.amax(img))
   
-  return img  
+  return img 
 
 def LoadFilter(fileName):
   '''
@@ -128,81 +138,18 @@ def measureFilterDimensions(grayFilter):
 
   return numRows, numCols
 
-def makeCubeFilter(prismFilter):
-  '''
-  Function to make a filter that is sufficiently padded with zeros such that 
-  any rotation performed on the filter will not cause the filter information
-  to be clipped by any rotation algorithm.
-  '''
-  # get shape of old filter
-  fy,fx,fz = np.shape(prismFilter)
-
-  # get shape of new cubic filter
-  biggestDimension = np.max((fy,fx,fz))
-  newDim = int(np.ceil(np.sqrt(2) * biggestDimension))
-  if newDim % 2 != 0:
-    newDim += 1
-
-  # construct holder for new filter
-  cubeFilt = np.zeros((newDim,newDim,newDim),dtype=np.float64)
-  center = newDim / 2
-
-  # store old filter in the new filter
-  cubeFilt[center - int(np.floor(fy/2.)):center + int(np.ceil(fy/2.)),
-           center - int(np.floor(fx/2.)):center + int(np.ceil(fx/2.)),
-           center - int(np.floor(fz/2.)):center + int(np.ceil(fz/2.))] = prismFilter
-
-  return cubeFilt
-
 def viewer(tensor):
-    def dummy(tensor2):
-        return tensor2
-
-    with tf.Session() as sess:
-        result = sess.run(dummy(tensor))
-        print np.shape(result)
-        print result
-        return result
-
-def rotateTFFilter2D(img,rotation):
   '''
-  Function to 'tensorize' the rotation of the filter
+  Quick and dirty function for viewing a tensor used with tensorflow
   '''
-  #rotated = tf.cast(img,dtype=tf.float64)
-  #rotated = tf.cast(img,dtype=tf.float32)
-  rotated = tf.to_float(img)
-  rotated = tf.contrib.image.rotate(rotated,rotation,interpolation="BILINEAR")
-  rotated = tf.cast(rotated,dtype=tf.complex64)
-  return rotated
+  def dummy(tensor2):
+    return tensor2
 
-
-# Prepare matrix of vectorized of FFT'd images
-def CalcX(
-  imgs,
-  debug=False
-  ):
-  nImg,d1,d2 = np.shape(imgs)
-  dd = d1*d2  
-  #print nImg, d2
-  X = np.zeros([nImg,dd],np.dtype(np.complex128))
-    
-  for i,img in enumerate(imgs):
-    xi = np.array(img,np.dtype(np.complex128))     
-    # FFT (don't think I need to shift here)  
-    Xi = fftp.fft2( xi )    
-    if debug:
-      Xi = xi    
-    #myplot(np.real(Xi))
-    # flatten
-    Xif = np.ndarray.flatten(Xi)
-    X[i,:]=Xif
-  return X  
-
-def renorm(img,scale=255):
-    img = img-np.min(img)
-    img/= np.max(img)
-    img*=scale 
-    return img
+  with tf.Session() as sess:
+    result = sess.run(dummy(tensor))
+    print np.shape(result)
+    print result
+    return result
 
 def markMaskOnMyocyte(img,imgName):
   '''
@@ -252,47 +199,68 @@ def markMaskOnMyocyte(img,imgName):
 
   return colorImg
 
+def PasteFilter(img, filt):
+  '''
+  function to paste the filter in the upper left region of the img 
+  to make sure they are scaled correctly
+  '''
+    
+  myImg = img.copy()
+  filtDim = np.shape(filt)
+  myImg[:filtDim[0],:filtDim[1]] = filt
+  return myImg
 
-def GetAnnulus(region,sidx,innerMargin,outerMargin=None):
-  if outerMargin==None: 
-      # other function wasn't really an annulus 
-      raise RuntimeError("Antiquated. See GetRegion")
+# Embegs signal into known image for testing 
+def embedSignal(img,mf,loc=None,scale=0.5):
+    #plt.figure()
+    s= np.max(img)*scale
+    mfs= np.array(mf*s,dtype=np.uint8)
+    imgEmb = np.copy(img)
+    dimr = np.shape(mf)
+    if isinstance(loc,np.ndarray):
+      1
+    else: 
+      loc = [0,0]
+    imgEmb[loc[0]:(loc[0]+dimr[0]),loc[1]:(loc[1]+dimr[1])] += mfs 
+    #imshow(imgEmb)
+    return imgEmb
 
-  if innerMargin%2==0 or outerMargin%2==0:
-      print "WARNING: should use odd values for margin!" 
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Functions for Filter Generation
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
 
-  # grab entire region
-  outerRegion,dummy,dummy = GetRegion(region,sidx,outerMargin)
+def makeCubeFilter(prismFilter):
+  '''
+  Function to make a filter that is sufficiently padded with zeros such that 
+  any rotation performed on the filter will not cause the filter information
+  to be clipped by any rotation algorithm.
+  '''
+  # get shape of old filter
+  fy,fx,fz = np.shape(prismFilter)
 
-  # block out interior to create annulus 
-  annulus = np.copy(outerRegion) 
-  s = np.shape(annulus)
-  aM = outerMargin - innerMargin
-  xMin,xMax = 0+aM, s[0]-aM
-  yMin,yMax = 0+aM, s[1]-aM
-  interior = np.copy(annulus[xMin:xMax,yMin:yMax])
-  annulus[xMin:xMax,yMin:yMax]=0. 
+  # get shape of new cubic filter
+  biggestDimension = np.max((fy,fx,fz))
+  newDim = int(np.ceil(np.sqrt(2) * biggestDimension))
+  if newDim % 2 != 0:
+    newDim += 1
 
-  return annulus,interior
+  # construct holder for new filter
+  cubeFilt = np.zeros((newDim,newDim,newDim),dtype=np.float64)
+  center = newDim / 2
 
-def GetRegion(region,sidx,margin):
-      subregion = region[(sidx[0]-margin):(sidx[0]+margin+1),
-                         (sidx[1]-margin):(sidx[1]+margin+1)]        
-      area = np.float(np.prod(np.shape(subregion)))
-      intVal = np.sum(subregion)  
-      return subregion, intVal, area
+  # store old filter in the new filter
+  cubeFilt[center - int(np.floor(fy/2.)):center + int(np.ceil(fy/2.)),
+           center - int(np.floor(fx/2.)):center + int(np.ceil(fx/2.)),
+           center - int(np.floor(fz/2.)):center + int(np.ceil(fz/2.))] = prismFilter
 
-def MaskRegion(region,sidx,margin,value=0):
-      region[(sidx[0]-margin):(sidx[0]+margin+1),
-                         (sidx[1]-margin):(sidx[1]+margin+1)]=value  
+  return cubeFilt
 
-
-def ApplyCLAHE(grayImgList, tileGridSize, clipLimit=2.0, plot=False):
-    clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
-    clahedImage = clahe.apply(grayImgList) # stupid hack
-    return clahedImage
-
-### Generating filters
 def generateWTFilter(WTFilterRoot=root+"/filterImgs/WT/", filterTwoSarcSize=25):
   WTFilterImgs = []
   for fileName in os.listdir(WTFilterRoot):
@@ -388,7 +356,6 @@ def saveSingleTTPunishmentFilter():
   punishFilter =  punishFilter.astype(np.uint8)
   cv2.imwrite("./myoimages/singleTTPunishmentFilter.png",punishFilter)
 
-
 # # 'Fixing' filters (improving contrast) via basic thresholding
 def fixFilter(Filter,pixelCeiling=0.7,pixelFloor=0.4,rowMin=0, rowMax=None, colMin=0, colMax=None):
   fixedFilter = Filter.copy()
@@ -479,6 +446,58 @@ def saveFixedPunishmentFilter():
   punishFilter[1:-1,2:-2] = 255
   cv2.imwrite(root+"WTPunishmentFilter.png",punishFilter)
 
+def saveAllMyo():
+      saveFixedWTFilter()
+      saveSimpleWTFilter()
+      saveGaussLongFilter()
+      saveFixedLossFilter()
+      saveFixedPunishmentFilter()
+      saveSingleTTFilter()
+      saveSingleTTPunishmentFilter()
+
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Functions for Image Manipulation
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
+def rotateTFFilter2D(img,rotation):
+  '''
+  Function to 'tensorize' the rotation of the filter
+  '''
+  #rotated = tf.cast(img,dtype=tf.float64)
+  #rotated = tf.cast(img,dtype=tf.float32)
+  rotated = tf.to_float(img)
+  rotated = tf.contrib.image.rotate(rotated,rotation,interpolation="BILINEAR")
+  rotated = tf.cast(rotated,dtype=tf.complex64)
+  return rotated
+
+def renorm(img,scale=255):
+    img = img-np.min(img)
+    img/= np.max(img)
+    img*=scale 
+    return img
+
+def GetRegion(region,sidx,margin):
+      subregion = region[(sidx[0]-margin):(sidx[0]+margin+1),
+                         (sidx[1]-margin):(sidx[1]+margin+1)]        
+      area = np.float(np.prod(np.shape(subregion)))
+      intVal = np.sum(subregion)  
+      return subregion, intVal, area
+
+def MaskRegion(region,sidx,margin,value=0):
+      region[(sidx[0]-margin):(sidx[0]+margin+1),
+                         (sidx[1]-margin):(sidx[1]+margin+1)]=value 
+
+def ApplyCLAHE(grayImgList, tileGridSize, clipLimit=2.0, plot=False):
+    clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
+    clahedImage = clahe.apply(grayImgList) # stupid hack
+    return clahedImage
+
 def PadWithZeros(img, padding = 15):
   '''
   routine to pad your image with a border of zeros. This reduces the 
@@ -502,116 +521,10 @@ def Depad(img, padding=15):
   newImg = newImg.astype(imgType)
   return newImg
 
-def CalcPSD(Hs): # fourier xformed data
-    psd = np.real(np.conj(Hs)*Hs)
-    eps = 1e-5
-    psd[ psd < eps ] = eps
-    return fftp.fftshift(np.log( psd ))
-
-
-def dissimilar(
-    theFilter,
-    theDecoy,
-    Cv = 1.,
-    Clutter = 1.,
-    beta = 0.,
-    gamma = 0.0001):
-
-    s = 1.
-    s2 = 3.
-
-    # filter FFT
-    kernel = np.ones((s2,s2),np.float32)/np.float(s2*s2)
-    h = np.array(theFilter,dtype=np.float)
-    h = cv2.resize(h, None, fx = s, fy = s, interpolation = cv2.INTER_CUBIC)
-    
-    plt.figure()
-    plt.subplot(2,2,1)
-    plt.imshow(h,cmap="gray")
-    hs = fftp.fftshift(h)
-    Hs = fftp.fftn(hs)
-    plt.subplot(2,2,2)
-    plt.imshow(CalcPSD(Hs))
-
-    # noise FFT 
-    Cn = Cv*np.ones_like(h,dtype=np.float)
-
-    # clutter FFT
-    Cc = np.ones_like(h,dtype=np.float)
-
-    # difference image 
-    p = cv2.resize(theDecoy, None, fx = s, fy = s, interpolation = cv2.INTER_CUBIC)
-    p = cv2.filter2D(p,-1,kernel)
-    k = p - h
-    k[ k < 0] = 0
-    plt.subplot(2,2,3)
-    plt.imshow(k,cmap='gray')
-    ks = fftp.fftshift(k)
-    Ks = fftp.fftn(ks)
-    print np.min(k), np.min(Ks)
-    #Ks = cv2.filter2D(np.real(Ks),-1,kernel)
-    #Ks = cv2.filter2D(np.real(Ks),-1,kernel)
-    #Ks = cv2.filter2D(np.real(Ks),-1,kernel)    
-    plt.subplot(2,2,4)
-    plt.imshow(CalcPSD(Ks))
-
-    ### modified filter
-    Fs = Hs / (Cn + beta*Cc + gamma*np.abs(Ks))
-    
-    fs = fftp.ifftn(Fs)
-    f  = fftp.ifftshift(fs)
-    f-= np.min(f); f/=np.max(f); f*=255
-    f = np.array(np.real(f),dtype=np.uint8)
-    plt.figure()
-    plt.subplot(1,2,1)
-    plt.imshow(f,cmap="gray")
-    plt.subplot(1,2,2)
-    plt.imshow(CalcPSD(Fs))
-    
-    
-    f = cv2.resize(f, None, fx = 1/s, fy = 1/s, interpolation = cv2.INTER_CUBIC)
-    return f, Hs,Ks
-
-def PasteFilter(img, filt):
-  '''
-  function to paste the filter in the upper left region of the img 
-  to make sure they are scaled correctly
-  '''
-    
-  myImg = img.copy()
-  filtDim = np.shape(filt)
-  myImg[:filtDim[0],:filtDim[1]] = filt
-  return myImg
-
-def saveAllMyo():
-      saveFixedWTFilter()
-      saveSimpleWTFilter()
-      saveGaussLongFilter()
-      saveFixedLossFilter()
-      saveFixedPunishmentFilter()
-      saveSingleTTFilter()
-      saveSingleTTPunishmentFilter()
-
-# Embegs signal into known iomage for testing 
-def embedSignal(img,mf,loc=None,scale=0.5):
-    #plt.figure()
-    s= np.max(img)*scale
-    mfs= np.array(mf*s,dtype=np.uint8)
-    imgEmb = np.copy(img)
-    dimr = np.shape(mf)
-    if isinstance(loc,np.ndarray):
-      1
-    else: 
-      loc = [0,0]
-    imgEmb[loc[0]:(loc[0]+dimr[0]),loc[1]:(loc[1]+dimr[1])] += mfs 
-    #imshow(imgEmb)
-    return imgEmb
-
 def padWithZeros(array, padwidth, iaxis, kwargs):
     array[:padwidth[0]] = 0
     array[-padwidth[1]:]= 0
     return array
-
 
 def PadRotate(myFilter1,val):
   dims = np.shape(myFilter1)
@@ -681,11 +594,141 @@ def rotate3D(arr,angles,padding=4,clipOutput=True):
 
   return rot
 
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Functions for Image Analysis
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
+# Prepare matrix of vectorized of FFT'd images
+def CalcX(
+  imgs,
+  debug=False
+  ):
+  nImg,d1,d2 = np.shape(imgs)
+  dd = d1*d2  
+  #print nImg, d2
+  X = np.zeros([nImg,dd],np.dtype(np.complex128))
+    
+  for i,img in enumerate(imgs):
+    xi = np.array(img,np.dtype(np.complex128))     
+    # FFT (don't think I need to shift here)  
+    Xi = fftp.fft2( xi )    
+    if debug:
+      Xi = xi    
+    #myplot(np.real(Xi))
+    # flatten
+    Xif = np.ndarray.flatten(Xi)
+    X[i,:]=Xif
+  return X 
+
+def GetAnnulus(region,sidx,innerMargin,outerMargin=None):
+  if outerMargin==None: 
+      # other function wasn't really an annulus 
+      raise RuntimeError("Antiquated. See GetRegion")
+
+  if innerMargin%2==0 or outerMargin%2==0:
+      print "WARNING: should use odd values for margin!" 
+
+  # grab entire region
+  outerRegion,dummy,dummy = GetRegion(region,sidx,outerMargin)
+
+  # block out interior to create annulus 
+  annulus = np.copy(outerRegion) 
+  s = np.shape(annulus)
+  aM = outerMargin - innerMargin
+  xMin,xMax = 0+aM, s[0]-aM
+  yMin,yMax = 0+aM, s[1]-aM
+  interior = np.copy(annulus[xMin:xMax,yMin:yMax])
+  annulus[xMin:xMax,yMin:yMax]=0. 
+
+  return annulus,interior
+
+def CalcPSD(Hs): # fourier xformed data
+    psd = np.real(np.conj(Hs)*Hs)
+    eps = 1e-5
+    psd[ psd < eps ] = eps
+    return fftp.fftshift(np.log( psd ))
+
+def dissimilar(
+    theFilter,
+    theDecoy,
+    Cv = 1.,
+    Clutter = 1.,
+    beta = 0.,
+    gamma = 0.0001):
+
+    s = 1.
+    s2 = 3.
+
+    # filter FFT
+    kernel = np.ones((s2,s2),np.float32)/np.float(s2*s2)
+    h = np.array(theFilter,dtype=np.float)
+    h = cv2.resize(h, None, fx = s, fy = s, interpolation = cv2.INTER_CUBIC)
+    
+    plt.figure()
+    plt.subplot(2,2,1)
+    plt.imshow(h,cmap="gray")
+    hs = fftp.fftshift(h)
+    Hs = fftp.fftn(hs)
+    plt.subplot(2,2,2)
+    plt.imshow(CalcPSD(Hs))
+
+    # noise FFT 
+    Cn = Cv*np.ones_like(h,dtype=np.float)
+
+    # clutter FFT
+    Cc = np.ones_like(h,dtype=np.float)
+
+    # difference image 
+    p = cv2.resize(theDecoy, None, fx = s, fy = s, interpolation = cv2.INTER_CUBIC)
+    p = cv2.filter2D(p,-1,kernel)
+    k = p - h
+    k[ k < 0] = 0
+    plt.subplot(2,2,3)
+    plt.imshow(k,cmap='gray')
+    ks = fftp.fftshift(k)
+    Ks = fftp.fftn(ks)
+    print np.min(k), np.min(Ks)
+    #Ks = cv2.filter2D(np.real(Ks),-1,kernel)
+    #Ks = cv2.filter2D(np.real(Ks),-1,kernel)
+    #Ks = cv2.filter2D(np.real(Ks),-1,kernel)    
+    plt.subplot(2,2,4)
+    plt.imshow(CalcPSD(Ks))
+
+    ### modified filter
+    Fs = Hs / (Cn + beta*Cc + gamma*np.abs(Ks))
+    
+    fs = fftp.ifftn(Fs)
+    f  = fftp.ifftshift(fs)
+    f-= np.min(f); f/=np.max(f); f*=255
+    f = np.array(np.real(f),dtype=np.uint8)
+    plt.figure()
+    plt.subplot(1,2,1)
+    plt.imshow(f,cmap="gray")
+    plt.subplot(1,2,2)
+    plt.imshow(CalcPSD(Fs))
+    
+    
+    f = cv2.resize(f, None, fx = 1/s, fy = 1/s, interpolation = cv2.INTER_CUBIC)
+    return f, Hs,Ks
 
 
-#
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Command Line Functionality
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
 # Message printed when program run without arguments 
-#
 def helpmsg():
   scriptName= sys.argv[0]
   msg="""
@@ -716,22 +759,27 @@ if __name__ == "__main__":
   for i,arg in enumerate(sys.argv):
     if(arg=="-genWT"):
       saveFixedWTFilter()
+      quit()
     elif(arg=="-genSimpleWTFilter"):
-      saveSimpleWT()
+      saveSimpleWTFilter()
+      quit()
     elif(arg=="-genLoss"):
       saveFixedLossFilter()
+      quit()
     elif(arg=="-genPunishment"):
       saveFixedPunishmentFilter()
+      quit()
     elif(arg=="-genAllMyo"): 
       saveAllMyo()
+      quit()
     elif(arg=="-genWeirdLong"):
-      print "WARNING: DEPRECATED. Use -genGaussLongFilter"
-      saveWeirdLongFilter()
-      quit()
+      raise RuntimeError("WARNING: DEPRECATED. Use -genGaussLongFilter")
+      #saveWeirdLongFilter()
+      #quit()
     elif(arg=="-genSimpleLong"):
-      print "WARNING: DEPRECATED. Use -genGaussLongFilter"
-      saveSimpleLongFilter()
-      quit()
+      raise RuntimeError("WARNING: DEPRECATED. Use -genGaussLongFilter")
+      #saveSimpleLongFilter()
+      #quit()
     elif(arg=="-genGaussLong"):
       saveGaussLongFilter()
       quit()
