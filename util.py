@@ -622,7 +622,7 @@ def PadRotate(myFilter1,val):
 
   return rF
 
-def rotate3D(arr,angles,padding=4):
+def rotate3D(arr,angles,padding=4,clipOutput=True):
   '''
   Rotates an array in 3D space.
 
@@ -631,9 +631,22 @@ def rotate3D(arr,angles,padding=4):
     angles -> list of values for which to rotate arr by. Values proceed as rotating about x, y, and z axes corresponding to [0,1,2] dimensions of array.
                 Convention is such that traveling along the rows is the x axis and traveling along the columns is the y axis. This is slightly
                 counter-intuitive but it matches with the image processing libraries better this way.
+                Rotation angles are for rotation in the clockwise direction.
+    padding -> int. Number of rows/cols/z stacks to add for padding. The padding value is 0.
+    clipOutput -> Bool. If true, then the output is clipped to the minimum and maximum values of the input array.
   Outputs:
     rot -> numpy array containing the rotated array
   '''
+  ### Measure the input max and min if we wish to clip the output to the input max and min range
+  if clipOutput:
+    inputMin = np.min(arr)
+    inputMax = np.max(arr)
+
+  ### I don't like the ndimage convention of rotating counter-clockwise, so I wish to feed in clockwise rotation
+  ###   angles and correct within this function
+  for i, arg in enumerate(angles):
+    angles[i] = -1. * arg
+
   ### The ndimage routine is supposed to take care of appropriate padding, but it seems to affect rotation
   ###   so we're going to manually pad the filter here instead
   arrDims = np.shape(arr)
@@ -645,11 +658,26 @@ def rotate3D(arr,angles,padding=4):
   ### Rotate about x axis (y,z plane)
   rot = ndimage.rotate(bigArr, angles[0], axes=(1,2))
 
+  ### Clip rotation output if desired
+  if clipOutput:
+    rot[rot < inputMin] = inputMin
+    rot[rot > inputMax] = inputMax
+
   ### Rotate about y axis (x,z plane)
   rot = ndimage.rotate(rot, angles[1], axes=(0,2))
 
+  ### Clip rotation output if desired
+  if clipOutput:
+    rot[rot < inputMin] = inputMin
+    rot[rot > inputMax] = inputMax
+
   ### Rotate about z axis (x,y plane)
   rot = ndimage.rotate(rot, angles[2], axes=(0,1))
+
+  ### Clip rotation output if desired
+  if clipOutput:
+    rot[rot < inputMin] = inputMin
+    rot[rot > inputMax] = inputMax
 
   return rot
 
