@@ -6,8 +6,10 @@ import cv2
 import scipy
 import scipy.signal as sig
 import scipy.fftpack as fftp
+from scipy import ndimage
 import imutils
 import operator
+import tifffile
 
 ### Temporarily raising error with tensorflow.
 ###   We should be getting rid of this soon
@@ -29,21 +31,80 @@ def myplot(img,fileName=None,clim=None):
     plt.clim(clim)
 
 def ReadImg(fileName,cvtColor=True,renorm=False,bound=False):
+  ### Check to see what the file type is
+  fileType = fileName[-4:]
+
+  if fileType == '.tif':
+    ## Read in image
+    img = tifffile.imread(fileName)
+
+    ## Check dimensionality of image. If image is 3D, we want to roll the z axis to the last position since 
+    ##   tifffile reads in the z-stacks in the first dimension.
+    if len(np.shape(img)) == 3:
+      img = np.moveaxis(img,source=0,destination=2)
+
+  elif fileType == '.png':
+    ## Read in image
     img = cv2.imread(fileName)
+
+    ## Check that an image was actually read in
     if img is None:
         raise RuntimeError(fileName+" likely doesn't exist")
+
+    ## Convert to grayscale
     if cvtColor:
       img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    if bound!=False:
+
+    ## Check if the image is bounded
+    if bound != False:
       img=img[bound[0]:bound[1],bound[0]:bound[1]]
-    if renorm:# rescaling
-      img = img / np.float(np.amax(img))
-    return img  
+
+  else:
+    raise RuntimeError("File type is not understood. Please use a .png or .tif file.")
+
+  ### Normalize the image to have maximum value of 1.
+  if renorm:
+    img = img / np.float(np.amax(img))
+  
+  return img  
 
 def LoadFilter(fileName):
+  '''
+  This function serves the purpose of reading in and ensuring that the sum of the filter is 1.
+    This guarantees that no pixel in the filtered image will be above the local maximum of the filter.
+    i.e. this is turning the read-in filter into a mean filter.
+  '''
+  ### Read image using previous routine
   filterImg = ReadImg(fileName,cvtColor=True,renorm=True).astype(np.float64)
+
+  ### Divide out the sum of the filter s.t. new sum of the filter will be 1.
   filterImg /=  np.sum(filterImg)
+
   return filterImg
+
+def Save3DImg(img, fileName):
+  '''
+  This function will roll the axis of img and save the image in the img variable to the fileName location.
+    This is necessary since the convention that I have been using in the analysis scheme is to have:
+      [Row, Column, Z-stack]
+    BUT tifffile uses the following convention:
+      [Z-stack, Row, Column]
+
+  Inputs:
+    img -> numpy array with dimensions [Row, Column, Z-stack]. Image to be saved.
+    fileName -> str. String containing the location and file name with which image will be saved
+  '''
+
+  ### Roll the third axis to the first position
+  dummyImg = np.moveaxis(img,source=2,destination=0)
+
+  ### Convert to 32 bit float format since ImageJ can't handle 64 bit
+  dummyImg = dummyImg.astype(np.float32)
+
+  ### Write image
+  tifffile.imsave(fileName, data=dummyImg)
+
+  print "Wrote file to:",fileName
 
 def measureFilterDimensions(grayFilter):
   '''
@@ -560,6 +621,38 @@ def PadRotate(myFilter1,val):
   rF = np.copy(rotatedFilter)
 
   return rF
+
+def rotate3D(arr,angles,padding=4):
+  '''
+  Rotates an array in 3D space.
+
+  Inputs:
+    arr -> numpy array
+    angles -> list of values for which to rotate arr by. Values proceed as rotating about x, y, and z axes corresponding to [0,1,2] dimensions of array.
+                Convention is such that traveling along the rows is the x axis and traveling along the columns is the y axis. This is slightly
+                counter-intuitive but it matches with the image processing libraries better this way.
+  Outputs:
+    rot -> numpy array containing the rotated array
+  '''
+  ### The ndimage routine is supposed to take care of appropriate padding, but it seems to affect rotation
+  ###   so we're going to manually pad the filter here instead
+  arrDims = np.shape(arr)
+  bigArr = np.zeros((arrDims[0]+2*padding,
+                     arrDims[1]+2*padding,
+                     arrDims[2]+2*padding),dtype=arr.dtype)
+  bigArr[padding:-padding,padding:-padding,padding:-padding] = arr
+
+  ### Rotate about x axis (y,z plane)
+  rot = ndimage.rotate(bigArr, angles[0], axes=(1,2))
+
+  ### Rotate about y axis (x,z plane)
+  rot = ndimage.rotate(rot, angles[1], axes=(0,2))
+
+  ### Rotate about z axis (x,y plane)
+  rot = ndimage.rotate(rot, angles[2], axes=(0,1))
+
+  return rot
+
 
 
 #

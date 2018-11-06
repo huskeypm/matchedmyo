@@ -1129,7 +1129,13 @@ def markPastedFilters(
 
   return cI
 
-def WT_Filtering(inputs,iters,ttFilterName,wtPunishFilterName,ttThresh,wtGamma,returnAngles):
+def WT_Filtering(inputs,
+                 iters,
+                 ttFilterName,
+                 wtPunishFilterName,
+                 ttThresh=None,
+                 wtGamma=None,
+                 returnAngles=False):
   '''
   Takes inputs class that contains original image and performs WT filtering on the image
   '''
@@ -1148,7 +1154,13 @@ def WT_Filtering(inputs,iters,ttFilterName,wtPunishFilterName,ttThresh,wtGamma,r
 
   return WTresults
 
-def LT_Filtering(inputs,iters,ltFilterName,ltThresh,ltStdThresh,returnAngles):
+def LT_Filtering(inputs,
+                 iters,
+                 ltFilterName,
+                 ltThresh=None,
+                 ltStdThresh=None,
+                 returnAngles=False
+                 ):
   '''
   Takes inputs class that contains original image and performs LT filtering on the image
   '''
@@ -1165,7 +1177,13 @@ def LT_Filtering(inputs,iters,ltFilterName,ltThresh,ltStdThresh,returnAngles):
 
   return LTresults
 
-def Loss_Filtering(inputs,lossFilterName,lossThresh,lossStdThresh,returnAngles):
+def Loss_Filtering(inputs,
+                   lossFilterName,
+                   iters=None,
+                   lossThresh=None,
+                   lossStdThresh=None,
+                   returnAngles=False,
+                   ):
   '''
   Takes inputs class that contains original image and performs Loss filtering on the image
   '''
@@ -1173,7 +1191,10 @@ def Loss_Filtering(inputs,lossFilterName,lossThresh,lossStdThresh,returnAngles):
   inputs.mfOrig = util.LoadFilter(lossFilterName)
   Lossparams = optimizer.ParamDict(typeDict='Loss')
   Lossparams['useGPU'] = inputs.useGPU
-  Lossiters = [0, 45] # don't need many rotations for loss filtering
+  if iters != None:
+    Lossiters = iters
+  else:
+    Lossiters = [0, 45] # don't need many rotations for loss filtering
   if lossThresh != None:
     Lossparams['snrThresh'] = lossThresh
   if lossStdThresh != None:
@@ -1367,6 +1388,101 @@ def giveMarkedMyocyte(
   tElapsed = end - start
   print "Total Elapsed Time: {}s".format(tElapsed)
   return cI 
+
+def give3DMarkedMyocyte(
+      testImage,
+      ttFilterName=None,
+      ltFilterName=None,
+      taFilterName=None,
+      ttPunishFilterName=None,
+      ltPunishFilterName=None,
+      ttThresh=None,
+      ltThresh=None,
+      lossThresh=None,
+      wtGamma=None,
+      ltStdThresh=None,
+      lossStdThresh=None,
+      ImgTwoSarcSize=None,
+      tag = "default_",
+      xiters=[-10,0,10],
+      yiters=[-10,0,10],
+      ziters=[-10,0,10],
+      returnAngles=False,
+      returnPastedFilter=True
+      ):
+  '''
+  This function is for the detection and marking of TT features in three dimensions. 
+
+  Inputs:
+    ttFilterName -> str. Name of the transverse tubule filter to be used
+    ltFiltername -> str. Name of the longitudinal filter to be used
+    lossFilterName -> str. Name of the tubule absence filter to be used
+    ttPunishFilterName -> str. Name of the transverse tubule punishment filter to be used
+    ltPunishFilterName -> str. Name of the longitudinal tubule punishment filter to be used NOTE: Delete?
+    testImage -> str. Name of the image to be analyzed. NOTE: This image has previously been preprocessed by 
+                   XXX routine.
+    tag -> str. Base name of the written files 
+    xiters -> list of ints. Rotations with which the filters will be rotated about the x axis (yz plane)
+    yiters -> list of ints. Rotations with which the filters will be rotated about the y axis (xz plane)
+    ziters -> list of ints. Rotations with which the filters will be rotated about the z axis (xy plane)
+    returnAngles -> Bool. Whether or not to return the angles with which the voxel experienced the greatest SNR
+                      NOTE: Do I need to delete this? Not like I'll be able to get a colormap for this
+    returnPastedFilter -> Bool. Whether or not to paste filter sized unit cells where detections occur.
+                            This translates to much more intuitive hit markings.
+  
+  Outputs:
+    TBD
+  '''
+  start = time.time()
+
+  ### Read in preprocessed test image and store in inputs class for use in all subroutines
+  inputs = empty()
+  inputs.imgOrig = util.ReadImg(testImage)
+
+  ### Form flattened iteration matrix containing all possible rotation combinations
+  flattenedIters = []
+  for i in xiters:
+    for j in yiters:
+      for k in ziters:
+        flattenedIters.append( [i,j,k] )
+
+  ### WT filtering
+  if ttFilterName != None:
+    WTresults = WT_Filtering(inputs,flattenedIters,ttFilterName,ttPunishFilterName,ttThresh,wtGamma,returnAngles)
+    WTstackedHits = WTresults.stackedHits
+  else:
+    WTstackedHits = np.zeros_like(inputs.imgOrig)
+
+  ### LT filtering
+  if ltFilterName != None:
+    LTresults = LT_Filtering(inputs,flattenedIters,ltFilterName,ltThresh,ltStdThresh,returnAngles)
+    LTstackedHits = LTresults.stackedHits
+  else:
+    LTstackedHits = np.zeros_like(inputs.imgOrig)
+
+  ### Loss filtering
+  if taFilterName != None:
+    ## form tubule absence flattened rotation matrix. Choosing to look at tubule absence at one rotation right now.
+    taIters = [[0,0,0]]
+    TAresults = Loss_Filtering(inputs,
+                               taFilterName,
+                               iters=taIters,
+                               lossThresh=lossThresh,
+                               lossStdThresh=lossStdThresh,
+                               returnAngles=returnAngles)
+    TAstackedHits = TAresults.stackedHits
+  else:
+    TAstackedHits = np.zeros_like(inputs.imgOrig)
+
+  
+
+
+
+
+  end = time.time()
+  print "Time for algorithm to run:",start-end,"seconds"
+  
+  
 
 def setupAnnotatedImage(annotatedName, baseImageName):
   '''

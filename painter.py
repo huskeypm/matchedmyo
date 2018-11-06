@@ -6,6 +6,7 @@ import matplotlib.mlab as mlab
 import cv2
 from scipy.misc import toimage
 from scipy.ndimage.filters import *
+from scipy import ndimage
 import matchedFilter as mF
 import imutils
 from imtools import *
@@ -50,17 +51,29 @@ def correlateThresher(
     correlated = []
 
     inputs.demeanedImg = np.abs(np.subtract(inputs.imgOrig, np.mean(inputs.imgOrig)))
-    for i, angle in enumerate(iters):
+    for i in iters:
       result = empty()
 
-      # pad/rotate 
-      params['angle'] = angle
-      rFN = util.PadRotate(filterRef,angle)  
-      inputs.mf = rFN  
+      # Check dimensionality of iteration
+      if type(i) == list:
+        # This is 3D
+        # pad/rotate filter
+        rFN = util.rotate3D(filterRef,i)
+        inputs.mf = rFN
 
-      # check for other matched filters
-      if params['filterMode'] == 'punishmentFilter':
-        params['mfPunishmentRot'] = util.PadRotate(params['mfPunishment'].copy(),angle)
+        # check to see if we need to rotate other matched filters for the detection
+        if params['filterMode'] == 'punishmentFilter':
+          params['mfPunishmentRot'] = util.rotate3D(params['mfPunishment'].copy(),i)
+      else:
+        # This is 2D
+        # pad/rotate 
+        params['angle'] = i
+        rFN = util.PadRotate(filterRef,i)  
+        inputs.mf = rFN  
+
+        # check for other matched filters
+        if params['filterMode'] == 'punishmentFilter':
+          params['mfPunishmentRot'] = util.PadRotate(params['mfPunishment'].copy(),i)
       
       # matched filtering 
       result = dps.FilterSingle(inputs,params)      

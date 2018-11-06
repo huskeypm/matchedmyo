@@ -85,7 +85,6 @@ def lobeDetect(
 
 # TODO phase this out 
 def CalcInvFilter(inputs,paramDict,corr):
-    
       penaltyscale = paramDict['penaltyscale'] 
       sigma_n  = paramDict['sigma_n']
       angle  = paramDict['angle']
