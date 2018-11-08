@@ -455,6 +455,27 @@ def saveAllMyo():
       saveSingleTTFilter()
       saveSingleTTPunishmentFilter()
 
+def determineZStacksFromResolution(zResolution, # [voxels/um]
+                                   DiameterTT=.2 # [um]
+                                   ):
+  '''
+  This function determines the number of z stacks needed to cover transverse tubules given a 
+    z-stack resolution of the confocal microscope used.
+
+  Inputs:
+    zResolution -> float. Resolution of the confocal microscope used to record the image in [voxels/um]
+    DiameterTT -> float. Diameter of a typical transverse tubule in the species of the animal used.
+                    Default value is .2 um
+  '''
+
+  numZStacksNeeded = DiamterTT * zResolution
+
+  return numZStacksNeeded
+
+#def generate3DFilter(originalFilterFileName,
+#                     numberZStacks):
+
+
 ###################################################################################################
 ###################################################################################################
 ###################################################################################################
@@ -535,7 +556,97 @@ def PadRotate(myFilter1,val):
 
   return rF
 
-def rotate3D(arr,angles,padding=4,clipOutput=True):
+def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpolationOrder=2):
+  '''
+  This function is for the rotation of matrices with non-homogeneous coordinates. For example, 
+    rotation of images taken with scopes with anisotropic resolution
+  
+  Inputs:
+    A -> np array. Matrix with which to rotate
+    angles -> list of floats. List of angles with which A will be rotated.The convention used here is that 
+                the zeroth coordinate corresponds to rotation angle about the x axis (zeroth axis)
+                the first coordinate corresponds to rotation angle about the y axis (first axis)
+                the second coordinate corresponds to rotation angle about the z axis (second axis)
+                NOTE: Angles are in degrees
+    resolution -> list of resolutions for 0th, 1st, and 2nd dimensions.
+    clipValues -> Bool. If true, the routine clips the output of rotations and zooms to have 
+                          maximums and minimums reflective of the input array, A.
+    interpolationOrder -> int. Valid values range between 0-5. Order of the interpolation for rotation.
+                                 NOTE: Cubic interpolation seems to introduce artifacts. Setting default to 2
+  '''
+
+  minVal = np.min(A)
+  maxVal = np.max(A)
+
+  ### 1. Interpolate and Form New Matrix with Homogeneous Coordinates
+  ## Find zoom levels based on resolutions. We need to zoom in for all dimensions with resolutiosn lower than the maximum
+  maxResolution = np.max(resolutions).astype(float)
+
+  zooms = []
+  for res in resolutions:
+    zooms.append(maxResolution / float(res))
+  
+  ## Form the new zoomed in matrix
+  zoomed = ndimage.zoom(A,zoom=zooms)
+  if clipValues:
+    zoomed[zoomed < minVal] = minVal
+    zoomed[zoomed > maxVal] = maxVal
+
+  ### 2. Rotate the Matrix Using Homogeneous Coordinate Rotation Routine
+  ## Pad the zoomed in image first to ensure that rotation does not induce artifacts
+  padded = pad3DArray(zoomed)
+
+  ## Rotate the matrix
+  rotated = rotate3DArray_Homogeneous(padded, angles, clipOutput=clipValues, interpolationOrder=interpolationOrder)
+
+  ### 3. Downsample by Zooming Out
+  ## Find the amount we'll have to zoom out to return to previous levels
+  zoomOutLevels = [1./ i for i in zooms]
+
+  ## Zoom out
+  zoomedOut = ndimage.zoom(rotated, zoom=zoomOutLevels)
+  if clipValues:
+    zoomedOut[zoomedOut < minVal] = minVal
+    zoomedOut[zoomedOut > maxVal] = maxVal
+
+  return zoomedOut
+
+def pad3DArray(array, 
+             padding = 4,
+             paddingValue = 0):
+  '''
+  This routine takes a 3D array and pads the array in all dimensions
+  
+  Inputs:
+    array -> numpy array. Array which padding will be applied to.
+    padding -> int. 1/2 the number of rows,columns,and z stacks that will be applied to the array.
+    paddingValue -> Value with which the array will be padded with. Should be the same data type 
+                      as the original array.
+  
+  Outputs:
+    padded -> numpy array. Padded array.
+  '''
+
+  ### Create a big array with which will store the padded array
+  arrDims = np.shape(array)
+  padded = np.ones(
+    (
+      arrDims[0]+2*padding,
+      arrDims[1]+2*padding,
+      arrDims[2]+2*padding
+    ),
+    dtype = array.dtype
+  )
+
+  ### Set the values of the array to the padding value
+  padded *= paddingValue
+
+  ### Place the original array into the padded array
+  padded[padding:-padding,padding:-padding,padding:-padding] = array
+
+  return padded
+
+def rotate3DArray_Homogeneous(array, angles, clipOutput=True, interpolationOrder=3):
   '''
   Rotates an array in 3D space.
 
@@ -547,29 +658,23 @@ def rotate3D(arr,angles,padding=4,clipOutput=True):
                 Rotation angles are for rotation in the clockwise direction.
     padding -> int. Number of rows/cols/z stacks to add for padding. The padding value is 0.
     clipOutput -> Bool. If true, then the output is clipped to the minimum and maximum values of the input array.
+    interpolationOrder -> int. Valid values range between 0-5. Order of the interpolation for rotation.
+                                 NOTE: Cubic interpolation seems to introduce artifacts. May think about setting default to 2
   Outputs:
     rot -> numpy array containing the rotated array
   '''
   ### Measure the input max and min if we wish to clip the output to the input max and min range
   if clipOutput:
-    inputMin = np.min(arr)
-    inputMax = np.max(arr)
+    inputMin = np.min(array)
+    inputMax = np.max(array)
 
   ### I don't like the ndimage convention of rotating counter-clockwise, so I wish to feed in clockwise rotation
   ###   angles and correct within this function
   for i, arg in enumerate(angles):
     angles[i] = -1. * arg
 
-  ### The ndimage routine is supposed to take care of appropriate padding, but it seems to affect rotation
-  ###   so we're going to manually pad the filter here instead
-  arrDims = np.shape(arr)
-  bigArr = np.zeros((arrDims[0]+2*padding,
-                     arrDims[1]+2*padding,
-                     arrDims[2]+2*padding),dtype=arr.dtype)
-  bigArr[padding:-padding,padding:-padding,padding:-padding] = arr
-
   ### Rotate about x axis (y,z plane)
-  rot = ndimage.rotate(bigArr, angles[0], axes=(1,2))
+  rot = ndimage.rotate(array, angles[0], axes=(1,2),order=interpolationOrder)
 
   ### Clip rotation output if desired
   if clipOutput:
@@ -577,7 +682,7 @@ def rotate3D(arr,angles,padding=4,clipOutput=True):
     rot[rot > inputMax] = inputMax
 
   ### Rotate about y axis (x,z plane)
-  rot = ndimage.rotate(rot, angles[1], axes=(0,2))
+  rot = ndimage.rotate(rot, angles[1], axes=(0,2), order=interpolationOrder)
 
   ### Clip rotation output if desired
   if clipOutput:
@@ -585,7 +690,7 @@ def rotate3D(arr,angles,padding=4,clipOutput=True):
     rot[rot > inputMax] = inputMax
 
   ### Rotate about z axis (x,y plane)
-  rot = ndimage.rotate(rot, angles[2], axes=(0,1))
+  rot = ndimage.rotate(rot, angles[2], axes=(0,1), order=interpolationOrder)
 
   ### Clip rotation output if desired
   if clipOutput:
