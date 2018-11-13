@@ -1122,10 +1122,18 @@ def markPastedFilters(
   LTmask[labeledLoss] = False
   LTmask[WTmask] = False # prevents double marking of WT and LT
 
+  ### Dampen brightness
   alpha = 1.0
-  cI[:,:,2][Lossmask] = int(round(alpha * 255))
-  cI[:,:,1][LTmask] = int(round(alpha * 255))
-  cI[:,:,0][WTmask] = int(round(alpha * 255))
+  hitValue = int(round(alpha * 255))
+  if len(cI.shape) == 3:
+    cI[:,:,:,0][Lossmask] = hitValue
+    cI[:,:,:,1][LTmask] = hitValue
+    cI[:,:,:,2][WTmask] = hitValue
+  else:
+    ## There's a difference in the color channel conventions between 2D and 3D data
+    cI[:,:,2][Lossmask] = hitValue
+    cI[:,:,1][LTmask] = hitValue
+    cI[:,:,0][WTmask] = hitValue
 
   return cI
 

@@ -253,25 +253,43 @@ def paintME(myImg, myFilter1,  threshold = 190, cropper=[24,129,24,129],iters = 
 
 # Basically just finds a 'unit cell' sized area around each detection 
 # for the purpose of interpolating the data 
-def doLabel(result,dx=10,dy=None,thresh=0):
-    if dy == None:
-      dy = dx
-    img =result.stackedHits > thresh
-    kernel = np.ones((dy,dx),np.float32)/(float(dy*dx))
-    
-    filtered = signal.convolve2d(img, kernel, mode='same') / np.sum(kernel)
+def doLabel(result,dx=10,dy=None,dz=None,thresh=0):
+  '''
+  Finds a unit cell sized area around each detection. This serves to display more intuitive representations 
+    of detections. This is for 2 and 3 dimensional data.
+  
+  Inputs:
+    result - class. Result class from bankDetect.DetectFilter(). result.stackedHits is where the detetions are stored.
+    dx, dy, dz - int. Measurement of the unit cell dimensions in the x, y, and z directions.
+                   Specification of y and z is optional but should be specified for accurate results.
+                   Specification of z only needed if image is 3D.
+    thresh - int or float. Threshold applied to result.stackedHits to determine where the hits are.
 
-    #plt.subplot(1,3,1)
-    #plt.imshow(img)
-    #plt.subplot(1,3,2)
-    #plt.imshow(filtered)
-    #plt.subplot(1,3,3)
-    labeled = filtered > 0
-    #plt.imshow(labeled)
-    #plt.tight_layout()
-    #plt.show()
-    
-    return labeled
+  Outputs:
+    labeled - boolean array. The image with detections dilated according to unit cell size.
+  '''
+  ### Determine dimensions of unit cell if none are specified. If dy and dz are not specified, set equal to dx
+  if dy == None:
+    dy = dx
+  if dz == None and len(result.stackedHits.shape) == 3:
+    dz = dx
+  
+  ### Determine where hits are present in stackedHits based on threshold
+  img =result.stackedHits > thresh
+
+  ### Construct kernel the size of the unit cell
+  if len(result.stackedHits.shape) == 3:
+    kernel = np.ones((dy,dx,dz),np.float32)/(float(dy*dx*dz))
+  else:
+    kernel = np.ones((dy,dx),np.float32)/(float(dy*dx))
+  
+  ### Perform convolution to determine where kernel overlaps with detection
+  filtered = signal.convolve2d(img, kernel, mode='same') / np.sum(kernel)
+
+  ### Perform boolean operation to pull out all dilated hits
+  labeled = filtered > 0
+  
+  return labeled
 
 def WT_SNR(Img, WTfilter, WTPunishmentFilter,C,gamma):
   # calculates SNR of WT filter
