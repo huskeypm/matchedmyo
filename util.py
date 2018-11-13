@@ -110,7 +110,8 @@ def Save3DImg(img, fileName):
   dummyImg = np.moveaxis(img,source=2,destination=0)
 
   ### Convert to 32 bit float format since ImageJ can't handle 64 bit
-  dummyImg = dummyImg.astype(np.float32)
+  if dummyImg.dtype == np.float64:
+    dummyImg = dummyImg.astype(np.float32)
 
   ### Write image
   tifffile.imsave(fileName, data=dummyImg)
@@ -123,21 +124,41 @@ def measureFilterDimensions(grayFilter):
   rectangle around the filter. To be used in conjunction with the 
   pasteFilters flag in DataSet
   '''
-  filtery,filterx = np.shape(grayFilter)
+  #filtery,filterx = np.shape(grayFilter)
+  ### Measure shape of filter
+  filterShape = np.shape(grayFilter)
+  print filterShape
 
-  collapsedRows = np.sum(grayFilter,0)
-  leftPadding = np.argmax(collapsedRows>0)
-  rightPadding = np.argmax(collapsedRows[::-1]>0)
-  numRows = filtery - leftPadding - rightPadding
+  ### For each axis, determine the amount of padding in each direction and subtract that from the measured dimensions
+  newDimLengths = []
+  for i,dimLength in enumerate(filterShape):
+    otherAxes = np.delete(np.arange(len(filterShape)),i)
+    print otherAxes
+       
+    collapsedDim = np.sum(grayFilter,axis=tuple(otherAxes))
+    
+    ## Measure padding before the filter in this dimension
+    previousPadding = np.argmax(collapsedDim > 0)
+    ## Measure padding after the filter in this dimension
+    afterPadding = np.argmax(collapsedDim[::-1] > 0)
 
-  collapsedCols = np.sum(grayFilter,1)
-  topPadding = np.argmax(collapsedCols>0)
-  bottomPadding = np.argmax(collapsedCols[::-1]>0)
-  numCols = filterx - topPadding - bottomPadding
+    ## Find actual filter dimensions (minus padding)
+    newDimLengths.append(dimLength - previousPadding - afterPadding)
 
-  print "filter y,x:",numRows,numCols
 
-  return numRows, numCols
+  #collapsedRows = np.sum(grayFilter,0)
+  #leftPadding = np.argmax(collapsedRows>0)
+  #rightPadding = np.argmax(collapsedRows[::-1]>0)
+  #numRows = filtery - leftPadding - rightPadding
+
+  #collapsedCols = np.sum(grayFilter,1)
+  #topPadding = np.argmax(collapsedCols>0)
+  #bottomPadding = np.argmax(collapsedCols[::-1]>0)
+  #numCols = filterx - topPadding - bottomPadding
+
+  #print "filter y,x:",numRows,numCols
+
+  return newDimLengths
 
 def viewer(tensor):
   '''
@@ -515,10 +536,20 @@ def generate3DTTFilter(scopeResolutions, # [vx/um]
   zoomOut = [1., 1., zZoomOut]
   filt3D = ndimage.zoom(filt3D,zoom=zoomOut)
   punishFilt3D = ndimage.zoom(punishFilt3D, zoom=zoomOut)
+
+  ### Threshold the filter to get rid of rotation numerical artifacts
+  filt3DMean = np.mean(filt3D)
+  filt3DMax = np.max(filt3D)
+  filt3D[filt3D > filt3DMean] = filt3DMax
+  filt3D[filt3D < filt3DMean] = 0
+  punishFilt3DMean = np.mean(punishFilt3D)
+  punishFilt3DMax = np.max(punishFilt3D)
+  punishFilt3D[punishFilt3D > punishFilt3DMean] = punishFilt3DMax
+  punishFilt3D[punishFilt3D < punishFilt3DMean] = 0
   
   ### Save filters
-  Save3DImg(filt3D, 'TT_3D.tif')
-  Save3DImg(punishFilt3D, 'TT_Punishment_3D.tif')
+  Save3DImg(filt3D, './myoimages/TT_3D.tif')
+  Save3DImg(punishFilt3D, './myoimages/TT_Punishment_3D.tif')
 
 def generate3DLTFilter(scopeResolutions, # [vx/um]
                        originalFilterName='./myoimages/newSimpleWTFilter.png',

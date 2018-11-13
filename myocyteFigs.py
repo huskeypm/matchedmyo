@@ -1102,15 +1102,15 @@ def markPastedFilters(
   wtFilt = util.LoadFilter(wtName)
 
   ### get filter dimensions
-  lossy,lossx = util.measureFilterDimensions(lossFilt)
-  LTy, LTx = util.measureFilterDimensions(ltFilt)
-  WTy, WTx = util.measureFilterDimensions(wtFilt)
+  lossDimensions = util.measureFilterDimensions(lossFilt)
+  LTDimensions = util.measureFilterDimensions(ltFilt)
+  WTDimensions = util.measureFilterDimensions(wtFilt)
 
   ### we want to mark WT last since that should be the most stringent
   # Opting to mark Loss, then Long, then WT
-  labeledLoss = painter.doLabel(Lossholder,dx=lossx,dy=lossy,thresh=254)
-  labeledLT = painter.doLabel(LTholder,dx=LTx,dy=LTy,thresh=254)
-  labeledWT = painter.doLabel(WTholder,dx=WTx,dy=WTy,thresh=254)
+  labeledLoss = painter.doLabel(Lossholder,cellDimensions=lossDimensions,thresh=254)
+  labeledLT = painter.doLabel(LTholder,cellDimensions=LTDimensions,thresh=254)
+  labeledWT = painter.doLabel(WTholder,cellDimensions=WTDimensions,thresh=254)
 
   ### perform masking
   WTmask = labeledWT.copy()
@@ -1233,6 +1233,11 @@ def giveMarkedMyocyte(
       useGPU=False,
       fileExtension=".pdf"
       ):
+  '''
+  This function is the main workhorse for the detetion of features in 2D myocytes.
+    See give3DMarkedMyocyte() for better documentation.
+    TODO: Better document this
+  '''
  
   start = time.time()
 
@@ -1399,6 +1404,7 @@ def giveMarkedMyocyte(
 
 def give3DMarkedMyocyte(
       testImage,
+      scopeResolutions,
       ttFilterName=None,
       ltFilterName=None,
       taFilterName=None,
@@ -1411,7 +1417,7 @@ def give3DMarkedMyocyte(
       ltStdThresh=None,
       lossStdThresh=None,
       ImgTwoSarcSize=None,
-      tag = "default_",
+      tag = None,
       xiters=[-10,0,10],
       yiters=[-10,0,10],
       ziters=[-10,0,10],
@@ -1419,16 +1425,18 @@ def give3DMarkedMyocyte(
       returnPastedFilter=True
       ):
   '''
-  This function is for the detection and marking of TT features in three dimensions. 
+  This function is for the detection and marking of subcellular features in three dimensions. 
 
   Inputs:
+    testImage -> str. Name of the image to be analyzed. NOTE: This image has previously been preprocessed by 
+                   XXX routine.
+    scopeResolutions -> list of values (ints or floats). List of resolutions of the confocal microscope for x, y, and z.
     ttFilterName -> str. Name of the transverse tubule filter to be used
     ltFiltername -> str. Name of the longitudinal filter to be used
     lossFilterName -> str. Name of the tubule absence filter to be used
     ttPunishFilterName -> str. Name of the transverse tubule punishment filter to be used
     ltPunishFilterName -> str. Name of the longitudinal tubule punishment filter to be used NOTE: Delete?
-    testImage -> str. Name of the image to be analyzed. NOTE: This image has previously been preprocessed by 
-                   XXX routine.
+    
     tag -> str. Base name of the written files 
     xiters -> list of ints. Rotations with which the filters will be rotated about the x axis (yz plane)
     yiters -> list of ints. Rotations with which the filters will be rotated about the y axis (xz plane)
@@ -1446,6 +1454,8 @@ def give3DMarkedMyocyte(
   ### Read in preprocessed test image and store in inputs class for use in all subroutines
   inputs = empty()
   inputs.imgOrig = util.ReadImg(testImage)
+  inputs.useGPU = False
+  inputs.scopeResolutions = scopeResolutions
 
   ### Form flattened iteration matrix containing all possible rotation combinations
   flattenedIters = []
@@ -1456,10 +1466,10 @@ def give3DMarkedMyocyte(
 
   ### WT filtering
   if ttFilterName != None:
-    WTresults = WT_Filtering(inputs,flattenedIters,ttFilterName,ttPunishFilterName,ttThresh,wtGamma,returnAngles)
-    WTstackedHits = WTresults.stackedHits
+    TTresults = WT_Filtering(inputs,flattenedIters,ttFilterName,ttPunishFilterName,ttThresh,wtGamma,returnAngles)
+    TTstackedHits = TTresults.stackedHits
   else:
-    WTstackedHits = np.zeros_like(inputs.imgOrig)
+    TTstackedHits = np.zeros_like(inputs.imgOrig)
 
   ### LT filtering
   if ltFilterName != None:
@@ -1482,14 +1492,45 @@ def give3DMarkedMyocyte(
   else:
     TAstackedHits = np.zeros_like(inputs.imgOrig)
 
+  ### Mark Detections on the Image
+  cImg = np.stack(
+    (
+      inputs.imgOrig,
+      inputs.imgOrig,
+      inputs.imgOrig
+    ),
+    axis=-1
+  )
+  ## Scale cImg and convert to 8 bit for color marking
+  alpha = 0.75
+  cImg = cImg.astype(np.float)
+  cImg /= np.max(cImg)
+  cImg *= 255 * alpha
+  cImg = cImg.astype(np.uint8)
+  if returnPastedFilter:
+    ## Use routine to mark unit cell sized cuboids around detections
+    cImg = markPastedFilters(TAstackedHits,
+                             LTstackedHits,
+                             TTstackedHits,
+                             cImg,
+                             wtName = './myoimages/TT_3D.tif')
+  else:
+    ## Just mark exactly where detection is instead of pasting until cells on detections
+    cImg[:,:,:,0][TAstackedHits > 0] = 255
+    cImg[:,:,:,1][LTstackedHits > 0] = 255
+    cImg[:,:,:,2][TTstackedHits > 0] = 255
+
+  if returnAngles:
+    print "WARNING: Striation angle analysis is not yet available in 3D"
   
-
-
-
+  ### Save detection image
+  if tag:
+    util.Save3DImg(cImg,tag+'.tif')
 
   end = time.time()
-  print "Time for algorithm to run:",start-end,"seconds"
+  print "Time for algorithm to run:",end-start,"seconds"
   
+  return cImg
   
 
 def setupAnnotatedImage(annotatedName, baseImageName):

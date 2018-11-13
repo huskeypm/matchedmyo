@@ -28,7 +28,6 @@ def matchedFilter(
       ### TRYING OUT NEW CV2 CONVOLUTION CODE
       ###   This will eventually take over as default option since it is so much faster than in-house MF code
       h = cv2.filter2D(dimg,-1,daFilter)
-      return h
     else:
       # placeholder for 'noise' component (will refine later)
       fsC = np.ones(np.shape(dimg))
@@ -72,4 +71,4 @@ def matchedFilter(
       ## apply parsevals
       if parsevals:
         h *= 1/np.float(np.prod(np.shape(h)))
-      return h 
+  return h 
