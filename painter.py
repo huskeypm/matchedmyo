@@ -58,12 +58,12 @@ def correlateThresher(
       if type(i) == list:
         # This is 3D
         # pad/rotate filter
-        rFN = util.rotate3D(filterRef,i)
+        rFN = util.rotate3DArray_Nonhomogeneous(filterRef,i,inputs.scopeResolutions)
         inputs.mf = rFN
 
         # check to see if we need to rotate other matched filters for the detection
         if params['filterMode'] == 'punishmentFilter':
-          params['mfPunishmentRot'] = util.rotate3D(params['mfPunishment'].copy(),i)
+          params['mfPunishmentRot'] = util.rotate3DArray_Nonhomogeneous(params['mfPunishment'].copy(),i,inputs.scopeResolutions)
       else:
         # This is 2D
         # pad/rotate 
@@ -253,21 +253,26 @@ def paintME(myImg, myFilter1,  threshold = 190, cropper=[24,129,24,129],iters = 
 
 # Basically just finds a 'unit cell' sized area around each detection 
 # for the purpose of interpolating the data 
-def doLabel(result,dx=10,dy=None,dz=None,thresh=0):
+def doLabel(result,cellDimensions = [10, None, None],thresh=0):
   '''
   Finds a unit cell sized area around each detection. This serves to display more intuitive representations 
     of detections. This is for 2 and 3 dimensional data.
   
   Inputs:
-    result - class. Result class from bankDetect.DetectFilter(). result.stackedHits is where the detetions are stored.
-    dx, dy, dz - int. Measurement of the unit cell dimensions in the x, y, and z directions.
+    result -> class. Result class from bankDetect.DetectFilter(). result.stackedHits is where the detetions are stored.
+    cellDimensions -> list of ints. Measurement of the unit cell dimensions in the x, y, and z directions.
                    Specification of y and z is optional but should be specified for accurate results.
                    Specification of z only needed if image is 3D.
-    thresh - int or float. Threshold applied to result.stackedHits to determine where the hits are.
+    thresh -> int or float. Threshold applied to result.stackedHits to determine where the hits are.
 
   Outputs:
-    labeled - boolean array. The image with detections dilated according to unit cell size.
+    labeled -> boolean array. The image with detections dilated according to unit cell size.
   '''
+  if len(result.stackedHits.shape) == 3:
+    dx, dy, dz = cellDimensions
+  else:
+    dx, dy = cellDimensions
+
   ### Determine dimensions of unit cell if none are specified. If dy and dz are not specified, set equal to dx
   if dy == None:
     dy = dx
