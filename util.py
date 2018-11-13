@@ -477,7 +477,7 @@ def generate3DTTFilter(scopeResolutions, # [vx/um]
                        originalFilterName='./myoimages/newSimpleWTFilter.png',
                        originalPunishFilterName='./myoimages/newSimpleWTPunishmentFilter.png',
                        diameterTT = 0.2, # [um]
-                       filterZLength=3, # [um]
+                       #filterZLength=3, # [um]
                        ):
   '''
   This function generates a 3D filter for the detection of prototypical transverse tubules
@@ -487,7 +487,7 @@ def generate3DTTFilter(scopeResolutions, # [vx/um]
     originalFilterName - str. Name of the original TT filter we would like to extrude
     originalPunishFilterName - str. Name of the original TT punishment filter we would like to extrude
     diameterTT - float or int. Diameter of the typical transverse tubule in the animal model used in microns
-    filterZLength - float or int. Length of the output TT filter in microns.
+    #filterZLength - float or int. Length of the output TT filter in microns. NOT INCORPORATED YET
   '''
 
   ### Read in images
@@ -769,7 +769,7 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
     cell *= 65534
     cell = cell.astype(np.uint16)
     cell = np.moveaxis(cell, 2, 0)
-    tif.imsave(fileName,data=cell)
+    tifffile.imsave(fileName,data=cell)
     print "Wrote:",fileName
 #def generate3DFilter(originalFilterFileName,
 #                     numberZStacks):
