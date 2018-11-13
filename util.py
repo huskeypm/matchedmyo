@@ -84,6 +84,7 @@ def LoadFilter(fileName):
     This guarantees that no pixel in the filtered image will be above the local maximum of the filter.
     i.e. this is turning the read-in filter into a mean filter.
   '''
+  
   ### Read image using previous routine
   filterImg = ReadImg(fileName,cvtColor=True,renorm=True).astype(np.float64)
 
@@ -229,7 +230,7 @@ def embedSignal(img,mf,loc=None,scale=0.5):
 ###################################################################################################
 ###################################################################################################
 ###
-### Functions for Filter Generation
+### Functions for Image/Filter Generation
 ###
 ###################################################################################################
 ###################################################################################################
@@ -468,10 +469,308 @@ def determineZStacksFromResolution(zResolution, # [voxels/um]
                     Default value is .2 um
   '''
 
-  numZStacksNeeded = DiamterTT * zResolution
+  numZStacksNeeded = DiameterTT * zResolution
 
   return numZStacksNeeded
 
+def generate3DTTFilter(scopeResolutions, # [vx/um]
+                       originalFilterName='./myoimages/newSimpleWTFilter.png',
+                       originalPunishFilterName='./myoimages/newSimpleWTPunishmentFilter.png',
+                       diameterTT = 0.2, # [um]
+                       filterZLength=3, # [um]
+                       ):
+  '''
+  This function generates a 3D filter for the detection of prototypical transverse tubules
+  
+  Inputs:
+    scopeResolutions - list of values. List of the resolutions of the confocal microscope for x, y, and z
+    originalFilterName - str. Name of the original TT filter we would like to extrude
+    originalPunishFilterName - str. Name of the original TT punishment filter we would like to extrude
+    diameterTT - float or int. Diameter of the typical transverse tubule in the animal model used in microns
+    filterZLength - float or int. Length of the output TT filter in microns.
+  '''
+
+  ### Read in images
+  filt = LoadFilter(originalFilterName)
+  punishFilt = LoadFilter(originalPunishFilterName)
+
+  ### Stack the 2D filters to extrude them and form 3D filter
+  ###   Here we are extruding in what will be the x axis in the 3D filter, so we'll use that resolution
+  filt3D = np.stack((filt,filt),axis=2)
+  punishFilt3D = np.stack((punishFilt,punishFilt),axis=2)
+  numXStacks = int(round(diameterTT * scopeResolutions[0]))
+  if numXStacks > 1:
+    for i in range(numXStacks - 1):
+      filt3D = np.dstack((filt3D, filt))
+      punishFilt3D = np.dstack((punishFilt3D,punishFilt))
+
+  ### Rotate the 3D filters to orient them correctly
+  filt3D = pad3DArray(filt3D)
+  filt3D = rotate3DArray_Homogeneous(filt3D, angles=[0, 90, 0])
+  punishFilt3D = pad3DArray(punishFilt3D)
+  punishFilt3D = rotate3DArray_Homogeneous(punishFilt3D, angles=[0, 90, 0])
+  
+  ### Downsample the filters in the (new) z direction
+  zZoomOut = float(scopeResolutions[2]) / float(scopeResolutions[0])
+  zoomOut = [1., 1., zZoomOut]
+  filt3D = ndimage.zoom(filt3D,zoom=zoomOut)
+  punishFilt3D = ndimage.zoom(punishFilt3D, zoom=zoomOut)
+  
+  ### Save filters
+  Save3DImg(filt3D, 'TT_3D.tif')
+  Save3DImg(punishFilt3D, 'TT_Punishment_3D.tif')
+
+def generate3DLTFilter(scopeResolutions, # [vx/um]
+                       originalFilterName='./myoimages/newSimpleWTFilter.png',
+                       diameterTT = 0.2, # [um]
+                       filterZLength=3, # [um]
+                       ):
+  '''
+  This function generates a 3D filter for the detection of prototypical longitudinal tubules
+  
+  Inputs:
+    scopeResolutions - list of values. List of the resolutions of the confocal microscope for x, y, and z
+    originalFilterName - str. Name of the original TT filter we would like to extrude
+    originalPunishFilterName - str. Name of the original TT punishment filter we would like to extrude
+    diameterTT - float or int. Diameter of the typical transverse tubule in the animal model used in microns
+    filterZLength - float or int. Length of the output TT filter in microns.
+  '''
+  ### Read in images
+  filt = LoadFilter(originalFilterName)
+
+  ### Stack the 2D filters to extrude them and form 3D filter
+  ###   Here we are extruding in what will be the x axis in the 3D filter, so we'll use that resolution
+  filt3D = np.stack((filt,filt),axis=2)
+  numXStacks = int(round(diameterTT * scopeResolutions[0]))
+  for i in range(numXStacks - 1):
+    filt3D = np.stack((filt3D, filt),axis=2)
+
+  ### Rotate the 3D filters to orient them correctly
+  filt3D = rotate3DArray_Homogeneous(filt3D, angles=[0, 90, 0])
+
+  ### Downsample the filters in the (new) z direction
+  zZoomOut = float(scopeResolutions[2]) / float(scopeResolutions[0])
+  filt3D = ndimage.zoom(filt3D,zoom=zZoomOut)
+  
+  ### Save filters
+  Save3DImg(filt3D, 'LT_3D.tif')
+
+#def generate3DTAFilter(scopeResolutions, # [vx/um]
+#                       originalFilterName='./myoimages/newSimpleWTFilter.png',
+#                       diameterTT = 0.2, # [um]
+#                       filterZLength=3, # [um]
+#                       ):
+  
+
+def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
+                            FilterZStackSize = 5, # [vx] 
+                            unitCellSizeX = 10, # [vx] 
+                            TTradius = 3, # [vx] 
+                            scopeResolutions = [5,5,2], # [vx / um] 
+                            LT_probability = 0.1, 
+                            TA_probability = 0.1, 
+                            noiseType = 'additive',
+                            noiseDistribution = 'Guassian', 
+                            noiseAmplitude = 0.25, 
+                            cellDimensions = [25, 100, 20], # [um] 
+                            fileName = "simulatedData.tif",
+                            verbose=False):
+    '''
+    This function provides the workflow to generate a three dimensional cell based on probabilities of finding 
+      normal transverse tubules (TTs), longitudinal tubules (LTs), and regions of tubule absence (TA).
+      
+    Inputs:
+        FilterTwoSarcomereSize - int. Size of two sarcomeres of the simulated cell in voxels.
+        FilterZStackSize - int. Z-stack size of the filter to be tested. ARBITRARY for now
+            = 5 # [vx] Complete guess. TODO: tune this based on very light optimization
+        unitCellSizeX - int. Size of the unit cells in the x direction with which we construct the simulated cell.
+                          This can be tuned for longer filters.
+            = 10 # [vx] Arbitray. Currently setting it to the size of the TT filter
+        TTradius - int. Radius of the transverse tubules in the xy direction. This is resized for the z direction
+                     based on the provided resolutions.
+            = 3 # [vx] in TODO: Change to where it is specified in microns
+        scopeResolutions - list of values (can be ints, floats, etc). List of the x, y, and z resolutions in vx/um.
+            = [5,5,2] # [vx / um] These are placeholder values for now. Aparna said z res roughly 1/2 that of xy res
+        LT_probability - float between 0 and 1. Likelihood of finding a LT unit cell in the simulated cell.
+            = 0.1 # [% likelihood unit cell is LT]. Float bounded [0,1]
+        TA_probability - float between 0 and 1. Likelihood of finding a TA unit cell in the simulated cell.
+            = 0.1 # [% likelihood unit cell is TA]. Float bounded [0,1]. These two should add to be <= 1
+        # NOTE: TT probability is 1. - TA_probability - LT_probability
+        noiseType - str. Type of noise to be incorporated into the cell. This isn't incorporated yet but is left as an option for future 
+                      development.
+            = 'additive'
+        noiseDistribution - str. Distribution of the noise to be incorporated into the cell. This isn't incorporated yet but is left as an
+                              option for future development.
+            = 'Guassian' # these parameters are likely going to be the only ones considered
+        noiseAmplitude - float. Amplitude of the noise incorporated into the simulated cell.
+            = 0.25 # float. Amplitude of the noise
+        cellDimensions - list of values. Size of the simulated cell in x, y, and z directions in microns.
+            = [25, 100, 20] # [um] Size of the simulated cell in x, y, and z directions. Completely arbitrary right now. TODO find better estimates
+        fileName - str. Name of the output file. Must be a .tif file.
+            = "simulatedData.tif"
+            
+    Outputs:
+        None
+    '''
+    
+    ### 0. Check for errors in inputs
+    if LT_probability + TA_probability > 1.0:
+        raise RuntimeError("The combined probability of finding LT and TA in the cell has been specified to be above 100%. Decrease LT_probability and/or TA_probability")
+    
+    ### 1. Find the Number of Unit Cells Within the Simulated Cell
+    ## find unit cell size
+    unitCellVoxels = [None, None, None]
+    unitCellVoxels[0] = unitCellSizeX
+    unitCellVoxels[1] = int(np.floor(FilterTwoSarcomereSize / 2.))
+    unitCellVoxels[2] = FilterZStackSize
+
+    ## count number of voxels in each dimension based on specified cell size and scope resolution
+    numVoxelsInDimension = []
+    for i in range(3):
+        value = int(np.floor(float(cellDimensions[i]) * float(scopeResolutions[i])))
+        numVoxelsInDimension.append(value)
+
+
+    ## count the number of unit cells in each dimension
+    numUnitCellsInDimension = []
+    for i in range(3):
+        numUnitCellsInDimension.append(int(np.floor(float(numVoxelsInDimension[i]) / float(unitCellVoxels[i]))))
+
+    ## amend the number of voxels in each dimension since we may have to clip some voxels based on unit cell size
+    for i in range(3):
+        numVoxelsInDimension[i] = int(np.floor(numUnitCellsInDimension[i] * unitCellVoxels[i]))
+
+    for i in range(3):
+        print "Final truncated cell size in {} dimension: {} [um]".format(i, float(numVoxelsInDimension[i])/float(scopeResolutions[i]))
+        print "Number of unit cells in {} dimension: {}".format(i, numUnitCellsInDimension[i])
+
+    print "Total number of unit cells: {}".format(np.prod(numUnitCellsInDimension))
+    
+    ## construct the cell
+    cell = np.zeros(
+        (
+            numVoxelsInDimension[0],
+            numVoxelsInDimension[1],
+            numVoxelsInDimension[2]
+        ),
+        dtype = np.float
+    )
+    
+    ### 2. Define The Unit Cells to Assign in the Cell
+    TTcell = np.zeros(
+        (
+            unitCellVoxels[0],
+            unitCellVoxels[1],
+            unitCellVoxels[2]
+        ),
+        dtype = np.float
+    )
+
+    TAcell = np.zeros(
+        (
+            unitCellVoxels[0],
+            unitCellVoxels[1],
+            unitCellVoxels[2]
+        ),
+        dtype = np.float
+    )
+
+    unitCellMidPoint = [
+        int(np.floor(float(unitCellVoxels[0]) / 2.)),
+        int(np.floor(float(unitCellVoxels[1]) / 2.)),
+        int(np.floor(float(unitCellVoxels[2]) / 2.))
+    ]
+
+    TTcell[
+        unitCellMidPoint[0] - TTradius:unitCellMidPoint[0] + TTradius, 
+        unitCellMidPoint[1] - TTradius:unitCellMidPoint[1] + TTradius,
+        :
+    ] = 1.
+
+    ## The longitudinal cell just consists of two regular TT elements that are joined by a middle tubule branch.
+    ##   So we can just join together two TT cells and join them to form a LT cell
+    LTcell = np.concatenate((TTcell,TTcell),axis=1)
+    TTradius_z = int(np.floor(TTradius * float(scopeResolutions[2]) / float(scopeResolutions[0])))
+
+    LTcell[
+        unitCellMidPoint[0] - TTradius : unitCellMidPoint[0] + TTradius,
+        unitCellMidPoint[1] : unitCellMidPoint[1] + unitCellVoxels[1],
+        unitCellMidPoint[2] - TTradius_z : unitCellMidPoint[2] + TTradius_z
+    ] = 1.
+    
+    ### 3. Loop Through Cell and Assign Unit Cells to Chunks
+    i = 0; j = 0; k = 0
+    while i < numUnitCellsInDimension[0]:
+        k = 0
+        while k < numUnitCellsInDimension[2]:
+            j = 0
+            while j < numUnitCellsInDimension[1]:
+                #print i,j,k
+                location = [
+                    i * unitCellVoxels[0],
+                    j * unitCellVoxels[1],
+                    k * unitCellVoxels[2]
+                ]
+
+                # Get a random number to determine which unit cell to place
+                randNum = np.random.random()
+
+                # Determine which unit cell we will place in the position
+                if randNum < TA_probability:
+                    # we don't actually have to do anything for TA since the unit cell is already zero. Increment j by 2.
+                    j += 2
+                elif randNum > TA_probability and randNum < TA_probability + LT_probability:
+                    # check to see if there is room to stick the LT unit cell since it is twice as large as the others
+                    try:
+                        cell[
+                            location[0]:location[0]+unitCellVoxels[0],
+                            location[1]:location[1]+2*unitCellVoxels[1],
+                            location[2]:location[2]+unitCellVoxels[2]
+                        ] = LTcell
+                        j += 2
+                    except:
+                        if verbose:
+                            print "There is not enough room to place the LT unit cell. Setting this as TA for now"
+                        j += 1
+                else:
+                    # Try to stick in two TT unit cells. If we can't do that, we've hit the edge of the cell
+                    cell[
+                        location[0]:location[0]+unitCellVoxels[0],
+                        location[1]:location[1]+unitCellVoxels[1],
+                        location[2]:location[2]+unitCellVoxels[2]
+                    ] = TTcell
+                    j += 1
+                    try:
+                        cell[
+                            location[0]:location[0]+unitCellVoxels[0],
+                            location[1]+unitCellVoxels[1]:location[1]+2*unitCellVoxels[1],
+                            location[2]:location[2]+unitCellVoxels[2]
+                        ] = TTcell
+                        j += 1
+                    except:
+                        if verbose:
+                            print "Attempted to insert two TT unit cells but could not do to cell boundary. Setting as single TT unit cell for now."
+            k += 1
+        i += 1
+    
+    ### 4. Add in the noise
+    imgNoise = np.random.rand(
+        numVoxelsInDimension[0],
+        numVoxelsInDimension[1],
+        numVoxelsInDimension[2]
+    ) * noiseAmplitude 
+    cell *= (np.max(cell) - noiseAmplitude) / np.max(cell)
+    #print np.max(cell)
+    #print np.min(cell)
+    cell = cell + imgNoise
+    
+    ### 5. Convert to Format That Can Be Saved and Save
+    ## rescale to 16 bit int
+    cell *= 65534
+    cell = cell.astype(np.uint16)
+    cell = np.moveaxis(cell, 2, 0)
+    tif.imsave(fileName,data=cell)
+    print "Wrote:",fileName
 #def generate3DFilter(originalFilterFileName,
 #                     numberZStacks):
 

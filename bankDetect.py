@@ -25,6 +25,15 @@ def DetectFilter(
   filterMode=None,
   returnAngles=False,
 ):
+  '''
+  For a single matched filter, this function iterates over passed-in angles
+    and reports highest correlation output for each iteration.
+
+  Inputs:
+    inputs -> Class containing inputs of test data and matched filter
+    paramDict -> Parameter dictionary
+    iters -> Rotations over which matched filter will be tested.
+  '''
 
   if inputs is None:
     raise RuntimeError("PLACEHOLDER TO REMIND ONE TO USE INPUT/PARAMDICT OBJECTS")
