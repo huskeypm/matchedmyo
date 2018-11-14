@@ -124,16 +124,13 @@ def measureFilterDimensions(grayFilter):
   rectangle around the filter. To be used in conjunction with the 
   pasteFilters flag in DataSet
   '''
-  #filtery,filterx = np.shape(grayFilter)
   ### Measure shape of filter
   filterShape = np.shape(grayFilter)
-  print filterShape
 
   ### For each axis, determine the amount of padding in each direction and subtract that from the measured dimensions
   newDimLengths = []
   for i,dimLength in enumerate(filterShape):
     otherAxes = np.delete(np.arange(len(filterShape)),i)
-    print otherAxes
        
     collapsedDim = np.sum(grayFilter,axis=tuple(otherAxes))
     
@@ -144,19 +141,7 @@ def measureFilterDimensions(grayFilter):
 
     ## Find actual filter dimensions (minus padding)
     newDimLengths.append(dimLength - previousPadding - afterPadding)
-
-
-  #collapsedRows = np.sum(grayFilter,0)
-  #leftPadding = np.argmax(collapsedRows>0)
-  #rightPadding = np.argmax(collapsedRows[::-1]>0)
-  #numRows = filtery - leftPadding - rightPadding
-
-  #collapsedCols = np.sum(grayFilter,1)
-  #topPadding = np.argmax(collapsedCols>0)
-  #bottomPadding = np.argmax(collapsedCols[::-1]>0)
-  #numCols = filterx - topPadding - bottomPadding
-
-  #print "filter y,x:",numRows,numCols
+  print "Filter Dimensions:",newDimLengths
 
   return newDimLengths
 
@@ -476,6 +461,11 @@ def saveAllMyo():
       saveFixedPunishmentFilter()
       saveSingleTTFilter()
       saveSingleTTPunishmentFilter()
+      scopeResolutions = [10,10,5]
+      print "WARNING: This is generating 3D filters with an assumed scope resolution of xy = 10 vx/um and z = 5 vx/um."
+      generate3DTTFilter(scopeResolutions)
+      generate3DLTFilter(scopeResolutions)
+      generate3DTAFilter(scopeResolutions)
 
 def determineZStacksFromResolution(zResolution, # [voxels/um]
                                    DiameterTT=.2 # [um]
@@ -552,9 +542,9 @@ def generate3DTTFilter(scopeResolutions, # [vx/um]
   Save3DImg(punishFilt3D, './myoimages/TT_Punishment_3D.tif')
 
 def generate3DLTFilter(scopeResolutions, # [vx/um]
-                       originalFilterName='./myoimages/newSimpleWTFilter.png',
+                       originalFilterName='./myoimages/LongitudinalFilter.png',
                        diameterTT = 0.2, # [um]
-                       filterZLength=3, # [um]
+                       #filterZLength=3, # [um]
                        ):
   '''
   This function generates a 3D filter for the detection of prototypical longitudinal tubules
@@ -564,7 +554,7 @@ def generate3DLTFilter(scopeResolutions, # [vx/um]
     originalFilterName - str. Name of the original TT filter we would like to extrude
     originalPunishFilterName - str. Name of the original TT punishment filter we would like to extrude
     diameterTT - float or int. Diameter of the typical transverse tubule in the animal model used in microns
-    filterZLength - float or int. Length of the output TT filter in microns.
+    #filterZLength - float or int. Length of the output TT filter in microns.
   '''
   ### Read in images
   filt = LoadFilter(originalFilterName)
@@ -573,25 +563,71 @@ def generate3DLTFilter(scopeResolutions, # [vx/um]
   ###   Here we are extruding in what will be the x axis in the 3D filter, so we'll use that resolution
   filt3D = np.stack((filt,filt),axis=2)
   numXStacks = int(round(diameterTT * scopeResolutions[0]))
-  for i in range(numXStacks - 1):
-    filt3D = np.stack((filt3D, filt),axis=2)
+  if numXStacks > 1:
+    for i in range(numXStacks - 1):
+      filt3D = np.dstack((filt3D, filt))
 
   ### Rotate the 3D filters to orient them correctly
+  filt3D = pad3DArray(filt3D)
   filt3D = rotate3DArray_Homogeneous(filt3D, angles=[0, 90, 0])
-
+  
   ### Downsample the filters in the (new) z direction
   zZoomOut = float(scopeResolutions[2]) / float(scopeResolutions[0])
-  filt3D = ndimage.zoom(filt3D,zoom=zZoomOut)
+  zoomOut = [1., 1., zZoomOut]
+  filt3D = ndimage.zoom(filt3D,zoom=zoomOut)
+
+  ### Threshold the filter to get rid of rotation numerical artifacts
+  filt3DMean = np.mean(filt3D)
+  filt3DMax = np.max(filt3D)
+  filt3D[filt3D > filt3DMean] = filt3DMax
+  filt3D[filt3D < filt3DMean] = 0
   
   ### Save filters
-  Save3DImg(filt3D, 'LT_3D.tif')
+  Save3DImg(filt3D, './myoimages/LT_3D.tif')
 
-#def generate3DTAFilter(scopeResolutions, # [vx/um]
-#                       originalFilterName='./myoimages/newSimpleWTFilter.png',
-#                       diameterTT = 0.2, # [um]
-#                       filterZLength=3, # [um]
-#                       ):
+def generate3DTAFilter(scopeResolutions, # [vx/um]
+                       originalFilterName='./myoimages/LossFilter.png',
+                       lengthTARegion = 0.4, # [um]
+                       filterZLength=3, # [um]
+                       ):
+  '''
+  This function generates a 3D filter for the detection of prototypical longitudinal tubules
   
+  Inputs:
+    scopeResolutions - list of values. List of the resolutions of the confocal microscope for x, y, and z
+    originalFilterName - str. Name of the original TT filter we would like to extrude
+    originalPunishFilterName - str. Name of the original TT punishment filter we would like to extrude
+    lengthTARegion - float or int. Necessary length of missing TT structure needed to be considered a tubule absence region
+    #filterZLength - float or int. Length of the output TT filter in microns.
+  '''
+  ### Read in images
+  filt = LoadFilter(originalFilterName)
+
+  ### Stack the 2D filters to extrude them and form 3D filter
+  ###   Here we are extruding in what will be the x axis in the 3D filter, so we'll use that resolution
+  filt3D = np.stack((filt,filt),axis=2)
+  _,numXStacks = measureFilterDimensions(filt)
+  #numXStacks = int(round(lengthTARegion * scopeResolutions[0]))
+  for i in range(numXStacks - 1):
+    filt3D = np.dstack((filt3D, filt))
+  
+  ### Rotate the 3D filters to orient them correctly
+  filt3D = pad3DArray(filt3D)
+  filt3D = rotate3DArray_Homogeneous(filt3D, angles=[0, 90, 0])
+  '''
+  ### Downsample the filters in the (new) z direction
+  zZoomOut = float(scopeResolutions[2]) / float(scopeResolutions[0])
+  zoomOut = [1., 1., zZoomOut]
+  filt3D = ndimage.zoom(filt3D,zoom=zoomOut)
+  '''
+  ### Threshold the filter to get rid of rotation numerical artifacts
+  filt3DMean = np.mean(filt3D)
+  filt3DMax = np.max(filt3D)
+  filt3D[filt3D > filt3DMean] = filt3DMax
+  filt3D[filt3D < filt3DMean] = 0
+  
+  ### Save filters
+  Save3DImg(filt3D, './myoimages/TA_3D.tif')  
 
 def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
                             FilterZStackSize = 5, # [vx] 
@@ -1203,6 +1239,12 @@ if __name__ == "__main__":
       quit()
     elif(arg=="-genPunishment"):
       saveFixedPunishmentFilter()
+      quit()
+    elif(arg=="-genAll3DFilters"):
+      scopeResolutions = [10,10,5]
+      generate3DTTFilter(scopeResolutions)
+      generate3DLTFilter(scopeResolutions)
+      generate3DTAFilter(scopeResolutions)
       quit()
     elif(arg=="-genAllMyo"): 
       saveAllMyo()
