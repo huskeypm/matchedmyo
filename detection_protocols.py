@@ -219,7 +219,9 @@ def regionalDeviation(inputs,paramDict):
   q = np.square(img)
   q = mF.matchedFilter(q, kernel,parsevals=False,demean=paramDict['demeanMF'])
   stdDev = np.sqrt( np.divide((q-np.divide(np.square(s),n)),n-1)) 
- 
+  ## if s^2/n > q, we get NaN, so we can just convert that to zero here
+  stdDev = np.nan_to_num(stdDev)
+
   ### Find common hits
   stdDevHits = stdDev < paramDict['stdDevThresh']
   if paramDict['inverseSNR'] == False:

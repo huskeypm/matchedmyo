@@ -1097,25 +1097,43 @@ def markPastedFilters(
   WTholder.stackedHits = wtMasked
 
   ### load in filters to get filter dimensions
-  lossFilt = util.LoadFilter(lossName)
-  ltFilt = util.LoadFilter(ltName)
-  wtFilt = util.LoadFilter(wtName)
+  if lossName:
+    lossFilt = util.LoadFilter(lossName)
+  if ltName:
+    ltFilt = util.LoadFilter(ltName)
+  if wtName:
+    wtFilt = util.LoadFilter(wtName)
 
   ### get filter dimensions
-  lossDimensions = util.measureFilterDimensions(lossFilt)
-  LTDimensions = util.measureFilterDimensions(ltFilt)
-  WTDimensions = util.measureFilterDimensions(wtFilt)
+  if lossName:
+    lossDimensions = util.measureFilterDimensions(lossFilt)
+  if ltName:
+    LTDimensions = util.measureFilterDimensions(ltFilt)
+  if wtName:
+    WTDimensions = util.measureFilterDimensions(wtFilt)
 
   ### we want to mark WT last since that should be the most stringent
   # Opting to mark Loss, then Long, then WT
-  labeledLoss = painter.doLabel(Lossholder,cellDimensions=lossDimensions,thresh=254)
-  labeledLT = painter.doLabel(LTholder,cellDimensions=LTDimensions,thresh=254)
-  labeledWT = painter.doLabel(WTholder,cellDimensions=WTDimensions,thresh=254)
+  if lossName:
+    labeledLoss = painter.doLabel(Lossholder,cellDimensions=lossDimensions,thresh=0)
+  if ltName:
+    labeledLT = painter.doLabel(LTholder,cellDimensions=LTDimensions,thresh=0)
+  if wtName:
+    labeledWT = painter.doLabel(WTholder,cellDimensions=WTDimensions,thresh=0)
 
   ### perform masking
-  WTmask = labeledWT.copy()
-  LTmask = labeledLT.copy()
-  Lossmask = labeledLoss.copy()
+  if lossName:
+    Lossmask = labeledLoss.copy()
+  else:
+    Lossmask = Lossholder.stackedHits > np.inf
+  if ltName:
+    LTmask = labeledLT.copy()
+  else:
+    LTmask = LTholder.stackedHits > np.inf
+  if wtName:
+    WTmask = labeledWT.copy()
+  else:
+    WTmask = WTholder.stackedHits > np.inf
 
   WTmask[labeledLoss] = False
   WTmask[labeledLT] = False
@@ -1125,7 +1143,7 @@ def markPastedFilters(
   ### Dampen brightness
   alpha = 1.0
   hitValue = int(round(alpha * 255))
-  if len(cI.shape) == 3:
+  if len(cI.shape) == 4:
     cI[:,:,:,0][Lossmask] = hitValue
     cI[:,:,:,1][LTmask] = hitValue
     cI[:,:,:,2][WTmask] = hitValue
@@ -1140,25 +1158,33 @@ def markPastedFilters(
 def WT_Filtering(inputs,
                  iters,
                  ttFilterName,
-                 wtPunishFilterName,
+                 ttPunishFilterName,
                  ttThresh=None,
-                 wtGamma=None,
+                 ttGamma=None,
                  returnAngles=False):
   '''
   Takes inputs class that contains original image and performs WT filtering on the image
   '''
+  print "TT Filtering"
+  start = time.time()
+
+  ### Specify necessary inputs
   ttFilter = util.LoadFilter(ttFilterName)
   inputs.mfOrig = ttFilter
   WTparams = optimizer.ParamDict(typeDict='WT')
   WTparams['covarianceMatrix'] = np.ones_like(inputs.imgOrig)
-  WTparams['mfPunishment'] = util.LoadFilter(wtPunishFilterName)
+  WTparams['mfPunishment'] = util.LoadFilter(ttPunishFilterName)
   WTparams['useGPU'] = inputs.useGPU
   if ttThresh != None:
     WTparams['snrThresh'] = ttThresh
-  if wtGamma != None:
-    WTparams['gamma'] = wtGamma
-  print "WT Filtering"
+  if ttGamma != None:
+    WTparams['gamma'] = ttGamma
+
+  ### Perform filtering
   WTresults = bD.DetectFilter(inputs,WTparams,iters,returnAngles=returnAngles)  
+
+  end = time.time()
+  print "Time for WT filtering to complete:",end-start,"seconds"
 
   return WTresults
 
@@ -1174,6 +1200,9 @@ def LT_Filtering(inputs,
   '''
 
   print "LT filtering"
+  start = time.time()
+
+  ### Specify necessary inputs
   inputs.mfOrig = util.LoadFilter(ltFilterName)
   LTparams = optimizer.ParamDict(typeDict='LT')
   if ltThresh != None:
@@ -1181,7 +1210,12 @@ def LT_Filtering(inputs,
   if ltStdThresh != None:
     LTparams['stdDevThresh'] = ltStdThresh
   LTparams['useGPU'] = inputs.useGPU
+
+  ### Perform filtering
   LTresults = bD.DetectFilter(inputs,LTparams,iters,returnAngles=returnAngles)
+
+  end = time.time()
+  print "Time for LT filtering to complete:",end-start,"seconds"
 
   return LTresults
 
@@ -1195,7 +1229,10 @@ def Loss_Filtering(inputs,
   '''
   Takes inputs class that contains original image and performs Loss filtering on the image
   '''
-  print "Loss filtering"
+  print "TA filtering"
+  start = time.time()
+
+  ### Specify necessary inputs
   inputs.mfOrig = util.LoadFilter(lossFilterName)
   Lossparams = optimizer.ParamDict(typeDict='Loss')
   Lossparams['useGPU'] = inputs.useGPU
@@ -1207,7 +1244,12 @@ def Loss_Filtering(inputs,
     Lossparams['snrThresh'] = lossThresh
   if lossStdThresh != None:
     Lossparams['stdDevThresh'] = lossStdThresh
+
+  ### Perform filtering
   Lossresults = bD.DetectFilter(inputs,Lossparams,Lossiters,returnAngles=returnAngles)
+
+  end = time.time()
+  print "Time for TA filtering to complete:",end-start,"seconds"
 
   return Lossresults
 
@@ -1234,7 +1276,7 @@ def giveMarkedMyocyte(
       fileExtension=".pdf"
       ):
   '''
-  This function is the main workhorse for the detetion of features in 2D myocytes.
+  This function is the main workhorse for the detection of features in 2D myocytes.
     See give3DMarkedMyocyte() for better documentation.
     TODO: Better document this
   '''
@@ -1251,21 +1293,42 @@ def giveMarkedMyocyte(
 
   ### WT filtering
   if ttFilterName != None:
-    WTresults = WT_Filtering(inputs,iters,ttFilterName,wtPunishFilterName,ttThresh,wtGamma,returnAngles)
+    WTresults = WT_Filtering(
+      inputs = inputs,
+      iters = iters,
+      ttFilterName = ttFilterName,
+      ttPunishFilterName = wtPunishFilterName,
+      ttThresh = ttThresh,
+      ttGamma = wtGamma,
+      returnAngles = returnAngles
+    )
     WTstackedHits = WTresults.stackedHits
   else:
     WTstackedHits = np.zeros_like(inputs.imgOrig)
 
   ### LT filtering
   if ltFilterName != None:
-    LTresults = LT_Filtering(inputs,iters,ltFilterName,ltThresh,ltStdThresh,returnAngles)
+    LTresults = LT_Filtering(
+      inputs = inputs,
+      iters = iters,
+      ltFilterName = ltFilterName,
+      ltThresh = ltThresh,
+      ltStdThresh = ltStdThresh,
+      returnAngles = returnAngles
+    )
     LTstackedHits = LTresults.stackedHits
   else:
     LTstackedHits = np.zeros_like(inputs.imgOrig)
 
   ### Loss filtering
   if lossFilterName != None:
-    Lossresults = Loss_Filtering(inputs,lossFilterName,lossThresh,lossStdThresh,returnAngles)
+    Lossresults = Loss_Filtering(
+      inputs=inputs,
+      lossFilterName = lossFilterName,
+      lossThresh = lossThresh,
+      lossStdThresh = lossStdThresh,
+      returnAngles = returnAngles
+    )
     LossstackedHits = Lossresults.stackedHits
   else:
     LossstackedHits = np.zeros_like(inputs.imgOrig)
@@ -1453,7 +1516,7 @@ def give3DMarkedMyocyte(
 
   ### Read in preprocessed test image and store in inputs class for use in all subroutines
   inputs = empty()
-  inputs.imgOrig = util.ReadImg(testImage)
+  inputs.imgOrig = util.ReadImg(testImage,renorm=True)
   inputs.useGPU = False
   inputs.scopeResolutions = scopeResolutions
 
@@ -1489,6 +1552,9 @@ def give3DMarkedMyocyte(
                                lossStdThresh=lossStdThresh,
                                returnAngles=returnAngles)
     TAstackedHits = TAresults.stackedHits
+    print np.max(TAstackedHits)
+    print np.min(TAstackedHits)
+    util.Save3DImg(TAstackedHits,'TAstackedHits.tif')
   else:
     TAstackedHits = np.zeros_like(inputs.imgOrig)
 
@@ -1513,16 +1579,34 @@ def give3DMarkedMyocyte(
                              LTstackedHits,
                              TTstackedHits,
                              cImg,
-                             wtName = './myoimages/TT_3D.tif')
+                             wtName = ttFilterName,
+                             ltName = ltFilterName,
+                             lossName = taFilterName)
   else:
     ## Just mark exactly where detection is instead of pasting until cells on detections
     cImg[:,:,:,0][TAstackedHits > 0] = 255
     cImg[:,:,:,1][LTstackedHits > 0] = 255
     cImg[:,:,:,2][TTstackedHits > 0] = 255
 
+  ### Determine percentages of volume represented by each filter
+  cellVolume = np.float(np.product(inputs.imgOrig.shape))
+  taContent = np.float(np.sum(cImg[:,:,:,0] == 255)) / cellVolume
+  ltContent = np.float(np.sum(cImg[:,:,:,1] == 255)) / cellVolume
+  ttContent = np.float(np.sum(cImg[:,:,:,2] == 255)) / cellVolume
+
+  print "TA Content:", taContent
+  print "LT Content:", ltContent
+  print "TT Content:", ttContent
+
   if returnAngles:
     print "WARNING: Striation angle analysis is not yet available in 3D"
   
+  #print "WARNING: TEMPORARILY PASTING FILTERS ONTO IMAGE"
+  #filt = util.LoadFilter(ltFilterName)
+  #filt /= np.max(filt)
+  #filt *= 255
+  #cImg = util.PasteFilter(cImg,filt)
+
   ### Save detection image
   if tag:
     util.Save3DImg(cImg,tag+'.tif')

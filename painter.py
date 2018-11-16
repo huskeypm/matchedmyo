@@ -59,16 +59,21 @@ def correlateThresher(
         # This is 3D
         # pad/rotate filter
         rFN = util.rotate3DArray_Nonhomogeneous(filterRef,i,inputs.scopeResolutions)
+        # Depad the array to reduce computational expense
+        rFN = util.autoDepadArray(rFN)
         inputs.mf = rFN
 
         # check to see if we need to rotate other matched filters for the detection
         if params['filterMode'] == 'punishmentFilter':
           params['mfPunishmentRot'] = util.rotate3DArray_Nonhomogeneous(params['mfPunishment'].copy(),i,inputs.scopeResolutions)
+          params['mfPunishmentRot'] = util.autoDepadArray(params['mfPunishmentRot'])
       else:
         # This is 2D
         # pad/rotate 
         params['angle'] = i
         rFN = util.PadRotate(filterRef,i)  
+        # Depad the array to reduce computational expense
+        rFN = util.autoDepadArray(rFN)
         inputs.mf = rFN  
 
         # check for other matched filters
@@ -276,20 +281,24 @@ def doLabel(result,cellDimensions = [10, None, None],thresh=0):
   ### Determine dimensions of unit cell if none are specified. If dy and dz are not specified, set equal to dx
   if dy == None:
     dy = dx
-  if dz == None and len(result.stackedHits.shape) == 3:
-    dz = dx
+  if len(result.stackedHits.shape) == 3:
+    if dz == None:
+      dz = dx
   
   ### Determine where hits are present in stackedHits based on threshold
   img =result.stackedHits > thresh
 
   ### Construct kernel the size of the unit cell
   if len(result.stackedHits.shape) == 3:
-    kernel = np.ones((dy,dx,dz),np.float32)/(float(dy*dx*dz))
+    kernel = np.ones((dx,dy,dz),np.float32)/(float(dy*dx*dz))
   else:
-    kernel = np.ones((dy,dx),np.float32)/(float(dy*dx))
+    kernel = np.ones((dx,dy),np.float32)/(float(dy*dx))
   
   ### Perform convolution to determine where kernel overlaps with detection
-  filtered = signal.convolve2d(img, kernel, mode='same') / np.sum(kernel)
+  if len(result.stackedHits.shape) == 3:
+    filtered = ndimage.convolve(img.astype(float), kernel) / np.sum(kernel)
+  else:
+    filtered = signal.convolve2d(img, kernel, mode='same') / np.sum(kernel)
 
   ### Perform boolean operation to pull out all dilated hits
   labeled = filtered > 0

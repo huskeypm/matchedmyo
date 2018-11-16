@@ -50,7 +50,6 @@ def DetectFilter(
             ziters=iters
             )
     # since routine gives correlated > 0 for snr > snrThresh then all nonzero correlated pixels are hits
-    print paramDict['inverseSNR']
     if paramDict['inverseSNR']:
       result.stackedHits[result.stackedHits > paramDict['snrThresh']] = 0.
     else:
@@ -66,7 +65,7 @@ def DetectFilter(
        label=label,
        )
 
-      # stack hits to form 'total field' of hits
+    # stack hits to form 'total field' of hits
     if returnAngles:
       result.stackedHits, result.stackedAngles = painter.StackHits(
                   result.correlated,paramDict,iters,display=display,returnAngles=returnAngles)

@@ -109,8 +109,8 @@ def Save3DImg(img, fileName):
   ### Roll the third axis to the first position
   dummyImg = np.moveaxis(img,source=2,destination=0)
 
-  ### Convert to 32 bit float format since ImageJ can't handle 64 bit
-  if dummyImg.dtype == np.float64:
+  ### Convert to 16 bit float format since ImageJ can't handle 64 or 32 bit
+  if dummyImg.dtype == np.float64: #or dummyImg.dtype == np.float32:
     dummyImg = dummyImg.astype(np.float32)
 
   ### Write image
@@ -118,32 +118,44 @@ def Save3DImg(img, fileName):
 
   print "Wrote file to:",fileName
 
-def measureFilterDimensions(grayFilter):
+def measureFilterDimensions(grayFilter,returnFilterPaddingLocations=False,verbose=False,epsilon = 1e-8):
   '''
   Measures where the filter has any data and returns a minimum bounding
   rectangle around the filter. To be used in conjunction with the 
   pasteFilters flag in DataSet
+
+  epsilon -> float. Value that we determine that no information is present within the array. This is to deal with numerical artifacts.
   '''
   ### Measure shape of filter
   filterShape = np.shape(grayFilter)
 
   ### For each axis, determine the amount of padding in each direction and subtract that from the measured dimensions
   newDimLengths = []
+  if returnFilterPaddingLocations:
+    paddingLocs = []
   for i,dimLength in enumerate(filterShape):
     otherAxes = np.delete(np.arange(len(filterShape)),i)
        
     collapsedDim = np.sum(grayFilter,axis=tuple(otherAxes))
     
     ## Measure padding before the filter in this dimension
-    previousPadding = np.argmax(collapsedDim > 0)
+    previousPadding = np.argmax(collapsedDim > epsilon)
     ## Measure padding after the filter in this dimension
-    afterPadding = np.argmax(collapsedDim[::-1] > 0)
+    afterPadding = np.argmax(collapsedDim[::-1] > epsilon)
 
     ## Find actual filter dimensions (minus padding)
     newDimLengths.append(dimLength - previousPadding - afterPadding)
-  print "Filter Dimensions:",newDimLengths
 
-  return newDimLengths
+    if returnFilterPaddingLocations:
+      paddingLocs.append([previousPadding,afterPadding])
+
+  if verbose:
+    print "Filter Dimensions:",newDimLengths
+
+  if returnFilterPaddingLocations:
+    return newDimLengths, paddingLocs
+  else:
+    return newDimLengths
 
 def viewer(tensor):
   '''
@@ -214,7 +226,13 @@ def PasteFilter(img, filt):
     
   myImg = img.copy()
   filtDim = np.shape(filt)
-  myImg[:filtDim[0],:filtDim[1]] = filt
+  if len(myImg.shape) == 4:
+    for i in range(myImg.shape[-1]):
+      myImg[:filtDim[0],:filtDim[1],:filtDim[2],i] = filt
+  elif len(myImg.shape) == 3:
+    myImg[:filtDim[0],:filtDim[1],:filtDim[2]] = filt
+  else:
+    myImg[:filtDim[0],:filtDim[1]] = filt
   return myImg
 
 # Embegs signal into known image for testing 
@@ -529,17 +547,17 @@ def generate3DTTFilter(scopeResolutions, # [vx/um]
 
   ### Threshold the filter to get rid of rotation numerical artifacts
   filt3DMean = np.mean(filt3D)
-  filt3DMax = np.max(filt3D)
-  filt3D[filt3D > filt3DMean] = filt3DMax
+  #filt3DMax = np.max(filt3D)
+  filt3D[filt3D > filt3DMean] = 1.
   filt3D[filt3D < filt3DMean] = 0
   punishFilt3DMean = np.mean(punishFilt3D)
-  punishFilt3DMax = np.max(punishFilt3D)
-  punishFilt3D[punishFilt3D > punishFilt3DMean] = punishFilt3DMax
+  #punishFilt3DMax = np.max(punishFilt3D)
+  punishFilt3D[punishFilt3D > punishFilt3DMean] = 1.
   punishFilt3D[punishFilt3D < punishFilt3DMean] = 0
   
   ### Save filters
-  Save3DImg(filt3D, './myoimages/TT_3D.tif')
-  Save3DImg(punishFilt3D, './myoimages/TT_Punishment_3D.tif')
+  Save3DImg(filt3D.astype(np.uint16), './myoimages/TT_3D.tif')
+  Save3DImg(punishFilt3D.astype(np.uint16), './myoimages/TT_Punishment_3D.tif')
 
 def generate3DLTFilter(scopeResolutions, # [vx/um]
                        originalFilterName='./myoimages/LongitudinalFilter.png',
@@ -578,17 +596,16 @@ def generate3DLTFilter(scopeResolutions, # [vx/um]
 
   ### Threshold the filter to get rid of rotation numerical artifacts
   filt3DMean = np.mean(filt3D)
-  filt3DMax = np.max(filt3D)
-  filt3D[filt3D > filt3DMean] = filt3DMax
+  #filt3DMax = np.max(filt3D)
+  filt3D[filt3D > filt3DMean] = 1.
   filt3D[filt3D < filt3DMean] = 0
   
   ### Save filters
-  Save3DImg(filt3D, './myoimages/LT_3D.tif')
+  Save3DImg(filt3D.astype(np.uint16), './myoimages/LT_3D.tif')
 
 def generate3DTAFilter(scopeResolutions, # [vx/um]
                        originalFilterName='./myoimages/LossFilter.png',
-                       lengthTARegion = 0.4, # [um]
-                       filterZLength=3, # [um]
+                       lengthTARegion = 0.8, # [um]
                        ):
   '''
   This function generates a 3D filter for the detection of prototypical longitudinal tubules
@@ -598,7 +615,6 @@ def generate3DTAFilter(scopeResolutions, # [vx/um]
     originalFilterName - str. Name of the original TT filter we would like to extrude
     originalPunishFilterName - str. Name of the original TT punishment filter we would like to extrude
     lengthTARegion - float or int. Necessary length of missing TT structure needed to be considered a tubule absence region
-    #filterZLength - float or int. Length of the output TT filter in microns.
   '''
   ### Read in images
   filt = LoadFilter(originalFilterName)
@@ -614,20 +630,24 @@ def generate3DTAFilter(scopeResolutions, # [vx/um]
   ### Rotate the 3D filters to orient them correctly
   filt3D = pad3DArray(filt3D)
   filt3D = rotate3DArray_Homogeneous(filt3D, angles=[0, 90, 0])
-  '''
+  
   ### Downsample the filters in the (new) z direction
-  zZoomOut = float(scopeResolutions[2]) / float(scopeResolutions[0])
-  zoomOut = [1., 1., zZoomOut]
+  #zZoomOut = float(scopeResolutions[2]) / float(scopeResolutions[0])
+  _,_,currentZLength = measureFilterDimensions(filt3D)
+  zZoomOut = float(lengthTARegion * scopeResolutions[2]) / float(currentZLength)
+  print "WARNING: TEMPORARILY ZOOMING OUT OF X AND Y AXIS TO MAKE TA FILTER SMALLER AND WORK WITH SIMULATED DATA"
+  #zoomOut = [1., 1., zZoomOut]
+  zoomOut = [.75, .75, zZoomOut]
   filt3D = ndimage.zoom(filt3D,zoom=zoomOut)
-  '''
+  
   ### Threshold the filter to get rid of rotation numerical artifacts
   filt3DMean = np.mean(filt3D)
-  filt3DMax = np.max(filt3D)
-  filt3D[filt3D > filt3DMean] = filt3DMax
+  #filt3DMax = np.max(filt3D)
+  filt3D[filt3D > filt3DMean] = 1.
   filt3D[filt3D < filt3DMean] = 0
   
   ### Save filters
-  Save3DImg(filt3D, './myoimages/TA_3D.tif')  
+  Save3DImg(filt3D.astype(np.uint16), './myoimages/TA_3D.tif')  
 
 def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
                             FilterZStackSize = 5, # [vx] 
@@ -733,14 +753,14 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
         dtype = np.float
     )
 
-    TAcell = np.zeros(
-        (
-            unitCellVoxels[0],
-            unitCellVoxels[1],
-            unitCellVoxels[2]
-        ),
-        dtype = np.float
-    )
+    #TAcell = np.zeros(
+    #    (
+    #        unitCellVoxels[0],
+    #        unitCellVoxels[1],
+    #        unitCellVoxels[2]
+    #    ),
+    #    dtype = np.float
+    #)
 
     unitCellMidPoint = [
         int(np.floor(float(unitCellVoxels[0]) / 2.)),
@@ -764,6 +784,11 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
         unitCellMidPoint[1] : unitCellMidPoint[1] + unitCellVoxels[1],
         unitCellMidPoint[2] - TTradius_z : unitCellMidPoint[2] + TTradius_z
     ] = 1.
+
+    ### Save unit cells to display later
+    print "Saving unit cells"
+    Save3DImg(TTcell, './myoimages/TTcell.tif')
+    Save3DImg(LTcell, './myoimages/LTcell.tif')
     
     ### 3. Loop Through Cell and Assign Unit Cells to Chunks
     i = 0; j = 0; k = 0
@@ -1064,6 +1089,40 @@ def rotate3DArray_Homogeneous(array, angles, clipOutput=True, interpolationOrder
     rot[rot > inputMax] = inputMax
 
   return rot
+
+def autoDepadArray(img):
+  '''
+  This function is meant to automatically strip the padding from an array
+  '''
+
+  ### Get the locations of the start and end of the padding in the image
+  filtDims, paddingLocs = measureFilterDimensions(img,returnFilterPaddingLocations=True)
+
+  ### Check to see if there is padding in all 3 dimensions. If not, exit out of the routine
+  for i in range(len(paddingLocs)):
+    if paddingLocs[i][0] == 0 and paddingLocs[i][1] == 0:
+      print "There is no padding in the {} dimension of the image. Exiting routine without depadding.".format(i)
+      return img
+
+  ### Make a new array to store the depadded array
+  newImg = np.zeros(filtDims, dtype=img.dtype)
+
+  ### Store depadded array in new array
+  if len(img.shape) == 3:
+    newImg[:,:,:] = img[
+      paddingLocs[0][0]:-paddingLocs[0][1],
+      paddingLocs[1][0]:-paddingLocs[1][1],
+      paddingLocs[2][0]:-paddingLocs[2][1]
+    ]
+  elif len(img.shape) == 2:
+    newImg[:,:] = img[
+      paddingLocs[0][0]:-paddingLocs[0][1],
+      paddingLocs[1][0]:-paddingLocs[1][1],
+    ]
+  else:
+    raise RuntimeError("Image shape incompatible with routine.")
+  
+  return newImg
 
 ###################################################################################################
 ###################################################################################################
