@@ -21,7 +21,7 @@ def matchedFilter(
   ### Check to see if the image is 2D or 3D. cv2 algorithm is a bit quicker for 2D but it is not compatible with 3D images
   if len(np.shape(dimg)) == 3:
     ## Use scipy ndimage routine to convolve the 3D image and Filter
-    h = ndimage.convolve(dimg,daFilter,mode='mirror')
+    h = ndimage.convolve(dimg,daFilter)#,mode='mirror')
   else:
     useCV2 = True
     if useCV2:
