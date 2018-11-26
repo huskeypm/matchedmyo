@@ -1116,10 +1116,19 @@ def markPastedFilters(
   # Opting to mark Loss, then Long, then WT
   if lossName:
     labeledLoss = painter.doLabel(Lossholder,cellDimensions=lossDimensions,thresh=0)
+  else:
+    labeledLoss = np.zeros_like(lossMasked,dtype=int)
   if ltName:
     labeledLT = painter.doLabel(LTholder,cellDimensions=LTDimensions,thresh=0)
+    print "Warning: Shifting LT hits down one index in the z domain to make consistent hit detection."
+    dummy = np.zeros_like(labeledLT[:,:,0])
+    labeledLT = np.dstack((dummy,labeledLT))[:,:,:-1]
+  else:
+    labeledLT = np.zeros_like(ltMasked,dtype=int)
   if wtName:
     labeledWT = painter.doLabel(WTholder,cellDimensions=WTDimensions,thresh=0)
+  else:
+    labeledWT = np.zeros_like(wtMasked,dtype=int)
 
   ### perform masking
   if lossName:
@@ -1552,9 +1561,6 @@ def give3DMarkedMyocyte(
                                lossStdThresh=lossStdThresh,
                                returnAngles=returnAngles)
     TAstackedHits = TAresults.stackedHits
-    print np.max(TAstackedHits)
-    print np.min(TAstackedHits)
-    util.Save3DImg(TAstackedHits,'TAstackedHits.tif')
   else:
     TAstackedHits = np.zeros_like(inputs.imgOrig)
 

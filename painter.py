@@ -54,7 +54,7 @@ def correlateThresher(
     for i in iters:
       result = empty()
 
-      # Check dimensionality of iteration
+      # Check dimensionality of iteration and rotate filters accordingly
       if type(i) == list:
         # This is 3D
         # pad/rotate filter
