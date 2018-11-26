@@ -124,7 +124,15 @@ def measureFilterDimensions(grayFilter,returnFilterPaddingLocations=False,verbos
   rectangle around the filter. To be used in conjunction with the 
   pasteFilters flag in DataSet
 
-  epsilon -> float. Value that we determine that no information is present within the array. This is to deal with numerical artifacts.
+  Inputs:
+    epsilon -> float. Value that we determine that no information is present within the array. This is to deal with numerical artifacts.
+
+  Outputs:
+    newDimLengths -> List of ints. List of the lengths of the depadded dimensions
+    paddingLocs -> List of ints. Location of the first slice with information in each axis. This is list as 
+                     [[# of voxels before first slice, # of voxels after last slice]]. So to use this information
+                     for indexing when this is returned, we need to index as:
+                       grayFilter[# of voxels before first slice:-# of voxels after last slice]
   '''
   ### Measure shape of filter
   filterShape = np.shape(grayFilter)
@@ -135,8 +143,14 @@ def measureFilterDimensions(grayFilter,returnFilterPaddingLocations=False,verbos
     paddingLocs = []
   for i,dimLength in enumerate(filterShape):
     otherAxes = np.delete(np.arange(len(filterShape)),i)
+
+    if verbose:
+      print "Axes with which we are summing: {}".format(otherAxes)
        
     collapsedDim = np.sum(grayFilter,axis=tuple(otherAxes))
+
+    if verbose:
+      print "Sum along both of the previous axes {}".format(collapsedDim)
     
     ## Measure padding before the filter in this dimension
     previousPadding = np.argmax(collapsedDim > epsilon)
@@ -947,7 +961,7 @@ def PadRotate(myFilter1,val):
 
   return rF
 
-def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpolationOrder=2):
+def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpolationOrder=2, verbose=False):
   '''
   This function is for the rotation of matrices with non-homogeneous coordinates. For example, 
     rotation of images taken with scopes with anisotropic resolution
@@ -964,10 +978,14 @@ def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpola
                           maximums and minimums reflective of the input array, A.
     interpolationOrder -> int. Valid values range between 0-5. Order of the interpolation for rotation.
                                  NOTE: Cubic interpolation seems to introduce artifacts. Setting default to 2
+    verbose -> Bool. If True, the routine will display filter mins and maxes at the zeroth slice.
   '''
 
   minVal = np.min(A)
   maxVal = np.max(A)
+
+  if verbose:
+    print "Original Filter Values\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(A[:,:,0]), np.max(A[:,:,0]))
 
   ### 1. Interpolate and Form New Matrix with Homogeneous Coordinates
   ## Find zoom levels based on resolutions. We need to zoom in for all dimensions with resolutiosn lower than the maximum
@@ -983,12 +1001,21 @@ def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpola
     zoomed[zoomed < minVal] = minVal
     zoomed[zoomed > maxVal] = maxVal
 
+  if verbose:
+    print "Filter Values After Zooming In\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomed[:,:,0]),np.max(zoomed[:,:,0]))
+
   ### 2. Rotate the Matrix Using Homogeneous Coordinate Rotation Routine
   ## Pad the zoomed in image first to ensure that rotation does not induce artifacts
   padded = pad3DArray(zoomed)
 
+  if verbose:
+    print "Filter Values After Padding\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(padded[:,:,0]),np.max(padded[:,:,0]))
+
   ## Rotate the matrix
   rotated = rotate3DArray_Homogeneous(padded, angles, clipOutput=clipValues, interpolationOrder=interpolationOrder)
+
+  if verbose:
+    print "Filter Values After Rotating\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(rotated[:,:,0]),np.max(rotated[:,:,0]))
 
   ### 3. Downsample by Zooming Out
   ## Find the amount we'll have to zoom out to return to previous levels
@@ -999,6 +1026,9 @@ def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpola
   if clipValues:
     zoomedOut[zoomedOut < minVal] = minVal
     zoomedOut[zoomedOut > maxVal] = maxVal
+
+  if verbose:
+    print "Filter Values After Zooming Out\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomedOut[:,:,0]),np.max(zoomedOut[:,:,0]))
 
   return zoomedOut
 
@@ -1090,13 +1120,22 @@ def rotate3DArray_Homogeneous(array, angles, clipOutput=True, interpolationOrder
 
   return rot
 
-def autoDepadArray(img):
+def autoDepadArray(img, verbose=False):
   '''
   This function is meant to automatically strip the padding from an array
+
+  Inputs:
+    img -> Numpy array
+    verbose -> Bool. If True, information about img is printed
   '''
 
   ### Get the locations of the start and end of the padding in the image
-  filtDims, paddingLocs = measureFilterDimensions(img,returnFilterPaddingLocations=True)
+  ###   NOTE: Need to think of a better way to determine epsilon. This is ad hoc right now and WILL break
+  ###           eventually.
+  filtDims, paddingLocs = measureFilterDimensions(img,returnFilterPaddingLocations=True,epsilon=5e-5)
+
+  if verbose:
+    print "Image Padding Locations: {}".format(paddingLocs)
 
   ### Check to see if there is padding in all 3 dimensions. If not, exit out of the routine
   for i in range(len(paddingLocs)):
