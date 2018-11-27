@@ -731,7 +731,6 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
         value = int(np.floor(float(cellDimensions[i]) * float(scopeResolutions[i])))
         numVoxelsInDimension.append(value)
 
-
     ## count the number of unit cells in each dimension
     numUnitCellsInDimension = []
     for i in range(3):
@@ -744,6 +743,7 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
     for i in range(3):
         print "Final truncated cell size in {} dimension: {} [um]".format(i, float(numVoxelsInDimension[i])/float(scopeResolutions[i]))
         print "Number of unit cells in {} dimension: {}".format(i, numUnitCellsInDimension[i])
+        print "Number of voxels in {} dimension: {}".format(i, numVoxelsInDimension[i])
 
     print "Total number of unit cells: {}".format(np.prod(numUnitCellsInDimension))
     
@@ -766,15 +766,6 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
         ),
         dtype = np.float
     )
-
-    #TAcell = np.zeros(
-    #    (
-    #        unitCellVoxels[0],
-    #        unitCellVoxels[1],
-    #        unitCellVoxels[2]
-    #    ),
-    #    dtype = np.float
-    #)
 
     unitCellMidPoint = [
         int(np.floor(float(unitCellVoxels[0]) / 2.)),
@@ -877,9 +868,6 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
     cell = np.moveaxis(cell, 2, 0)
     tifffile.imsave(fileName,data=cell)
     print "Wrote:",fileName
-#def generate3DFilter(originalFilterFileName,
-#                     numberZStacks):
-
 
 ###################################################################################################
 ###################################################################################################
