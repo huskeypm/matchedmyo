@@ -1120,9 +1120,10 @@ def markPastedFilters(
     labeledLoss = np.zeros_like(lossMasked,dtype=int)
   if ltName:
     labeledLT = painter.doLabel(LTholder,cellDimensions=LTDimensions,thresh=0)
-    print "Warning: Shifting LT hits down one index in the z domain to make consistent hit detection."
-    dummy = np.zeros_like(labeledLT[:,:,0])
-    labeledLT = np.dstack((dummy,labeledLT))[:,:,:-1]
+    if len(np.shape(cI)) == 4:
+      print "Warning: Shifting LT hits down one index in the z domain to make consistent hit detection."
+      dummy = np.zeros_like(labeledLT[:,:,0])
+      labeledLT = np.dstack((dummy,labeledLT))[:,:,:-1]
   else:
     labeledLT = np.zeros_like(ltMasked,dtype=int)
   if wtName:
