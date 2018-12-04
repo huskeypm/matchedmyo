@@ -105,6 +105,8 @@ def Save3DImg(img, fileName):
     img -> numpy array with dimensions [Row, Column, Z-stack]. Image to be saved.
     fileName -> str. String containing the location and file name with which image will be saved
   '''
+  ### Switch the color channels because tifffile has the same color convention as matplotlib
+  img = switchBRChannels(img)
 
   ### Roll the third axis to the first position
   dummyImg = np.moveaxis(img,source=2,destination=0)
@@ -263,6 +265,27 @@ def embedSignal(img,mf,loc=None,scale=0.5):
     imgEmb[loc[0]:(loc[0]+dimr[0]),loc[1]:(loc[1]+dimr[1])] += mfs 
     #imshow(imgEmb)
     return imgEmb
+
+def switchBRChannels(img):
+  '''This function is a quick way to switch between color conventions. Example, cv2 and matplotlib have blue and red channels switched.
+  The 'right' color convention that we've chosen is for the:
+    - TT content to be marked in the zeroth channel
+    - LT content to be marked in the first channel
+    - TA content to be marked in the second channel
+  
+  Inputs:
+    img -> numpy array.
+
+  Outputs:
+    newImg -> numpy array. Copy of img but with the zeroth and second channels switched.
+  '''
+  newImg = img.copy()
+
+  # ensuring to copy so that we don't accidentally alter the original image
+  newImg[...,0] = img[...,2].copy()
+  newImg[...,2] = img[...,0].copy()
+
+  return newImg
 
 ###################################################################################################
 ###################################################################################################
@@ -675,7 +698,8 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
                             noiseAmplitude = 0.25, 
                             cellDimensions = [25, 100, 20], # [um] 
                             fileName = "simulatedData.tif",
-                            verbose=False):
+                            verbose=False,
+                            seed=None):
     '''
     This function provides the workflow to generate a three dimensional cell based on probabilities of finding 
       normal transverse tubules (TTs), longitudinal tubules (LTs), and regions of tubule absence (TA).
@@ -709,6 +733,7 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
             = [25, 100, 20] # [um] Size of the simulated cell in x, y, and z directions. Completely arbitrary right now. TODO find better estimates
         fileName - str. Name of the output file. Must be a .tif file.
             = "simulatedData.tif"
+        seed -> int. Random seed used to initialize the pseudo-random number generator. Can be any integer between 0 and 2**32 - 1 inclusive
             
     Outputs:
         None
@@ -794,6 +819,17 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
     print "Saving unit cells"
     Save3DImg(TTcell, './myoimages/TTcell.tif')
     Save3DImg(LTcell, './myoimages/LTcell.tif')
+
+    ### Generate a random number for each unit cell
+    if seed:
+      randomInstance = np.random.RandomState(seed=seed)
+    else:
+      randomInstance = np.random.RandomState()
+    unitCellChances = randomInstance.rand(
+      numUnitCellsInDimension[0],
+      numUnitCellsInDimension[1],
+      numUnitCellsInDimension[2]
+    )
     
     ### 3. Loop Through Cell and Assign Unit Cells to Chunks
     i = 0; j = 0; k = 0
@@ -810,7 +846,10 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
                 ]
 
                 # Get a random number to determine which unit cell to place
-                randNum = np.random.random()
+                #randNum = np.random.random()
+
+                # Get the random number chance for the specific unit cell
+                randNum = unitCellChances[i,j,k]
 
                 # Determine which unit cell we will place in the position
                 if randNum < TA_probability:

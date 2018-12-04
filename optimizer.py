@@ -140,8 +140,7 @@ def SetupTests(dataSet,meanFilter=False):
     dataSet.filter2Data = util.renorm(np.array(dataSet.filter2Data,dtype=float),scale=1.)
   dataSet.filter2y,dataSet.filter2x = util.measureFilterDimensions(dataSet.filter2Data)
 
-def ParamDict(typeDict=None):
-  #print "WILL MAKE INTO CLASS LATER"
+def ParamDict(typeDict=''):
   paramDict={
     'snrThresh':1.,
     'penaltyscale': 1.,
@@ -158,25 +157,33 @@ def ParamDict(typeDict=None):
     paramDict['useFilterInv'] = True
     paramDict['penaltyscale'] = 1.2
     paramDict['doCLAHE'] = True
-  elif typeDict=='WT':
+  elif 'WT' in typeDict:
     paramDict['filterMode'] = 'punishmentFilter'
-    # optimized as of June 25, 2018
-    #paramDict['gamma'] = 3.6842
-    #paramDict['snrThresh'] = 0.3526316 
-    # Keeping old parameters from June 5, 2018 for simplicity's sake
+    # optimized as of June 5, 2018
     paramDict['gamma'] = 3.
     paramDict['snrThresh'] = 0.35
-  elif typeDict=='LT':
+    if '3D' in typeDict:
+      # optimized as of December 4, 2018
+      paramDict['snrThresh'] = 0.8
+  elif 'LT' in typeDict:
     paramDict['filterMode'] = 'regionalDeviation'
     # optimized as of June 5, 2018 
     paramDict['snrThresh'] = 0.6 
     paramDict['stdDevThresh'] = 0.2
-  elif typeDict=='Loss':
+    if '3D' in typeDict:
+      # optimized as of December 4, 2018
+      paramDict['snrThresh'] = 0.9
+      paramDict['stdDevThresh'] = 1.
+  elif 'Loss' in typeDict:
     # optimized as of June 5, 2018
     paramDict['filterMode'] = 'regionalDeviation'
     paramDict['inverseSNR'] = True
     paramDict['snrThresh'] = 0.04 
     paramDict['stdDevThresh'] = 0.1
+    if '3D' in typeDict:
+      # optimized as of December 4, 2018
+      paramDict['stdDevThresh'] = 0.5
+
   return paramDict
 
 ##
