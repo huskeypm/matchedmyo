@@ -55,8 +55,8 @@ def WT_results():
                         tag='fig3',
                         writeImage = True
                         )
-  correctColoredAngles = switchBRChannels(coloredAngles)
-  correctColoredImg = switchBRChannels(coloredImg)
+  correctColoredAngles = util.switchBRChannels(coloredAngles)
+  correctColoredImg = util.switchBRChannels(coloredImg)
 
   ### make bar chart for content
   wtContent, ltContent, lossContent = assessContent(coloredImg,testImage)
@@ -82,7 +82,7 @@ def WT_results():
 
   ### save files individually and arrange using inkscape
   plt.figure()
-  plt.imshow(switchBRChannels(util.markMaskOnMyocyte(rawImg,testImage)))
+  plt.imshow(util.switchBRChannels(util.markMaskOnMyocyte(rawImg,testImage)))
   plt.gcf().savefig("fig3_Raw.pdf",dpi=300)
 
   plt.figure()
@@ -124,10 +124,10 @@ def HF_results():
   plt.gcf().savefig('fig4_BarChart.pdf',dpi=300)
   plt.close()
  
-  switchedImg = switchBRChannels(markedImg)
+  switchedImg = util.switchBRChannels(markedImg)
 
   plt.figure()
-  plt.imshow(switchBRChannels(util.markMaskOnMyocyte(rawImg,imgName)))
+  plt.imshow(util.switchBRChannels(util.markMaskOnMyocyte(rawImg,imgName)))
   plt.gcf().savefig("fig4_Raw.pdf",dpi=300)
 
 def MI_results(): 
@@ -191,15 +191,15 @@ def MI_results():
   plt.close()
 
   plt.figure()
-  plt.imshow(switchBRChannels(util.markMaskOnMyocyte(DImage,DImageName)))
+  plt.imshow(util.switchBRChannels(util.markMaskOnMyocyte(DImage,DImageName)))
   plt.gcf().savefig("fig5_Raw_D.pdf",dpi=300)
 
   plt.figure()
-  plt.imshow(switchBRChannels(util.markMaskOnMyocyte(MImage,MImageName)))
+  plt.imshow(util.switchBRChannels(util.markMaskOnMyocyte(MImage,MImageName)))
   plt.gcf().savefig("fig5_Raw_M.pdf",dpi=300)
 
   plt.figure()
-  plt.imshow(switchBRChannels(util.markMaskOnMyocyte(PImage,PImageName)))
+  plt.imshow(util.switchBRChannels(util.markMaskOnMyocyte(PImage,PImageName)))
   plt.gcf().savefig("fig5_Raw_P.pdf",dpi=300)
 
 def tissueComparison(fullAnalysis=True):
@@ -877,7 +877,7 @@ def analyzeAllMyo(root="/net/share/dfco222/data/TT/LouchData/processedWithIntell
     cImg = util.ReadImg(root+name)
     cImg = util.markMaskOnMyocyte(cImg,root+name)
     plt.figure()
-    plt.imshow(switchBRChannels(cImg))
+    plt.imshow(util.switchBRChannels(cImg))
     plt.gcf().savefig(name[:-4]+'_markedMask.pdf')
     plt.close()
 
@@ -1154,18 +1154,12 @@ def markPastedFilters(
   LTmask[labeledLoss] = False
   LTmask[WTmask] = False # prevents double marking of WT and LT
 
-  ### Dampen brightness
+  ### Dampen brightness and mark hits
   alpha = 1.0
   hitValue = int(round(alpha * 255))
-  if len(cI.shape) == 4:
-    cI[:,:,:,0][Lossmask] = hitValue
-    cI[:,:,:,1][LTmask] = hitValue
-    cI[:,:,:,2][WTmask] = hitValue
-  else:
-    ## There's a difference in the color channel conventions between 2D and 3D data
-    cI[:,:,2][Lossmask] = hitValue
-    cI[:,:,1][LTmask] = hitValue
-    cI[:,:,0][WTmask] = hitValue
+  cI[...,2][Lossmask] = hitValue
+  cI[...,1][LTmask] = hitValue
+  cI[...,0][WTmask] = hitValue
 
   return cI
 
@@ -1185,7 +1179,13 @@ def WT_Filtering(inputs,
   ### Specify necessary inputs
   ttFilter = util.LoadFilter(ttFilterName)
   inputs.mfOrig = ttFilter
-  WTparams = optimizer.ParamDict(typeDict='WT')
+  if len(np.shape(inputs.imgOrig)) == 3:
+    WTparams = optimizer.ParamDict(typeDict='WT3D')
+  elif len(np.shape(inputs.imgOrig)) == 2:
+    WTparams = optimizer.ParamDict(typeDict='WT')
+  else:
+    raise RuntimeError("The number of dimensions of the image stored in inputs.imgOrig is {}. \
+                       This is not supported currently.".format(len(np.shape(inputs.imgOrig))))
   WTparams['covarianceMatrix'] = np.ones_like(inputs.imgOrig)
   WTparams['mfPunishment'] = util.LoadFilter(ttPunishFilterName)
   WTparams['useGPU'] = inputs.useGPU
@@ -1218,7 +1218,13 @@ def LT_Filtering(inputs,
 
   ### Specify necessary inputs
   inputs.mfOrig = util.LoadFilter(ltFilterName)
-  LTparams = optimizer.ParamDict(typeDict='LT')
+  if len(np.shape(inputs.imgOrig)) == 3:
+    LTparams = optimizer.ParamDict(typeDict='LT3D')
+  elif len(np.shape(inputs.imgOrig)) == 2:
+    LTparams = optimizer.ParamDict(typeDict='LT')
+  else:
+    raise RuntimeError("The number of dimensions of the image stored in inputs.imgOrig is {}. \
+                       This is not supported currently.".format(len(np.shape(inputs.imgOrig))))
   if ltThresh != None:
     LTparams['snrThresh'] = ltThresh
   if ltStdThresh != None:
@@ -1248,7 +1254,13 @@ def Loss_Filtering(inputs,
 
   ### Specify necessary inputs
   inputs.mfOrig = util.LoadFilter(lossFilterName)
-  Lossparams = optimizer.ParamDict(typeDict='Loss')
+  if len(np.shape(inputs.imgOrig)) == 3:
+    Lossparams = optimizer.ParamDict(typeDict='Loss3D')
+  elif len(np.shape(inputs.imgOrig)) == 2:
+    Lossparams = optimizer.ParamDict(typeDict='Loss')
+  else:
+    raise RuntimeError("The number of dimensions of the image stored in inputs.imgOrig is {}. \
+                       This is not supported currently.".format(len(np.shape(inputs.imgOrig))))
   Lossparams['useGPU'] = inputs.useGPU
   if iters != None:
     Lossiters = iters
@@ -1400,7 +1412,7 @@ def giveMarkedMyocyte(
 
       ### write output image
       plt.figure()
-      plt.imshow(switchBRChannels(cI_written))
+      plt.imshow(util.switchBRChannels(cI_written))
       plt.gcf().savefig(tag+"_output"+fileExtension,dpi=300)
 
   if returnPastedFilter:
@@ -1417,7 +1429,7 @@ def giveMarkedMyocyte(
 
       ### write outputs	  
       plt.figure()
-      plt.imshow(switchBRChannels(cI_written))
+      plt.imshow(util.switchBRChannels(cI_written))
       plt.gcf().savefig(tag+"_output"+fileExtension,dpi=300)
 
   if returnAngles:
@@ -1466,7 +1478,7 @@ def giveMarkedMyocyte(
     if writeImage:
       #cv2.imwrite(tag+"_angles_output.png",coloredAnglesMasked)
       plt.figure()
-      plt.imshow(switchBRChannels(coloredAnglesMasked))
+      plt.imshow(util.switchBRChannels(coloredAnglesMasked))
       plt.gcf().savefig(tag+"_angles_output"+fileExtension)
     
     end = time.time()
@@ -1595,29 +1607,23 @@ def give3DMarkedMyocyte(
                              lossName = taFilterName)
   else:
     ## Just mark exactly where detection is instead of pasting until cells on detections
-    cImg[:,:,:,0][TAstackedHits > 0] = 255
+    cImg[:,:,:,2][TAstackedHits > 0] = 255
     cImg[:,:,:,1][LTstackedHits > 0] = 255
-    cImg[:,:,:,2][TTstackedHits > 0] = 255
+    cImg[:,:,:,0][TTstackedHits > 0] = 255
 
   ### Determine percentages of volume represented by each filter
   cellVolume = np.float(np.product(inputs.imgOrig.shape))
-  taContent = np.float(np.sum(cImg[:,:,:,0] == 255)) / cellVolume
+  taContent = np.float(np.sum(cImg[:,:,:,2] == 255)) / cellVolume
   ltContent = np.float(np.sum(cImg[:,:,:,1] == 255)) / cellVolume
-  ttContent = np.float(np.sum(cImg[:,:,:,2] == 255)) / cellVolume
+  ttContent = np.float(np.sum(cImg[:,:,:,0] == 255)) / cellVolume
 
-  print "TA Content:", taContent
-  print "LT Content:", ltContent
-  print "TT Content:", ttContent
+  print "TA Content per Cell Volume:", taContent
+  print "LT Content per Cell Volume:", ltContent
+  print "TT Content per Cell Volume:", ttContent
 
   if returnAngles:
     print "WARNING: Striation angle analysis is not yet available in 3D"
   
-  #print "WARNING: TEMPORARILY PASTING FILTERS ONTO IMAGE"
-  #filt = util.LoadFilter(ltFilterName)
-  #filt /= np.max(filt)
-  #filt *= 255
-  #cImg = util.PasteFilter(cImg,filt)
-
   ### Save detection image
   if tag:
     util.Save3DImg(cImg,tag+'.tif')
@@ -1814,19 +1820,6 @@ def myocyteROC(data, myoName,
                           display=False,
                           iters=LossIters)
 
-
-###
-### Function to convert from cv2's color channel convention to matplotlib's
-###         
-def switchBRChannels(img):
-  newImg = img.copy()
-
-  # ensuring to copy so that we don't accidentally alter the original image
-  newImg[:,:,0] = img[:,:,2].copy()
-  newImg[:,:,2] = img[:,:,0].copy()
-
-  return newImg
-
 def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize,filterTwoSarcSize=25):
   # function to apply the image mask before outputting results
   maskName = imgName[:-4]; fileType = imgName[-4:]
@@ -1854,52 +1847,68 @@ def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize,filterTwoSarcSize=25):
   return combined
 
 def assessContent(markedImg,imgName=None):
-  # create copy
+  '''This function analyzes the amount of TT, LT, and TA content that is present in a marked image
+  returned by giveMarkedMyocyte or give3DMarkedMyocyte.
+
+  Inputs:
+    markedImg -> numpy array. The marked image that is returned from the marking routines mentioned above.
+    imgName -> str. Name of the image. If this is specified, the routine will search for an image mask that 
+                 has been constructed to obfuscate the extracellular content/organelles. The naming convention
+                 for the masks is "<ORIGINAL_NAME>_masked.<FILETYPE>"
+
+  Outputs:
+    ttContent, ltContent, taContent
+  '''
+  ### Create copy of image
   imgCopy = markedImg.copy()
-  # pull out channels
-  wt = imgCopy[:,:,0]
-  lt = imgCopy[:,:,1]
-  loss = imgCopy[:,:,2]
 
-  # get rid of everything that isn't a hit (hits are marked as 255)
-  wt[wt != 255] = 0
+  ### Pull out content-specific channels
+  tt = imgCopy[...,0]
+  lt = imgCopy[...,1]
+  ta = imgCopy[...,2]
+
+  ### Get rid of everything that isn't a hit (hits are marked as 255)
+  tt[tt != 255] = 0
   lt[lt != 255] = 0
-  loss[loss != 255] = 0
+  ta[ta != 255] = 0
 
-  # normalize
-  wtNormed = np.divide(wt, np.max(wt))
+  ### normalize
+  ttNormed = np.divide(tt, np.max(tt))
   ltNormed = np.divide(lt, np.max(lt))
-  lossNormed = np.divide(loss, np.max(loss))
+  taNormed = np.divide(ta, np.max(ta))
 
-  # calculate content
-  wtContent = np.sum(wtNormed)
+  ### calculate content
+  ttContent = np.sum(ttNormed)
   ltContent = np.sum(ltNormed)
-  lossContent = np.sum(lossNormed)
+  taContent = np.sum(taNormed)
 
   if isinstance(imgName, (str)):
-    # if imgName is included, we normalize content to cell area
+    if len(np.shape(imgCopy)) == 4:
+      raise RuntimeError("WARNING: Masking is not implemented in 3D so the assessment of content does not include this. \
+                          This may skew results.")
+    ## if imgName is included, we normalize content to cell area
     dummy = np.multiply(np.ones_like(markedImg[:,:,0]), 255)
     mask = ReadResizeApplyMask(dummy,imgName,25,25)
     mask[mask <= 254] = 0
     mask[mask > 0] = 1
     cellArea = np.sum(mask,dtype=float)
-    wtContent /= cellArea
+    ttContent /= cellArea
     ltContent /= cellArea
-    lossContent /= cellArea
-    print "WT Content:", wtContent
+    taContent /= cellArea
+    print "TT Content:", ttContent
     print "LT Content:", ltContent
-    print "Loss Content:", lossContent
-    print "Sum of Content:", wtContent+ltContent+lossContent
-    # these should sum to 1 exactly but I'm leaving wiggle room
-    assert (wtContent+ltContent+lossContent) < 1.2, ("Something went " 
+    print "Loss Content:", taContent
+    print "Sum of Content:", ttContent+ltContent+taContent
+    ## these should sum to 1 exactly but I'm leaving wiggle room
+    assert (ttContent+ltContent+taContent) < 1.2, ("Something went " 
             +"wrong with the normalization of content to the cell area calculated "
             +"by the mask. Double check the masking routine.") 
   else:
-    print "WT Content:", wtContent
+    print "TT Content:", ttContent
     print "LT Content:", ltContent
-    print "Loss Content:", lossContent  
+    print "TA Content:", taContent  
 
-  return wtContent, ltContent, lossContent
+  return ttContent, ltContent, taContent
 
 def minDistanceROC(dataSet,paramDict,param1Range,param2Range,
                    param1="snrThresh",
@@ -2028,10 +2037,26 @@ def optimizeLoss():
   plt.colorbar()
   plt.gcf().savefig("ROC_Optimization_Loss.png")
 
-# function to validate that code has not changed since last commit
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+###  Validation Routines
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
 def validate(testImage="./myoimages/MI_M_45_processed.png",
              display=False
              ):
+  '''This function serves as a validation routine for the 2D functionality of this repo.
+  
+  Inputs:
+    testImage -> str. File path pointing to the image to be validated
+    display -> Bool. If True, display the marked image
+  '''
+  
   # run algorithm
   markedImg = giveMarkedMyocyte(testImage=testImage)
 
@@ -2041,11 +2066,68 @@ def validate(testImage="./myoimages/MI_M_45_processed.png",
     plt.show()
 
   # calculate wt, lt, and loss content  
-  wtContent, ltContent, lossContent = assessContent(markedImg)
+  ttContent, ltContent, taContent = assessContent(markedImg)
 
-  assert(abs(wtContent - 103050) < 1), "WT validation failed."
-  assert(abs(ltContent - 68068) < 1), "LT validation failed."
-  assert(abs(lossContent - 156039) < 1), "Loss validation failed."
+  assert(abs(ttContent - 103050) < 1), "TT validation failed."
+  assert(abs(ltContent -  68068) < 1), "LT validation failed."
+  assert(abs(taContent - 156039) < 1), "TA validation failed."
+  print "PASSED!"
+
+def validate3D():
+  '''This function serves as a validation routine for the 3D functionality of this repo.
+
+  Inputs:
+    None
+  '''
+  ### Define parameters for the simulation of the cell
+  ## Probability of finding a longitudinal tubule unit cell
+  ltProb = 0.3
+  ## Probability of finding a tubule absence unit cell
+  taProb = 0.3
+  ## Amplitude of the Guassian White Noise
+  noiseAmplitude = 0.
+  ## Define scope resolutions for generating the filters and the cell. This is in x, y, and z resolutions
+  scopeResolutions = [10,10,5] #[vx / um]
+  ## x, y, and z Dimensions of the simulated cell [microns]
+  cellDimensions = [10, 10, 20]
+  ## Define test file name
+  testName = "./myoimages/3DValidationData.tif"
+  ## Define output name for classification results
+  #outputName = "simulated3DData_LT{}_TA{}_analysis"
+  ## Give names for your filters. NOTE: These are hardcoded in the filter generation routines in util.py
+  ttName = './myoimages/TT_3D.tif'
+  ttPunishName = './myoimages/TT_Punishment_3D.tif'
+  ltName = './myoimages/LT_3D.tif'
+  taName = './myoimages/TA_3D.tif'
+
+  ### Simulate the small 3D cell
+  util.generateSimulated3DCell(LT_probability=ltProb,
+                               TA_probability=taProb,
+                               noiseAmplitude=noiseAmplitude,
+                               scopeResolutions=scopeResolutions,
+                               cellDimensions=cellDimensions,
+                               fileName=testName,
+                               seed=1001)
+
+  ### Analyze the 3D cell
+  markedImage = give3DMarkedMyocyte(testImage=testName,
+                                    scopeResolutions = scopeResolutions,
+                                    ttFilterName = ttName,
+                                    ttPunishFilterName = ttPunishName,
+                                    ltFilterName = ltName,
+                                    taFilterName = taName,
+                                    xiters = [0],
+                                    yiters = [0],
+                                    ziters = [0])
+
+  ### Assess the amount of TT,LT, and TA content there is in the image
+  ttContent, ltContent, taContent = assessContent(markedImage)
+
+  ### Check to see that they are in close agreement with previous values
+  ###   NOTE: We have to have a lot of wiggle room since we're generating a new cell for each validation
+  assert(abs(ttContent - 305001) < 1), "TT validation failed."
+  assert(abs(ltContent -  54016) < 1), "LT validation failed."
+  assert(abs(taContent - 403054) < 1), "TA validation failed."
   print "PASSED!"
 
 ###
@@ -2120,14 +2202,12 @@ if __name__ == "__main__":
       quit()
 
     if(arg=='-validate3D'):
-      #validate3D()
-      print "Need to write this unit test"
+      validate3D()
       quit()
 
     if(arg=='-fullValidation'):
       validate()
-      #validate3D()
-      print "Need to write the 3D test"
+      validate3D()
       quit()
 
     if(arg=="-scoretest"):
