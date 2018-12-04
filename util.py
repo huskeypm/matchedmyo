@@ -838,15 +838,11 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
         while k < numUnitCellsInDimension[2]:
             j = 0
             while j < numUnitCellsInDimension[1]:
-                #print i,j,k
                 location = [
                     i * unitCellVoxels[0],
                     j * unitCellVoxels[1],
                     k * unitCellVoxels[2]
                 ]
-
-                # Get a random number to determine which unit cell to place
-                #randNum = np.random.random()
 
                 # Get the random number chance for the specific unit cell
                 randNum = unitCellChances[i,j,k]
