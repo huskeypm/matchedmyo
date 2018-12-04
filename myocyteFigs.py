@@ -42,6 +42,16 @@ plt.rcParams['figure.autolayout'] = True
 #root = "myoimages/"
 root = "/net/share/dfco222/data/TT/LouchData/processedWithIntelligentThresholding/"
 
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Figure Generation Routines
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
 def WT_results(): 
   root = "/net/share/dfco222/data/TT/LouchData/processedMaskedNucleus/"
   testImage = root+"Sham_M_65_nucleus_processed.png"
@@ -520,7 +530,88 @@ def YAML_example():
   Routine to generate the example YAML output in the supplement
   '''
   detect.updatedSimpleYaml("ex.yml")
+
+def saveWorkflowFig():
+  '''
+  Function that will save the images used for the workflow figure in the paper.
+  Note: This is slightly subject to how one preprocesses the MI_D_73.png image.
+        A slight change in angle or what subsection was selected in the preprocessing
+        could slightly change how the images appear.
+  '''
+
+  imgName = "./myoimages/MI_D_73_processed.png" 
+  iters = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
   
+  colorImg,colorAngles,angleCounts = giveMarkedMyocyte(testImage=imgName,
+                                                       tag="WorkflowFig",
+                                                       iters=iters,
+                                                       returnAngles=True,
+                                                       writeImage=True)
+
+  ### save the correlation planes
+  lossFilter = util.LoadFilter("./myoimages/LossFilter.png")
+  ltFilter = util.LoadFilter("./myoimages/LongitudinalFilter.png")
+  wtFilter = util.LoadFilter("./myoimages/newSimpleWTFilter.png")
+
+  origImg = util.ReadImg(imgName,cvtColor=False)
+  origImg = cv2.cvtColor(origImg,cv2.COLOR_BGR2GRAY)
+  lossCorr = mF.matchedFilter(origImg, lossFilter,demean=False)
+  ltCorr = mF.matchedFilter(origImg, ltFilter,demean=False)
+  wtCorr = mF.matchedFilter(origImg, wtFilter,demean=False)
+
+  cropImgs = False
+  if cropImgs:
+    angle_output = util.ReadImg("WorkflowFig_angles_output.png",cvtColor=False)
+    output = util.ReadImg("WorkflowFig_output.png",cvtColor=False)
+    imgs = {"WorkflowFig_angles_output.png":angle_output, 
+            "WorkflowFig_output.png":output, 
+            "WorkflowFig_orig.png":origImg}
+
+    left = 204; right = 304; top = 74; bottom = 151
+    for name,img in imgs.iteritems():
+      if cropImgs:
+        holder = np.zeros((bottom-top,right-left,3),dtype=np.uint8)
+        for channel in range(3):
+          ### crop images
+          holder[:,:,channel] = img[top:bottom,left:right,channel]
+      cv2.imwrite(name,holder)
+    lossCorr = lossCorr[top:bottom,left:right]
+    ltCorr = ltCorr[top:bottom,left:right]
+    wtCorr = wtCorr[top:bottom,left:right]
+
+  plt.figure()
+  plt.imshow(lossCorr,cmap='gray')
+  plt.gcf().savefig("WorkflowFig_lossCorr.pdf")
+
+  plt.figure()
+  plt.imshow(ltCorr,cmap='gray')
+  plt.gcf().savefig("WorkflowFig_ltCorr.pdf")
+
+  plt.figure()
+  plt.imshow(wtCorr,cmap='gray')
+  plt.gcf().savefig("WorkflowFig_wtCorr.pdf")
+
+  ### Assess content
+  wtC,ltC,ldC = assessContent(colorImg,imgName=imgName)
+
+  ### make a bar chart using routine
+  content = [wtC,ltC,ldC]
+  contentDict = {imgName:content}
+  giveBarChartfromDict(contentDict,"WorkflowFig_Content")
+
+  ### Make a histogram for the angles
+  giveAngleHistogram(angleCounts,iters,"WorkflowFig")
+
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Utility Functions Specifically for Figure Generation
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
 def shaveFig(fileName,padY=None,padX=None,whiteSpace=None):
   '''
   Aggravating way of shaving a figure's white space down to an acceptable level
@@ -590,59 +681,268 @@ def preprocessTissueCase(case):
 
   return case
 
-def analyzeTissueCase(case,
-                      preprocess=True,
-                      useGPU=True,
-                      analyzeTA=True):
+def giveAvgStdofDicts(ShamDict,HFDict,MI_DDict,MI_MDict,MI_PDict):
+  ### make a big dictionary to iterate through
+  results = {'Sham':ShamDict,'HF':HFDict,'MI_D':MI_DDict,'MI_M':MI_MDict,'MI_P':MI_PDict}
+  ### make dictionaries to store results
+  avgDict = {}; stdDict = {}
+  for model,dictionary in results.iteritems():
+    ### make holders to store results
+    angleAvgs = []; angleStds = []
+    for name,angleCounts in dictionary.iteritems():
+      print name
+      if 'angle' not in name:
+        continue
+      angleAvgs.append(np.mean(angleCounts))
+      angleStds.append(np.std(angleCounts))
+      print "Average striation angle:",angleAvgs[-1]
+      print "Standard deviation of striation angle:",angleStds[-1]
+    avgDict[model] = angleAvgs
+    stdDict[model] = angleStds
+
+  ### Normalize Standard Deviations to Sham Standard Deviation
+  ShamAvgStd = np.mean(stdDict['Sham'])
+  stdStdDev = {}
+  for name,standDev in stdDict.iteritems():
+    standDev = np.asarray(standDev,dtype=float) / ShamAvgStd
+    stdDict[name] = np.mean(standDev)
+    stdStdDev[name] = np.std(standDev)
+
+  ### Make bar chart for angles 
+  # need to have results in ordered arrays...
+  names = ['Sham', 'HF', 'MI_D', 'MI_M', 'MI_P']
+  avgs = []; stds = []
+  for name in names:
+    avgs.append(avgDict[name])
+    stds.append(stdDict[name])
+  width = 0.25
+  N = 1
+  indices = np.arange(N) + width
+  fig,ax = plt.subplots()
+  for i,name in enumerate(names):
+    ax.bar(indices+i*width, stdDict[name], width, yerr=stdStdDev[name],ecolor='k',alpha=0.5)
+  ax.set_ylabel("Average Angle Standard Deviation Normalized to Sham")
+  xtickLocations = np.arange(len(names)) * width + width*3./2.
+  ax.set_xticks(xtickLocations)
+  ax.set_xticklabels(names,rotation='vertical')
+  plt.gcf().savefig("Whole_Dataset_Angles.pdf",dpi=300)
+
+def markPastedFilters(
+      lossMasked, ltMasked, wtMasked, cI,
+      lossName="./myoimages/LossFilter.png",
+      ltName="./myoimages/LongitudinalFilter.png",
+      wtName="./myoimages/newSimpleWTFilter.png"
+      ):
   '''
-  Refactored method to analyze tissue cases 
+  Given masked stacked hits for the 3 filters and a doctored colored image, 
+  function will paste filter sized boxes around the characterized regions
+  and return the colored image with filter sized regions colored.
+
+  NOTE: Colored image was read in (not grayscale) and 1 was subtracted from
+  the image. This was necessary for the thresholding to work with the painter
+  function
   '''
-  if preprocess:
-    case = preprocessTissueCase(case)
+  # exploiting architecture of painter function to mark hits for me
+  Lossholder = empty()
+  Lossholder.stackedHits = lossMasked
+  LTholder = empty()
+  LTholder.stackedHits = ltMasked
+  WTholder = empty()
+  WTholder.stackedHits = wtMasked
 
-  ### Setup Filters
-  root = "./myoimages/"
-  ttFilterName = root+"newSimpleWTFilter.png"
-  ttPunishmentFilterName = root+"newSimpleWTPunishmentFilter.png"
-  case.iters = [-25,-20,-15,-10-5,0,5,10,15,20,25]
-  returnAngles = True
-  ttFilter = util.LoadFilter(ttFilterName)
-  ttPunishmentFilter = util.LoadFilter(ttPunishmentFilterName)
+  ### load in filters to get filter dimensions
+  if lossName:
+    lossFilt = util.LoadFilter(lossName)
+  if ltName:
+    ltFilt = util.LoadFilter(ltName)
+  if wtName:
+    wtFilt = util.LoadFilter(wtName)
 
-  ### Setup parameter dictionaries
-  case.params = optimizer.ParamDict(typeDict="WT")
-  case.params['covarianceMatrix'] = np.ones_like(case.subregion)
-  case.params['mfPunishment'] = ttPunishmentFilter
-  case.params['useGPU'] = useGPU
+  ### get filter dimensions
+  if lossName:
+    lossDimensions = util.measureFilterDimensions(lossFilt)
+  if ltName:
+    LTDimensions = util.measureFilterDimensions(ltFilt)
+  if wtName:
+    WTDimensions = util.measureFilterDimensions(wtFilt)
 
-  ### Setup input classes
-  case.inputs = empty()
-  case.inputs.imgOrig = case.subregion.astype(np.float32) / float(np.max(case.subregion))
-  case.inputs.mfOrig = ttFilter
+  ### we want to mark WT last since that should be the most stringent
+  # Opting to mark Loss, then Long, then WT
+  if lossName:
+    labeledLoss = painter.doLabel(Lossholder,cellDimensions=lossDimensions,thresh=0)
+    if len(np.shape(cI)) == 4:
+      print "Warning: Shifting TA hits down one index in the z domain to make consistent hit detection."
+      dummy = np.zeros_like(labeledLoss[:,:,0])
+      labeledLoss = np.dstack((dummy,labeledLoss))[:,:,:-1]
+  else:
+    labeledLoss = np.zeros_like(lossMasked,dtype=int)
+  if ltName:
+    labeledLT = painter.doLabel(LTholder,cellDimensions=LTDimensions,thresh=0)
+    if len(np.shape(cI)) == 4:
+      print "Warning: Shifting LT hits down one index in the z domain to make consistent hit detection."
+      dummy = np.zeros_like(labeledLT[:,:,0])
+      labeledLT = np.dstack((dummy,labeledLT))[:,:,:-1]
+  else:
+    labeledLT = np.zeros_like(ltMasked,dtype=int)
+  if wtName:
+    labeledWT = painter.doLabel(WTholder,cellDimensions=WTDimensions,thresh=0)
+  else:
+    labeledWT = np.zeros_like(wtMasked,dtype=int)
 
-  ### Perform filtering for TT detection
-  case.results = bD.DetectFilter(case.inputs,
-                                 case.params,
-                                 case.iters
-                                 )
+  ### perform masking
+  if lossName:
+    Lossmask = labeledLoss.copy()
+  else:
+    Lossmask = Lossholder.stackedHits > np.inf
+  if ltName:
+    LTmask = labeledLT.copy()
+  else:
+    LTmask = LTholder.stackedHits > np.inf
+  if wtName:
+    WTmask = labeledWT.copy()
+  else:
+    WTmask = WTholder.stackedHits > np.inf
 
-  ### Modify case to perform TA detection
-  if analyzeTA:
-    case.TAinputs = empty()
-    case.TAinputs.imgOrig = case.subregion
-    case.TAinputs.displayImg = case.displayImg
-    lossFilterName = root+"LossFilter.png"
-    case.TAIters = [-45,0]
-    lossFilter = util.LoadFilter(lossFilterName)
-    case.TAinputs.mfOrig = lossFilter
-    case.TAparams = optimizer.ParamDict(typeDict='Loss')
+  WTmask[labeledLoss] = False
+  WTmask[labeledLT] = False
+  LTmask[labeledLoss] = False
+  LTmask[WTmask] = False # prevents double marking of WT and LT
 
-    ### Perform filtering for TA detection
-    case.TAresults = bD.DetectFilter(case.TAinputs,
-                                     case.TAparams,
-                                     case.TAIters)
+  ### Dampen brightness and mark hits
+  alpha = 1.0
+  hitValue = int(round(alpha * 255))
+  cI[...,2][Lossmask] = hitValue
+  cI[...,1][LTmask] = hitValue
+  cI[...,0][WTmask] = hitValue
 
-  return case
+  return cI
+
+def setupAnnotatedImage(annotatedName, baseImageName):
+  '''
+  Function to be used in conjunction with Myocyte().
+  Uses the markPastedFilters() function to paste filters onto the annotated image.
+  This is so we don't have to generate a new annotated image everytime we 
+  change filter sizes.
+  '''
+  ### Read in images
+  #baseImage = util.ReadImg(baseImageName,cvtColor=False)
+  markedImage = util.ReadImg(annotatedName, cvtColor=False)
+  
+  ### Divide up channels of markedImage to represent hits
+  wtHits, ltHits = markedImage[:,:,0],markedImage[:,:,1]
+  wtHits[wtHits > 0] = 255
+  ltHits[ltHits > 0] = 255
+  # loss is already adequately marked so we don't want it ran through the routine
+  lossHits = np.zeros_like(wtHits)
+  coloredImage = markPastedFilters(lossHits,ltHits,wtHits,markedImage)
+  # add back in the loss hits
+  coloredImage[:,:,2] = markedImage[:,:,2]  
+
+  ### Save image to run with optimizer routines
+  newName = annotatedName[:-4]+"_pasted"+annotatedName[-4:]
+  cv2.imwrite(newName,coloredImage)
+
+  return newName
+
+def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize,filterTwoSarcSize=25):
+  # function to apply the image mask before outputting results
+  maskName = imgName[:-4]; fileType = imgName[-4:]
+  fileName = maskName+'_mask'+fileType
+  mask = cv2.imread(fileName)                       
+  try:
+    maskGray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+  except:
+    print "No mask named '"+fileName +"' was found. Circumventing masking."
+    return img
+  if ImgTwoSarcSize != None:
+    scale = float(filterTwoSarcSize) / float(ImgTwoSarcSize)
+    maskResized = cv2.resize(maskGray,None,fx=scale,fy=scale,interpolation=cv2.INTER_CUBIC)
+  else:
+    maskResized = maskGray
+  normed = maskResized.astype('float') / float(np.max(maskResized))
+  normed[normed < 1.0] = 0
+  dimensions = np.shape(img)
+  if len(dimensions) < 3:
+    combined = img * normed 
+  else:
+    combined = img
+    for i in range(dimensions[2]):
+      combined[:,:,i] = combined[:,:,i] * normed
+  return combined
+
+def assessContent(markedImg,imgName=None):
+  '''This function analyzes the amount of TT, LT, and TA content that is present in a marked image
+  returned by giveMarkedMyocyte or give3DMarkedMyocyte.
+
+  Inputs:
+    markedImg -> numpy array. The marked image that is returned from the marking routines mentioned above.
+    imgName -> str. Name of the image. If this is specified, the routine will search for an image mask that 
+                 has been constructed to obfuscate the extracellular content/organelles. The naming convention
+                 for the masks is "<ORIGINAL_NAME>_masked.<FILETYPE>"
+
+  Outputs:
+    ttContent, ltContent, taContent
+  '''
+  ### Create copy of image
+  imgCopy = markedImg.copy()
+
+  ### Pull out content-specific channels
+  tt = imgCopy[...,0]
+  lt = imgCopy[...,1]
+  ta = imgCopy[...,2]
+
+  ### Get rid of everything that isn't a hit (hits are marked as 255)
+  tt[tt != 255] = 0
+  lt[lt != 255] = 0
+  ta[ta != 255] = 0
+
+  ### normalize
+  ttNormed = np.divide(tt, np.max(tt))
+  ltNormed = np.divide(lt, np.max(lt))
+  taNormed = np.divide(ta, np.max(ta))
+
+  ### calculate content
+  ttContent = np.sum(ttNormed)
+  ltContent = np.sum(ltNormed)
+  taContent = np.sum(taNormed)
+
+  if isinstance(imgName, (str)):
+    if len(np.shape(imgCopy)) == 4:
+      raise RuntimeError("WARNING: Masking is not implemented in 3D so the assessment of content does not include this. \
+                          This may skew results.")
+    ## if imgName is included, we normalize content to cell area
+    dummy = np.multiply(np.ones_like(markedImg[:,:,0]), 255)
+    mask = ReadResizeApplyMask(dummy,imgName,25,25)
+    mask[mask <= 254] = 0
+    mask[mask > 0] = 1
+    cellArea = np.sum(mask,dtype=float)
+    ttContent /= cellArea
+    ltContent /= cellArea
+    taContent /= cellArea
+    print "TT Content:", ttContent
+    print "LT Content:", ltContent
+    print "Loss Content:", taContent
+    print "Sum of Content:", ttContent+ltContent+taContent
+    ## these should sum to 1 exactly but I'm leaving wiggle room
+    assert (ttContent+ltContent+taContent) < 1.2, ("Something went " 
+            +"wrong with the normalization of content to the cell area calculated "
+            +"by the mask. Double check the masking routine.") 
+  else:
+    print "TT Content:", ttContent
+    print "LT Content:", ltContent
+    print "TA Content:", taContent  
+
+  return ttContent, ltContent, taContent
+
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+###  Plotting/Display Functions
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
 
 def displayTissueCaseHits(case,
                           tag,
@@ -720,77 +1020,6 @@ def displayTissueCaseHits(case,
   plt.imshow(coloredImage,vmin=0,vmax=255)
   plt.gcf().savefig(tag+"_hits.pdf",dpi=600)
 
-def saveWorkflowFig():
-  '''
-  Function that will save the images used for the workflow figure in the paper.
-  Note: This is slightly subject to how one preprocesses the MI_D_73.png image.
-        A slight change in angle or what subsection was selected in the preprocessing
-        could slightly change how the images appear.
-  '''
-
-  imgName = "./myoimages/MI_D_73_processed.png" 
-  iters = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
-  
-  colorImg,colorAngles,angleCounts = giveMarkedMyocyte(testImage=imgName,
-                                                       tag="WorkflowFig",
-                                                       iters=iters,
-                                                       returnAngles=True,
-                                                       writeImage=True)
-
-  ### save the correlation planes
-  lossFilter = util.LoadFilter("./myoimages/LossFilter.png")
-  ltFilter = util.LoadFilter("./myoimages/LongitudinalFilter.png")
-  wtFilter = util.LoadFilter("./myoimages/newSimpleWTFilter.png")
-
-  origImg = util.ReadImg(imgName,cvtColor=False)
-  origImg = cv2.cvtColor(origImg,cv2.COLOR_BGR2GRAY)
-  lossCorr = mF.matchedFilter(origImg, lossFilter,demean=False)
-  ltCorr = mF.matchedFilter(origImg, ltFilter,demean=False)
-  wtCorr = mF.matchedFilter(origImg, wtFilter,demean=False)
-
-  cropImgs = False
-  if cropImgs:
-    angle_output = util.ReadImg("WorkflowFig_angles_output.png",cvtColor=False)
-    output = util.ReadImg("WorkflowFig_output.png",cvtColor=False)
-    imgs = {"WorkflowFig_angles_output.png":angle_output, 
-            "WorkflowFig_output.png":output, 
-            "WorkflowFig_orig.png":origImg}
-
-    left = 204; right = 304; top = 74; bottom = 151
-    for name,img in imgs.iteritems():
-      if cropImgs:
-        holder = np.zeros((bottom-top,right-left,3),dtype=np.uint8)
-        for channel in range(3):
-          ### crop images
-          holder[:,:,channel] = img[top:bottom,left:right,channel]
-      cv2.imwrite(name,holder)
-    lossCorr = lossCorr[top:bottom,left:right]
-    ltCorr = ltCorr[top:bottom,left:right]
-    wtCorr = wtCorr[top:bottom,left:right]
-
-  plt.figure()
-  plt.imshow(lossCorr,cmap='gray')
-  plt.gcf().savefig("WorkflowFig_lossCorr.pdf")
-
-  plt.figure()
-  plt.imshow(ltCorr,cmap='gray')
-  plt.gcf().savefig("WorkflowFig_ltCorr.pdf")
-
-  plt.figure()
-  plt.imshow(wtCorr,cmap='gray')
-  plt.gcf().savefig("WorkflowFig_wtCorr.pdf")
-
-  ### Assess content
-  wtC,ltC,ldC = assessContent(colorImg,imgName=imgName)
-
-  ### make a bar chart using routine
-  content = [wtC,ltC,ldC]
-  contentDict = {imgName:content}
-  giveBarChartfromDict(contentDict,"WorkflowFig_Content")
-
-  ### Make a histogram for the angles
-  giveAngleHistogram(angleCounts,iters,"WorkflowFig")
-
 def giveAngleHistogram(angleCounts,iters,tag):
   ### Make a histogram for the angles
   iters = np.asarray(iters,dtype='float')
@@ -807,145 +1036,9 @@ def giveAngleHistogram(angleCounts,iters,tag):
   plt.gcf().savefig(tag+"_angle_histogram.pdf",dpi=300)
   plt.close()
 
-def giveAvgStdofDicts(ShamDict,HFDict,MI_DDict,MI_MDict,MI_PDict):
-  ### make a big dictionary to iterate through
-  results = {'Sham':ShamDict,'HF':HFDict,'MI_D':MI_DDict,'MI_M':MI_MDict,'MI_P':MI_PDict}
-  ### make dictionaries to store results
-  avgDict = {}; stdDict = {}
-  for model,dictionary in results.iteritems():
-    ### make holders to store results
-    angleAvgs = []; angleStds = []
-    for name,angleCounts in dictionary.iteritems():
-      print name
-      if 'angle' not in name:
-        continue
-      angleAvgs.append(np.mean(angleCounts))
-      angleStds.append(np.std(angleCounts))
-      print "Average striation angle:",angleAvgs[-1]
-      print "Standard deviation of striation angle:",angleStds[-1]
-    avgDict[model] = angleAvgs
-    stdDict[model] = angleStds
-
-  ### Normalize Standard Deviations to Sham Standard Deviation
-  ShamAvgStd = np.mean(stdDict['Sham'])
-  stdStdDev = {}
-  for name,standDev in stdDict.iteritems():
-    standDev = np.asarray(standDev,dtype=float) / ShamAvgStd
-    stdDict[name] = np.mean(standDev)
-    stdStdDev[name] = np.std(standDev)
-
-  ### Make bar chart for angles 
-  # need to have results in ordered arrays...
-  names = ['Sham', 'HF', 'MI_D', 'MI_M', 'MI_P']
-  avgs = []; stds = []
-  for name in names:
-    avgs.append(avgDict[name])
-    stds.append(stdDict[name])
-  width = 0.25
-  N = 1
-  indices = np.arange(N) + width
-  fig,ax = plt.subplots()
-  for i,name in enumerate(names):
-    ax.bar(indices+i*width, stdDict[name], width, yerr=stdStdDev[name],ecolor='k',alpha=0.5)
-  ax.set_ylabel("Average Angle Standard Deviation Normalized to Sham")
-  xtickLocations = np.arange(len(names)) * width + width*3./2.
-  ax.set_xticks(xtickLocations)
-  ax.set_xticklabels(names,rotation='vertical')
-  plt.gcf().savefig("Whole_Dataset_Angles.pdf",dpi=300)
-
-def analyzeAllMyo(root="/net/share/dfco222/data/TT/LouchData/processedWithIntelligentThresholding/"):
-  '''
-  Function to iterate through a directory containing images that have already
-  been preprocessed by preprocessing.py
-  This directory can contain masks but it is not necessary
-  '''
-  ### instantiate dicitionary to hold content values
-  Sham = {}; MI_D = {}; MI_M = {}; MI_P = {}; HF = {};
-
-  for name in os.listdir(root):
-    if "mask" in name:
-      continue
-    print name
-    iters=[-25,-20,-15,-10,-5,0,5,10,15,20,25]
-    ### iterate through names and mark the images
-    markedMyocyte,_,angleCounts = giveMarkedMyocyte(testImage=root+name,
-                                                    tag=name[:-4],
-                                                    iters=iters,
-                                                    writeImage=True,
-                                                    returnAngles=True)
-    ### save raw image with ROI marked
-    cImg = util.ReadImg(root+name)
-    cImg = util.markMaskOnMyocyte(cImg,root+name)
-    plt.figure()
-    plt.imshow(util.switchBRChannels(cImg))
-    plt.gcf().savefig(name[:-4]+'_markedMask.pdf')
-    plt.close()
-
-    ### hacky way to get percent of hits within range of 5 degrees from minor axis
-    idxs = [4,5,6]
-    totalHits = len(angleCounts)
-    angleCountsNP = np.asarray(angleCounts)
-    hitsInRange =   np.count_nonzero(np.equal(angleCounts, iters[idxs[0]])) \
-                  + np.count_nonzero(np.equal(angleCounts, iters[idxs[1]])) \
-                  + np.count_nonzero(np.equal(angleCounts, iters[idxs[2]])) 
-    print "Percentage of WT hits within 5 degrees of minor axis:", float(hitsInRange)/float(totalHits) * 100.
-
-    ### assess content
-    wtC, ltC, lossC = assessContent(markedMyocyte,imgName=root+name)
-    content = np.asarray([wtC, ltC, lossC],dtype=float)
-
-    ### store content in respective dictionary
-    if 'Sham' in name:
-      Sham[name] = content
-      Sham[name+'_angles'] = angleCounts
-    elif 'HF' in name:
-      HF[name] = content
-      HF[name+'_angles'] = angleCounts
-    elif 'MI' in name:
-      if '_D' in name:
-        MI_D[name] = content
-        MI_D[name+'_angles'] = angleCounts
-      elif '_M' in name:
-        MI_M[name] = content
-        MI_M[name+'_angles'] = angleCounts
-      elif '_P' in name:
-        MI_P[name] = content
-        MI_P[name+'_angles'] = angleCounts
-
-    ### make angle histogram for the data
-    giveAngleHistogram(angleCounts,iters,tag=name[:-4])
-
-  ### use function to construct and write bar charts for each content dictionary
-  giveBarChartfromDict(Sham,'Sham')
-  giveBarChartfromDict(HF,'HF')
-  giveMIBarChart(MI_D,MI_M,MI_P)
-  giveAvgStdofDicts(Sham,HF,MI_D,MI_M,MI_P)
-
-def analyzeSingleMyo(name,twoSarcSize):
-   realName = name#+"_processed.png"
-   iters = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
-   markedMyocyte,_,angleCounts = giveMarkedMyocyte(testImage=realName,
-                                     ImgTwoSarcSize=twoSarcSize,
-                                     tag=name,
-                                     writeImage=True,
-                                     returnAngles=True)
-   ### assess content
-   wtC, ltC, lossC = assessContent(markedMyocyte,imgName=realName)
-   #content = np.asarray([wtC, ltC, lossC],dtype=float)
-   #content /= np.max(content)
-
-   ### hacky way to get percent of hits within range of 5 degrees from minor axis
-   idxs = [4,5,6]
-   totalHits = len(angleCounts)
-   angleCountsNP = np.asarray(angleCounts)
-   hitsInRange =   np.count_nonzero(np.equal(angleCounts, iters[idxs[0]])) \
-                 + np.count_nonzero(np.equal(angleCounts, iters[idxs[1]])) \
-                 + np.count_nonzero(np.equal(angleCounts, iters[idxs[2]]))
-   print "Percentage of WT hits within 5 degrees of minor axis:", float(hitsInRange)/float(totalHits) * 100.
-
 def giveBarChartfromDict(dictionary,tag):
   ### instantiate lists to contain contents
-  wtC = []; ltC = []; lossC = [];
+  wtC = []; ltC = []; lossC = []
   for name,content in dictionary.iteritems():
     if "angle" in name:
       continue
@@ -1073,95 +1166,159 @@ def giveMIBarChart(MI_D, MI_M, MI_P):
   ax.set_ylim([0,1])
   plt.gcf().savefig('MI_BarChart.pdf',dpi=300)
 
-def markPastedFilters(
-      lossMasked, ltMasked, wtMasked, cI,
-      lossName="./myoimages/LossFilter.png",
-      ltName="./myoimages/LongitudinalFilter.png",
-      wtName="./myoimages/newSimpleWTFilter.png"
-      ):
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Analysis Routines
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
+def analyzeTissueCase(case,
+                      preprocess=True,
+                      useGPU=True,
+                      analyzeTA=True):
   '''
-  Given masked stacked hits for the 3 filters and a doctored colored image, 
-  function will paste filter sized boxes around the characterized regions
-  and return the colored image with filter sized regions colored.
-
-  NOTE: Colored image was read in (not grayscale) and 1 was subtracted from
-  the image. This was necessary for the thresholding to work with the painter
-  function
+  Refactored method to analyze tissue cases 
   '''
-  # exploiting architecture of painter function to mark hits for me
-  Lossholder = empty()
-  Lossholder.stackedHits = lossMasked
-  LTholder = empty()
-  LTholder.stackedHits = ltMasked
-  WTholder = empty()
-  WTholder.stackedHits = wtMasked
+  if preprocess:
+    case = preprocessTissueCase(case)
 
-  ### load in filters to get filter dimensions
-  if lossName:
-    lossFilt = util.LoadFilter(lossName)
-  if ltName:
-    ltFilt = util.LoadFilter(ltName)
-  if wtName:
-    wtFilt = util.LoadFilter(wtName)
+  ### Setup Filters
+  root = "./myoimages/"
+  ttFilterName = root+"newSimpleWTFilter.png"
+  ttPunishmentFilterName = root+"newSimpleWTPunishmentFilter.png"
+  case.iters = [-25,-20,-15,-10-5,0,5,10,15,20,25]
+  returnAngles = True
+  ttFilter = util.LoadFilter(ttFilterName)
+  ttPunishmentFilter = util.LoadFilter(ttPunishmentFilterName)
 
-  ### get filter dimensions
-  if lossName:
-    lossDimensions = util.measureFilterDimensions(lossFilt)
-  if ltName:
-    LTDimensions = util.measureFilterDimensions(ltFilt)
-  if wtName:
-    WTDimensions = util.measureFilterDimensions(wtFilt)
+  ### Setup parameter dictionaries
+  case.params = optimizer.ParamDict(typeDict="WT")
+  case.params['covarianceMatrix'] = np.ones_like(case.subregion)
+  case.params['mfPunishment'] = ttPunishmentFilter
+  case.params['useGPU'] = useGPU
 
-  ### we want to mark WT last since that should be the most stringent
-  # Opting to mark Loss, then Long, then WT
-  if lossName:
-    labeledLoss = painter.doLabel(Lossholder,cellDimensions=lossDimensions,thresh=0)
-    if len(np.shape(cI)) == 4:
-      print "Warning: Shifting TA hits down one index in the z domain to make consistent hit detection."
-      dummy = np.zeros_like(labeledLoss[:,:,0])
-      labeledLoss = np.dstack((dummy,labeledLoss))[:,:,:-1]
-  else:
-    labeledLoss = np.zeros_like(lossMasked,dtype=int)
-  if ltName:
-    labeledLT = painter.doLabel(LTholder,cellDimensions=LTDimensions,thresh=0)
-    if len(np.shape(cI)) == 4:
-      print "Warning: Shifting LT hits down one index in the z domain to make consistent hit detection."
-      dummy = np.zeros_like(labeledLT[:,:,0])
-      labeledLT = np.dstack((dummy,labeledLT))[:,:,:-1]
-  else:
-    labeledLT = np.zeros_like(ltMasked,dtype=int)
-  if wtName:
-    labeledWT = painter.doLabel(WTholder,cellDimensions=WTDimensions,thresh=0)
-  else:
-    labeledWT = np.zeros_like(wtMasked,dtype=int)
+  ### Setup input classes
+  case.inputs = empty()
+  case.inputs.imgOrig = case.subregion.astype(np.float32) / float(np.max(case.subregion))
+  case.inputs.mfOrig = ttFilter
 
-  ### perform masking
-  if lossName:
-    Lossmask = labeledLoss.copy()
-  else:
-    Lossmask = Lossholder.stackedHits > np.inf
-  if ltName:
-    LTmask = labeledLT.copy()
-  else:
-    LTmask = LTholder.stackedHits > np.inf
-  if wtName:
-    WTmask = labeledWT.copy()
-  else:
-    WTmask = WTholder.stackedHits > np.inf
+  ### Perform filtering for TT detection
+  case.results = bD.DetectFilter(case.inputs,
+                                 case.params,
+                                 case.iters
+                                 )
 
-  WTmask[labeledLoss] = False
-  WTmask[labeledLT] = False
-  LTmask[labeledLoss] = False
-  LTmask[WTmask] = False # prevents double marking of WT and LT
+  ### Modify case to perform TA detection
+  if analyzeTA:
+    case.TAinputs = empty()
+    case.TAinputs.imgOrig = case.subregion
+    case.TAinputs.displayImg = case.displayImg
+    lossFilterName = root+"LossFilter.png"
+    case.TAIters = [-45,0]
+    lossFilter = util.LoadFilter(lossFilterName)
+    case.TAinputs.mfOrig = lossFilter
+    case.TAparams = optimizer.ParamDict(typeDict='Loss')
 
-  ### Dampen brightness and mark hits
-  alpha = 1.0
-  hitValue = int(round(alpha * 255))
-  cI[...,2][Lossmask] = hitValue
-  cI[...,1][LTmask] = hitValue
-  cI[...,0][WTmask] = hitValue
+    ### Perform filtering for TA detection
+    case.TAresults = bD.DetectFilter(case.TAinputs,
+                                     case.TAparams,
+                                     case.TAIters)
 
-  return cI
+  return case
+
+def analyzeAllMyo(root="/net/share/dfco222/data/TT/LouchData/processedWithIntelligentThresholding/"):
+  '''
+  Function to iterate through a directory containing images that have already
+  been preprocessed by preprocessing.py
+  This directory can contain masks but it is not necessary
+  '''
+  ### instantiate dicitionary to hold content values
+  Sham = {}; MI_D = {}; MI_M = {}; MI_P = {}; HF = {}
+
+  for name in os.listdir(root):
+    if "mask" in name:
+      continue
+    print name
+    iters=[-25,-20,-15,-10,-5,0,5,10,15,20,25]
+    ### iterate through names and mark the images
+    markedMyocyte,_,angleCounts = giveMarkedMyocyte(testImage=root+name,
+                                                    tag=name[:-4],
+                                                    iters=iters,
+                                                    writeImage=True,
+                                                    returnAngles=True)
+    ### save raw image with ROI marked
+    cImg = util.ReadImg(root+name)
+    cImg = util.markMaskOnMyocyte(cImg,root+name)
+    plt.figure()
+    plt.imshow(util.switchBRChannels(cImg))
+    plt.gcf().savefig(name[:-4]+'_markedMask.pdf')
+    plt.close()
+
+    ### hacky way to get percent of hits within range of 5 degrees from minor axis
+    idxs = [4,5,6]
+    totalHits = len(angleCounts)
+    angleCountsNP = np.asarray(angleCounts)
+    hitsInRange =   np.count_nonzero(np.equal(angleCounts, iters[idxs[0]])) \
+                  + np.count_nonzero(np.equal(angleCounts, iters[idxs[1]])) \
+                  + np.count_nonzero(np.equal(angleCounts, iters[idxs[2]])) 
+    print "Percentage of WT hits within 5 degrees of minor axis:", float(hitsInRange)/float(totalHits) * 100.
+
+    ### assess content
+    wtC, ltC, lossC = assessContent(markedMyocyte,imgName=root+name)
+    content = np.asarray([wtC, ltC, lossC],dtype=float)
+
+    ### store content in respective dictionary
+    if 'Sham' in name:
+      Sham[name] = content
+      Sham[name+'_angles'] = angleCounts
+    elif 'HF' in name:
+      HF[name] = content
+      HF[name+'_angles'] = angleCounts
+    elif 'MI' in name:
+      if '_D' in name:
+        MI_D[name] = content
+        MI_D[name+'_angles'] = angleCounts
+      elif '_M' in name:
+        MI_M[name] = content
+        MI_M[name+'_angles'] = angleCounts
+      elif '_P' in name:
+        MI_P[name] = content
+        MI_P[name+'_angles'] = angleCounts
+
+    ### make angle histogram for the data
+    giveAngleHistogram(angleCounts,iters,tag=name[:-4])
+
+  ### use function to construct and write bar charts for each content dictionary
+  giveBarChartfromDict(Sham,'Sham')
+  giveBarChartfromDict(HF,'HF')
+  giveMIBarChart(MI_D,MI_M,MI_P)
+  giveAvgStdofDicts(Sham,HF,MI_D,MI_M,MI_P)
+
+def analyzeSingleMyo(name,twoSarcSize):
+   realName = name#+"_processed.png"
+   iters = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
+   markedMyocyte,_,angleCounts = giveMarkedMyocyte(testImage=realName,
+                                     ImgTwoSarcSize=twoSarcSize,
+                                     tag=name,
+                                     writeImage=True,
+                                     returnAngles=True)
+   ### assess content
+   wtC, ltC, lossC = assessContent(markedMyocyte,imgName=realName)
+   #content = np.asarray([wtC, ltC, lossC],dtype=float)
+   #content /= np.max(content)
+
+   ### hacky way to get percent of hits within range of 5 degrees from minor axis
+   idxs = [4,5,6]
+   totalHits = len(angleCounts)
+   angleCountsNP = np.asarray(angleCounts)
+   hitsInRange =   np.count_nonzero(np.equal(angleCounts, iters[idxs[0]])) \
+                 + np.count_nonzero(np.equal(angleCounts, iters[idxs[1]])) \
+                 + np.count_nonzero(np.equal(angleCounts, iters[idxs[2]]))
+   print "Percentage of WT hits within 5 degrees of minor axis:", float(hitsInRange)/float(totalHits) * 100.
 
 def WT_Filtering(inputs,
                  iters,
@@ -1632,69 +1789,41 @@ def give3DMarkedMyocyte(
   print "Time for algorithm to run:",end-start,"seconds"
   
   return cImg
-  
 
-def setupAnnotatedImage(annotatedName, baseImageName):
-  '''
-  Function to be used in conjunction with Myocyte().
-  Uses the markPastedFilters() function to paste filters onto the annotated image.
-  This is so we don't have to generate a new annotated image everytime we 
-  change filter sizes.
-  '''
-  ### Read in images
-  #baseImage = util.ReadImg(baseImageName,cvtColor=False)
-  markedImage = util.ReadImg(annotatedName, cvtColor=False)
-  
-  ### Divide up channels of markedImage to represent hits
-  wtHits, ltHits = markedImage[:,:,0],markedImage[:,:,1]
-  wtHits[wtHits > 0] = 255
-  ltHits[ltHits > 0] = 255
-  # loss is already adequately marked so we don't want it ran through the routine
-  lossHits = np.zeros_like(wtHits)
-  coloredImage = markPastedFilters(lossHits,ltHits,wtHits,markedImage)
-  # add back in the loss hits
-  coloredImage[:,:,2] = markedImage[:,:,2]  
-
-  ### Save image to run with optimizer routines
-  newName = annotatedName[:-4]+"_pasted"+annotatedName[-4:]
-  cv2.imwrite(newName,coloredImage)
-
-  return newName
-##
-## Defines dataset for myocyte (MI) 
-##
 def Myocyte():
-    # where to look for images
-    root = "myoimages/"
+  '''This function defines the dataset for the myocyte optimization routines
+  '''
 
-    filter1TestName = root + "MI_annotation_testImg.png"
-    filter1PositiveTest = root + "MI_annotation_trueImg.png"
+  # where to look for images
+  root = "myoimages/"
 
-    dataSet = optimizer.DataSet(
-        root = root,
-        filter1TestName = filter1TestName,
-        filter1TestRegion = None,
-        filter1PositiveTest = filter1PositiveTest,
-        filter1PositiveChannel= 0,  # blue, WT 
-        filter1Label = "TT",
-        filter1Name = root+'WTFilter.png',          
-        filter1Thresh=0.06, 
-        
-        filter2TestName = filter1TestName,
-        filter2TestRegion = None,
-        filter2PositiveTest = filter1PositiveTest,
-        filter2PositiveChannel= 1,  # green, longi
-        filter2Label = "LT",
-        filter2Name = root+'newLTfilter.png',        
-        filter2Thresh=0.38 
-    )
+  filter1TestName = root + "MI_annotation_testImg.png"
+  filter1PositiveTest = root + "MI_annotation_trueImg.png"
+
+  dataSet = optimizer.DataSet(
+      root = root,
+      filter1TestName = filter1TestName,
+      filter1TestRegion = None,
+      filter1PositiveTest = filter1PositiveTest,
+      filter1PositiveChannel= 0,  # blue, WT 
+      filter1Label = "TT",
+      filter1Name = root+'WTFilter.png',          
+      filter1Thresh=0.06, 
+
+      filter2TestName = filter1TestName,
+      filter2TestRegion = None,
+      filter2PositiveTest = filter1PositiveTest,
+      filter2PositiveChannel= 1,  # green, longi
+      filter2Label = "LT",
+      filter2Name = root+'newLTfilter.png',        
+      filter2Thresh=0.38 
+  )
 
 
-    # flag to paste filters on the myocyte to smooth out results
-    dataSet.pasteFilters = True
+  # flag to paste filters on the myocyte to smooth out results
+  dataSet.pasteFilters = True
 
-    return dataSet
-
+  return dataSet
 
 def rocData(): 
   dataSet = Myocyte() 
@@ -1756,15 +1885,13 @@ def rocData():
          iters=lossIters,
        )
 
-
-###
-### Function to calculate data for a full ROC for a given myocyte and return
-### scores for each filter at given thresholds
-###
 def myocyteROC(data, myoName,
                threshes = np.linspace(5,30,10),
                iters=[-25,-20,-15,-10,-5,0,5,10,15,20,25]
                ):
+  '''Function to calculate data for a full ROC for a given myocyte and return
+  scores for each filter at given thresholds
+  '''
   root = "./myoimages/"
 
   ### WT
@@ -1819,96 +1946,6 @@ def myocyteROC(data, myoName,
                           hdf5Name=myoName+"_Loss.h5",
                           display=False,
                           iters=LossIters)
-
-def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize,filterTwoSarcSize=25):
-  # function to apply the image mask before outputting results
-  maskName = imgName[:-4]; fileType = imgName[-4:]
-  fileName = maskName+'_mask'+fileType
-  mask = cv2.imread(fileName)                       
-  try:
-    maskGray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-  except:
-    print "No mask named '"+fileName +"' was found. Circumventing masking."
-    return img
-  if ImgTwoSarcSize != None:
-    scale = float(filterTwoSarcSize) / float(ImgTwoSarcSize)
-    maskResized = cv2.resize(maskGray,None,fx=scale,fy=scale,interpolation=cv2.INTER_CUBIC)
-  else:
-    maskResized = maskGray
-  normed = maskResized.astype('float') / float(np.max(maskResized))
-  normed[normed < 1.0] = 0
-  dimensions = np.shape(img)
-  if len(dimensions) < 3:
-    combined = img * normed 
-  else:
-    combined = img
-    for i in range(dimensions[2]):
-      combined[:,:,i] = combined[:,:,i] * normed
-  return combined
-
-def assessContent(markedImg,imgName=None):
-  '''This function analyzes the amount of TT, LT, and TA content that is present in a marked image
-  returned by giveMarkedMyocyte or give3DMarkedMyocyte.
-
-  Inputs:
-    markedImg -> numpy array. The marked image that is returned from the marking routines mentioned above.
-    imgName -> str. Name of the image. If this is specified, the routine will search for an image mask that 
-                 has been constructed to obfuscate the extracellular content/organelles. The naming convention
-                 for the masks is "<ORIGINAL_NAME>_masked.<FILETYPE>"
-
-  Outputs:
-    ttContent, ltContent, taContent
-  '''
-  ### Create copy of image
-  imgCopy = markedImg.copy()
-
-  ### Pull out content-specific channels
-  tt = imgCopy[...,0]
-  lt = imgCopy[...,1]
-  ta = imgCopy[...,2]
-
-  ### Get rid of everything that isn't a hit (hits are marked as 255)
-  tt[tt != 255] = 0
-  lt[lt != 255] = 0
-  ta[ta != 255] = 0
-
-  ### normalize
-  ttNormed = np.divide(tt, np.max(tt))
-  ltNormed = np.divide(lt, np.max(lt))
-  taNormed = np.divide(ta, np.max(ta))
-
-  ### calculate content
-  ttContent = np.sum(ttNormed)
-  ltContent = np.sum(ltNormed)
-  taContent = np.sum(taNormed)
-
-  if isinstance(imgName, (str)):
-    if len(np.shape(imgCopy)) == 4:
-      raise RuntimeError("WARNING: Masking is not implemented in 3D so the assessment of content does not include this. \
-                          This may skew results.")
-    ## if imgName is included, we normalize content to cell area
-    dummy = np.multiply(np.ones_like(markedImg[:,:,0]), 255)
-    mask = ReadResizeApplyMask(dummy,imgName,25,25)
-    mask[mask <= 254] = 0
-    mask[mask > 0] = 1
-    cellArea = np.sum(mask,dtype=float)
-    ttContent /= cellArea
-    ltContent /= cellArea
-    taContent /= cellArea
-    print "TT Content:", ttContent
-    print "LT Content:", ltContent
-    print "Loss Content:", taContent
-    print "Sum of Content:", ttContent+ltContent+taContent
-    ## these should sum to 1 exactly but I'm leaving wiggle room
-    assert (ttContent+ltContent+taContent) < 1.2, ("Something went " 
-            +"wrong with the normalization of content to the cell area calculated "
-            +"by the mask. Double check the masking routine.") 
-  else:
-    print "TT Content:", ttContent
-    print "LT Content:", ltContent
-    print "TA Content:", taContent  
-
-  return ttContent, ltContent, taContent
 
 def minDistanceROC(dataSet,paramDict,param1Range,param2Range,
                    param1="snrThresh",
@@ -1988,7 +2025,6 @@ def optimizeWT():
   plt.colorbar()
   plt.gcf().savefig("ROC_Optimization_WT.png")
   
-
 def optimizeLT():
   root = "./myoimages/"
   dataSet = Myocyte()
@@ -2092,8 +2128,6 @@ def validate3D():
   cellDimensions = [10, 10, 20]
   ## Define test file name
   testName = "./myoimages/3DValidationData.tif"
-  ## Define output name for classification results
-  #outputName = "simulated3DData_LT{}_TA{}_analysis"
   ## Give names for your filters. NOTE: These are hardcoded in the filter generation routines in util.py
   ttName = './myoimages/TT_3D.tif'
   ttPunishName = './myoimages/TT_Punishment_3D.tif'
@@ -2206,6 +2240,7 @@ if __name__ == "__main__":
       quit()
 
     if(arg=='-fullValidation'):
+      ## This routine MUST be run before changes are committed to the repo
       validate()
       validate3D()
       quit()
