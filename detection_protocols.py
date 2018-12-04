@@ -238,7 +238,7 @@ def regionalDeviation(inputs,paramDict):
     resultImage = np.ones_like(img) * 5. * paramDict['snrThresh']
     resultImage[commonHits] = 0.
   results.snr = resultImage
-
+  
   return results
 
 def filterRatio(inputs,paramDict):
