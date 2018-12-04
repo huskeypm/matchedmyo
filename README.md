@@ -4,9 +4,9 @@ Algorithm for the classification of subcellular features within isolated myocyte
 
 NOTE: Before running algorithm on user provided images, be sure to run through
 
-<code>
+```
 python preprocessing.py -preprocess "IMGNAME" "FILTERTWOSARCSIZE"
-</code>
+```
 
 Where IMGNAME is the path/name of your image and FILTERTWOSARCSIZE 
 is the default two sarcomere size for the filters used. Default filter size is 25 pixels.
@@ -32,21 +32,21 @@ NOTE: All package dependencies are handled by a full Anaconda install except for
 # Upon Pulling a Clean Repo
 Initialize the repo by running the following commands:
 
-1. Run "python util.py -genAllMyo" to generate all necessary filters
+1. Run `python util.py -genAllMyo` to generate all necessary filters
 
-2. Run "python preprocessing.py -preprocessAll" to process all of the included myocyte images
+2. Run `python preprocessing.py -preprocessAll` to process all of the included myocyte images
 
 # Preprocesing User Supplied Images
 To preprocess a directory containing user supplied images, run:
 
-<code>
+```
 python preprocessing.py -preprocessDirectory PATH_TO_DIRECTORY
-</code>
+```
 
 # MASTER SCRIPT 
 ## detect.py 
 To run with yaml: (follow ex.yml for an example) 
-python detect.py -updatedSimpleYaml ex.yml
+`python detect.py -updatedSimpleYaml ex.yml`
 
 
 ## GPU-accelerated Detection
@@ -59,27 +59,39 @@ GPU-acceleration implemented in twoDtense.py . This can be turned on and off wit
 # Miscellaneous 
 
 ### validation test
-<code>
+To validate the 2D usage of the software:
+
+```
 python myocyteFigs.py -validate
-</code>
+```
+
+To validate the 3D usage of the software:
+
+```
+python myocyteFigs.py -validate3D
+```
+
+To validate the code fully:
+
+```
+python myocyteFigs.py -fullValidation
+```
 
 ### Generate Paper Figures
 To preprocess images:
-<code>
-python preprocessing.py -preprocessAll
-</code>
-To generate the paper figures:
-<code>
-python myocyteFigs.py -allFigs 
-</code>
 
-### Minor validation test
-<code>
-python myocyteFigs.py -minorValidate
-</code>
-Meant to serve as a rapid validation test between commits
+```
+python preprocessing.py -preprocessAll
+```
+
+To generate the paper figures:
+
+```
+python myocyteFigs.py -allFigs 
+```
 
 ### ROC optimization
-<code>
+
+```
 python myocyteFigs.py -full_ROC
-</code>
+```
