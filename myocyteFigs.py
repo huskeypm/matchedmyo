@@ -1116,6 +1116,10 @@ def markPastedFilters(
   # Opting to mark Loss, then Long, then WT
   if lossName:
     labeledLoss = painter.doLabel(Lossholder,cellDimensions=lossDimensions,thresh=0)
+    if len(np.shape(cI)) == 4:
+      print "Warning: Shifting TA hits down one index in the z domain to make consistent hit detection."
+      dummy = np.zeros_like(labeledLoss[:,:,0])
+      labeledLoss = np.dstack((dummy,labeledLoss))[:,:,:-1]
   else:
     labeledLoss = np.zeros_like(lossMasked,dtype=int)
   if ltName:
@@ -2025,7 +2029,7 @@ def optimizeLoss():
   plt.gcf().savefig("ROC_Optimization_Loss.png")
 
 # function to validate that code has not changed since last commit
-def validate(testImage="./myoimages/MI_D_78_processed.png",
+def validate(testImage="./myoimages/MI_M_45_processed.png",
              display=False
              ):
   # run algorithm
@@ -2039,40 +2043,10 @@ def validate(testImage="./myoimages/MI_D_78_processed.png",
   # calculate wt, lt, and loss content  
   wtContent, ltContent, lossContent = assessContent(markedImg)
 
-  assert(abs(wtContent - 52594) < 1), "WT validation failed."
-  assert(abs(ltContent - 11687) < 1), "LT validation failed."
-  assert(abs(lossContent - 12752) < 1), "Loss validation failed."
+  assert(abs(wtContent - 103050) < 1), "WT validation failed."
+  assert(abs(ltContent - 68068) < 1), "LT validation failed."
+  assert(abs(lossContent - 156039) < 1), "Loss validation failed."
   print "PASSED!"
-
-# A minor validation function to serve as small tests between commits
-def minorValidate(testImage="./myoimages/MI_D_73_annotation.png",
-                  ImgTwoSarcSize=25, #img is already resized to 25 px
-                  iters=[-10,0,10],
-                  display=False):
-
-  # run algorithm
-  markedImg = giveMarkedMyocyte(testImage=testImage, 
-                                ImgTwoSarcSize=ImgTwoSarcSize,iters=iters)
-  if display:
-    plt.figure()
-    plt.imshow(markedImg)
-    plt.show()
-
-  # assess content
-  wtContent, ltContent, lossContent = assessContent(markedImg) 
-  
-  print "WT Content:",wtContent
-  print "Longitudinal Content", ltContent
-  print "Loss Content", lossContent
-
-  val = 18722 
-  assert(abs(wtContent - val) < 1),"%f != %f"%(wtContent, val)       
-  val = 3669
-  assert(abs(ltContent - val) < 1),"%f != %f"%(ltContent, val) 
-  val = 1420
-  assert(abs(lossContent - val) < 1),"%f != %f"%(lossContent, val)
-  print "PASSED!"
-
 
 ###
 ### Function to test that the optimizer routines that assess positive and negative
