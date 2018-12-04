@@ -2116,12 +2116,18 @@ if __name__ == "__main__":
 
     ### Validation Routines
     if(arg=="-validate"):
-      print "Consider developing a more robust behavior test"
       validate()
       quit()
 
-    if(arg=="-minorValidate"):
-      minorValidate()
+    if(arg=='-validate3D'):
+      #validate3D()
+      print "Need to write this unit test"
+      quit()
+
+    if(arg=='-fullValidation'):
+      validate()
+      #validate3D()
+      print "Need to write the 3D test"
       quit()
 
     if(arg=="-scoretest"):
