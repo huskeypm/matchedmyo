@@ -2,15 +2,6 @@
 
 Algorithm for the classification of subcellular features within isolated myocytes and tissue swatches. 
 
-NOTE: Before running algorithm on user provided images, be sure to run through
-
-```
-python preprocessing.py -preprocess "IMGNAME" "FILTERTWOSARCSIZE"
-```
-
-Where IMGNAME is the path/name of your image and FILTERTWOSARCSIZE 
-is the default two sarcomere size for the filters used. Default filter size is 25 pixels.
-
 # Package Dependencies and Installation Pages
 - OpenCV (cv2)
   - opencv-python (3.4.1.15)
@@ -36,7 +27,7 @@ is the default two sarcomere size for the filters used. Default filter size is 2
   - tifffile (2018.10.18)
 
 NOTE: All package dependencies are handled by a full Anaconda install except for imutils and pygame.
-If using a linux machine, installation can be handled by running './installation.bash' from within the MatchedMyo repository.
+If using a linux machine, installation of package dependencies can be handled by running './installation.bash' from within the MatchedMyo repository.
 
 # Upon Pulling a Clean Repo
 Initialize the repo by running the following commands:
@@ -46,22 +37,31 @@ Initialize the repo by running the following commands:
 2. Run `python preprocessing.py -preprocessAll` to process all of the included myocyte images
 
 # Preprocesing User Supplied Images
+
+Before running algorithm on user provided images, be sure to run the included preprocessing routines of the images. To do so, run:
+
+`python preprocessing.py -preprocess <IMGNAME> <FILTERTWOSARCSIZE>`
+
+Where IMGNAME is the path/name of your image and FILTERTWOSARCSIZE the two sarcomere size for the filters used in pixels. Default filter size that the algorithm defaults to if this argument is not specified is 25 pixels. This is for preprocessing of single images.
+
 To preprocess a directory containing user supplied images, run:
 
-`python preprocessing.py -preprocessDirectory PATH_TO_DIRECTORY`
+`python preprocessing.py -preprocessDirectory <PATH_TO_DIRECTORY>`
 
 # MASTER SCRIPT 
 ## detect.py 
 To run with yaml: (follow ex.yml for an example) 
 `python detect.py -updatedSimpleYaml ex.yml`
 
+By default, all parameters used for analysis within the detect.py script are the same as the parameters used within the paper. The YAML (.yml) file contains the functionality for changing parameters the user would like to change from the default settings in the analysis they are running. 
+
 
 ## GPU-accelerated Detection
-GPU-accelerated matched filter detection.
+GPU-accelerated matched filter detection. NOTE: This is currently being phased out. In future iterations of this repository, this will no longer be available and large tissue-section analysis will be run in the same way that isolated myocyte analysis is run.
 
 Requires tensorflow cuda (python).
 
-GPU-acceleration implemented in twoDtense.py . This can be turned on and off with the "useGPU" flag in the parameter dictionary.
+GPU-acceleration implemented in 'twoDtense.py'. This can be turned on and off with the "useGPU" flag in the parameter dictionary.
 
 # Miscellaneous 
 
