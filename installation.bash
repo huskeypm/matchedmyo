@@ -19,3 +19,5 @@ pip install pygame==1.9.3
 pip install Pillow==5.2.0
 
 pip install scikit-learn==0.19.1
+
+pip install tifffile==2018.10.18

@@ -32,6 +32,8 @@ is the default two sarcomere size for the filters used. Default filter size is 2
   - Pillow (5.2.0)
 - SciKit Learn
   - scikit-learn (0.19.1)
+- Tifffile
+  - tifffile (2018.10.18)
 
 NOTE: All package dependencies are handled by a full Anaconda install except for imutils and pygame.
 If using a linux machine, installation can be handled by running './installation.bash' from within the MatchedMyo repository.
