@@ -7,6 +7,8 @@ pip install --user imutils==0.4.6
 pip install --user numpy==1.15.4
 
 pip install --user matplotlib==2.2.3
+### The following is necessary to use matplotlib in it's current implementation
+sudo apt-get install python-tk
 
 pip install --user PyYAML==3.12
 
