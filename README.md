@@ -13,21 +13,28 @@ is the default two sarcomere size for the filters used. Default filter size is 2
 
 # Package Dependencies and Installation Pages
 - OpenCV (cv2)
+  - opencv-python (3.4.1.15)
 - imutils (https://github.com/jrosebr1/imutils)
+  - imutils (0.4.6)
 - Numpy
+  - numpy (1.15.4)
 - Matplotlib
+  - matplotlib (2.2.3)
 - PyYAML
+  - PyYAML (3.12)
 - Scipy
-  - Scipy.fftpack
-  - Scipy.signal
+  - scipy (1.1.0)
 - Pandas
+  - pandas (0.23.4)
 - Pygame (https://www.pygame.org/download.shtml)
+  - pygame (1.9.3)
 - Python Image Library (PIL)
+  - Pillow (5.2.0)
 - SciKit Learn
-  - sklearn.decomposition
-- TensorFlow
+  - scikit-learn (0.19.1)
 
 NOTE: All package dependencies are handled by a full Anaconda install except for imutils and pygame.
+If using a linux machine, installation can be handled by running './installation.bash' from within the MatchedMyo repository.
 
 # Upon Pulling a Clean Repo
 Initialize the repo by running the following commands:
@@ -39,9 +46,7 @@ Initialize the repo by running the following commands:
 # Preprocesing User Supplied Images
 To preprocess a directory containing user supplied images, run:
 
-```
-python preprocessing.py -preprocessDirectory PATH_TO_DIRECTORY
-```
+`python preprocessing.py -preprocessDirectory PATH_TO_DIRECTORY`
 
 # MASTER SCRIPT 
 ## detect.py 
@@ -61,37 +66,25 @@ GPU-acceleration implemented in twoDtense.py . This can be turned on and off wit
 ### validation test
 To validate the 2D usage of the software:
 
-```
-python myocyteFigs.py -validate
-```
+`python myocyteFigs.py -validate`
 
 To validate the 3D usage of the software:
 
-```
-python myocyteFigs.py -validate3D
-```
+`python myocyteFigs.py -validate3D`
 
 To validate the code fully:
 
-```
-python myocyteFigs.py -fullValidation
-```
+`python myocyteFigs.py -fullValidation`
 
 ### Generate Paper Figures
 To preprocess images:
 
-```
-python preprocessing.py -preprocessAll
-```
+`python preprocessing.py -preprocessAll`
 
 To generate the paper figures:
 
-```
-python myocyteFigs.py -allFigs 
-```
+`python myocyteFigs.py -allFigs`
 
 ### ROC optimization
 
-```
-python myocyteFigs.py -full_ROC
-```
+`python myocyteFigs.py -full_ROC`
