@@ -1548,7 +1548,7 @@ def giveMarkedMyocyte(
     cI[dummy==255] = 255
 
     ### Now based on the marked hits, we can obtain an estimate of tubule content
-    #estimatedContent = estimateTubuleContentFromColoredImage(cI)
+    estimatedContent = util.estimateTubuleContentFromColoredImage(cI)
   
     if writeImage:
       ### mark mask outline on myocyte
@@ -1733,21 +1733,34 @@ def give3DMarkedMyocyte(
                              wtName = ttFilterName,
                              ltName = ltFilterName,
                              lossName = taFilterName)
+
+    ### 'Measure' cell volume just by getting measure of containing array
+    cellVolume = np.float(np.product(inputs.imgOrig.shape))
+
+    ### Now based on the marked hits, we can obtain an estimate of tubule content
+    estimatedContent = util.estimateTubuleContentFromColoredImage(
+      cImg,
+      totalCellSpace=cellVolume,
+      taFilterName = taFilterName,
+      ltFilterName = ltFilterName,
+      ttFilterName = ttFilterName
+    )
+
   else:
     ## Just mark exactly where detection is instead of pasting until cells on detections
     cImg[:,:,:,2][TAstackedHits > 0] = 255
     cImg[:,:,:,1][LTstackedHits > 0] = 255
     cImg[:,:,:,0][TTstackedHits > 0] = 255
 
-  ### Determine percentages of volume represented by each filter
-  cellVolume = np.float(np.product(inputs.imgOrig.shape))
-  taContent = np.float(np.sum(cImg[:,:,:,2] == 255)) / cellVolume
-  ltContent = np.float(np.sum(cImg[:,:,:,1] == 255)) / cellVolume
-  ttContent = np.float(np.sum(cImg[:,:,:,0] == 255)) / cellVolume
+    ### Determine percentages of volume represented by each filter
+    cellVolume = np.float(np.product(inputs.imgOrig.shape))
+    taContent = np.float(np.sum(cImg[:,:,:,2] == 255)) / cellVolume
+    ltContent = np.float(np.sum(cImg[:,:,:,1] == 255)) / cellVolume
+    ttContent = np.float(np.sum(cImg[:,:,:,0] == 255)) / cellVolume
 
-  print "TA Content per Cell Volume:", taContent
-  print "LT Content per Cell Volume:", ltContent
-  print "TT Content per Cell Volume:", ttContent
+    print "TA Content per Cell Volume:", taContent
+    print "LT Content per Cell Volume:", ltContent
+    print "TT Content per Cell Volume:", ttContent
 
   if returnAngles:
     print "WARNING: Striation angle analysis is not yet available in 3D"
@@ -2072,13 +2085,15 @@ def validate(testImage="./myoimages/MI_M_45_processed.png",
     plt.imshow(markedImg)
     plt.show()
 
+  print "\nThe following content values are for validation purposes only.\n"
+
   # calculate wt, lt, and loss content  
   ttContent, ltContent, taContent = assessContent(markedImg)
 
   assert(abs(ttContent - 103050) < 1), "TT validation failed."
   assert(abs(ltContent -  68068) < 1), "LT validation failed."
   assert(abs(taContent - 156039) < 1), "TA validation failed."
-  print "PASSED!"
+  print "\nPASSED!\n"
 
 def validate3D():
   '''This function serves as a validation routine for the 3D functionality of this repo.
@@ -2127,7 +2142,9 @@ def validate3D():
                                     ziters = [0],
                                     tag = '3DValidationData_analysis')
 
-  ### Assess the amount of TT,LT, and TA content there is in the image
+  print "\nThe following content values are for validation purposes only.\n"
+
+  ### Assess the amount of TT, LT, and TA content there is in the image 
   ttContent, ltContent, taContent = assessContent(markedImage)
 
   ### Check to see that they are in close agreement with previous values
@@ -2135,7 +2152,7 @@ def validate3D():
   assert(abs(ttContent - 301215) < 1), "TT validation failed."
   assert(abs(ltContent -  53293) < 1), "LT validation failed."
   assert(abs(taContent - 409003) < 1), "TA validation failed."
-  print "PASSED!"
+  print "\nPASSED!\n"
 
 ###
 ### Function to test that the optimizer routines that assess positive and negative
