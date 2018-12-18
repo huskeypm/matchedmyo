@@ -125,14 +125,6 @@ def docalc(img,
 
 
 
-#!/usr/bin/env python
-##################################
-#
-# Revisions
-#       10.08.10 inception
-#
-##################################
-
 #
 # Simple performs a matched filtering detection with a single filter, image and threshold
 #
@@ -458,12 +450,6 @@ def do2DGPUFiltering():
   plt.colorbar()
   plt.show()
   quit()
-
-
-
-
-
-  
 
 #
 # Validation 
