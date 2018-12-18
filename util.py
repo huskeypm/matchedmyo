@@ -192,26 +192,6 @@ def viewer(tensor):
     print result
     return result
 
-def measureOccupiedVolumeFraction(inputArray):
-  '''This function measures the occupied volume (or area) fraction of a given array.
-  This could be used for measuring occupied volume (or area) fractions of unit cells or filters.
-
-  Inputs:
-    inputArray -> 3D array. The input 3D array that we wish to measure the 3D volume fraction of.
-  Outputs:
-    volFrac -> Float. The volume fraction of occupied (non-zero) elements in the array compared to 
-                 total elements in the array.
-  '''
-
-  ### Get number of non-zero elements
-  numNonzero = np.count_nonzero(inputArray)
-
-  ### Get ratio of nonzero compared to total elements in array
-  totalElements = np.prod(np.shape(inputArray))
-  volFrac = float(numNonzero) / float(totalElements)
-
-  return volFrac
-
 def markMaskOnMyocyte(img,imgName):
   '''
   Function that takes the image of the myocyte (either grayscale or RGB) and
@@ -1228,6 +1208,94 @@ def autoDepadArray(img, verbose=False):
 ###################################################################################################
 ###################################################################################################
 ###################################################################################################
+
+def estimateTubuleContentFromColoredImage(cI,
+                                          totalCellSpace = None,
+                                          taFilterName = './myoimages/LossFilter.png',
+                                          ltFilterName = './myoimages/LongitudinalFilter.png',
+                                          ttFilterName = './myoimages/newSimpleWTFilter.png',
+                                          verbose = True):
+  '''This function gives the estimated morphological content (TT, LT, and TA) from the image that has been
+  marked with the markPastedFilters() routine.
+
+  Inputs:
+    cI -> array. Generated from the markPastedFilters routine. This contains information about the hit
+            detections for each type of filter. 
+    totalCellSpace -> float. If specified, the measured content will be divided out by this number 
+                        and will be indicative of area/volume fraction instead of total cellular content.
+    taFilterName -> Name of the tubule absence filter used in the classification of the colored image
+    ltFilterName -> Name of the longitudinal tubule filter used in the classification of the colored image
+    ttFilterName -> Name of the tranverse tubule filter used in the classification of the colored image
+
+  Outputs:
+    content -> dict. Dictionary containing the estimated volume/area fraction of each filter/morphological 
+                 feature.
+  '''
+
+  ### Pull out the channels that contain hits for each filter
+  TAchannel = cI[...,2]
+  LTchannel = cI[...,1]
+  TTchannel = cI[...,0]
+
+  ### Load in the filters
+  TAfilter = LoadFilter(taFilterName)
+  LTfilter = LoadFilter(ltFilterName)
+  TTfilter = LoadFilter(ttFilterName)
+
+  ### Measure the occupied volume/area fractions of each filter
+  TAvolFrac = measureOccupiedVolumeFraction(TAfilter)
+  LTvolFrac = measureOccupiedVolumeFraction(LTfilter)
+  TTvolFrac = measureOccupiedVolumeFraction(TTfilter)
+
+  ### Find the occupied area/volume of each filter's hits
+  totalTAhits = np.count_nonzero(TAchannel == np.max(TAchannel))
+  totalLThits = np.count_nonzero(LTchannel == np.max(LTchannel))
+  totalTThits = np.count_nonzero(TTchannel == np.max(TTchannel))
+
+  ### Multiply the total number of hits by the amount of occupied space in the filter
+  correctedTAContent = totalTAhits * TAvolFrac
+  correctedLTContent = totalLThits * LTvolFrac
+  correctedTTContent = totalTThits * TTvolFrac
+
+  content = {
+    'TA':correctedTAContent,
+    'LT':correctedLTContent,
+    'TT':correctedTTContent
+  }
+
+  if totalCellSpace:
+    for key,value in content.iteritems():
+      content[key] /= float(totalCellSpace)
+
+  if verbose:
+    for key, value in content.iteritems():
+      print "Corrected {} Morphological Feature Occupied Cell Space: {}".format(key, value)
+
+  return content
+
+def measureOccupiedVolumeFraction(inputArray):
+  '''This function measures the occupied volume (or area) fraction of a given filter.
+
+  Inputs:
+    inputArray -> 2D or 3D array. The input 2D or 3D array that we wish to measure the volume/area fraction of.
+  Outputs:
+    volFrac -> Float. The volume fraction of occupied (non-zero) elements in the array compared to 
+                 total elements in the array.
+  '''
+
+  ### Measure the dimensions of the filter using the previously written function
+  dimensions = measureFilterDimensions(inputArray)
+
+  ### Get the product of the array to determine total number of elements in the depadded array
+  totalElements = np.prod(dimensions)
+
+  ### Get the number of nonzero elements in the depadded array
+  numNonzero = np.count_nonzero(inputArray)
+
+  ### Determine the volume fraction
+  volFrac = float(numNonzero) / float(totalElements)
+
+  return volFrac
 
 def markPastedFilters(
       lossMasked, ltMasked, wtMasked, cI,
