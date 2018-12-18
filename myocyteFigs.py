@@ -602,6 +602,62 @@ def saveWorkflowFig():
   ### Make a histogram for the angles
   giveAngleHistogram(angleCounts,iters,"WorkflowFig")
 
+def test3DSimulatedData(LT_probability = [0.1], 
+                        TA_probability = [0.1],
+                        noiseAmplitude = 0.):
+  '''This function tests out the implementation of the 3D data simulation and detection routines.
+  This is carried out by generating the simulated data based on user specified ratios of LT, TT,
+  and TA unit cells. We then analyze this using the 3D filtering routines. Then compare the results
+  compared to what we would expect based on the specified probability distributions.
+
+  TODO: Make the probabilities much larger so we can test a large dataset and get a range of predictions.
+
+  Inputs:
+    LT_probability -> List of floats. Probability of inserting a LT unit cell into the simulated data.
+    TA_probability -> List of floats. Probability of inserting a TA unit cell into the simulated data.
+                        NOTE: The probability of finding a TT unit cell is
+                          1 - LT_probability - TA_probability
+    noiseAmplitude -> float. Amplitude of the multiplicative Gaussian white noise in the simulated data
+
+  Outputs:
+    None
+  '''
+
+  ### Define parameters for the simulation of the cell
+  ## Define scope resolutions for generating the filters and the cell. This is in x, y, and z resolutions
+  scopeResolutions = [10,10,5] #[vx / um]
+  ## x, y, and z Dimensions of the simulated cell [microns]
+  cellDimensions = [20, 20, 30]
+  ## Give names for your filters. NOTE: These are hardcoded in the filter generation routines in util.py
+  ttName = './myoimages/TT_3D.tif'
+  ttPunishName = './myoimages/TT_Punishment_3D.tif'
+  ltName = './myoimages/LT_3D.tif'
+  taName = './myoimages/TA_3D.tif'
+
+  ### Loop through and generate all of the necessary simulated cells
+  for LTp in LT_probability:
+    for TAp in TA_probability:
+      ## Define test file name
+      testName = "./myoimages/3DTestData_{}LT_{}TA.tif".format(
+        LTp.replace('.',''),
+        TAp.replace('.','')
+      )
+
+      ## Simulate the small 3D cell
+      util.generateSimulated3DCell(LT_probability=LTp,
+                                   TA_probability=TAp,
+                                   noiseAmplitude=noiseAmplitude,
+                                   scopeResolutions=scopeResolutions,
+                                   cellDimensions=cellDimensions,
+                                   fileName=testName,
+                                   seed=1001,
+                                   )
+
+  ### Loop through and Analyze the simulated data
+
+  ### TODO: Finish this
+  
+
 ###################################################################################################
 ###################################################################################################
 ###################################################################################################
@@ -727,100 +783,10 @@ def giveAvgStdofDicts(ShamDict,HFDict,MI_DDict,MI_MDict,MI_PDict):
   ax.set_xticklabels(names,rotation='vertical')
   plt.gcf().savefig("Whole_Dataset_Angles.pdf",dpi=300)
 
-def markPastedFilters(
-      lossMasked, ltMasked, wtMasked, cI,
-      lossName="./myoimages/LossFilter.png",
-      ltName="./myoimages/LongitudinalFilter.png",
-      wtName="./myoimages/newSimpleWTFilter.png"
-      ):
-  '''
-  Given masked stacked hits for the 3 filters and a doctored colored image, 
-  function will paste filter sized boxes around the characterized regions
-  and return the colored image with filter sized regions colored.
-
-  NOTE: Colored image was read in (not grayscale) and 1 was subtracted from
-  the image. This was necessary for the thresholding to work with the painter
-  function
-  '''
-  # exploiting architecture of painter function to mark hits for me
-  Lossholder = empty()
-  Lossholder.stackedHits = lossMasked
-  LTholder = empty()
-  LTholder.stackedHits = ltMasked
-  WTholder = empty()
-  WTholder.stackedHits = wtMasked
-
-  ### load in filters to get filter dimensions
-  if lossName:
-    lossFilt = util.LoadFilter(lossName)
-  if ltName:
-    ltFilt = util.LoadFilter(ltName)
-  if wtName:
-    wtFilt = util.LoadFilter(wtName)
-
-  ### get filter dimensions
-  if lossName:
-    lossDimensions = util.measureFilterDimensions(lossFilt)
-  if ltName:
-    LTDimensions = util.measureFilterDimensions(ltFilt)
-  if wtName:
-    WTDimensions = util.measureFilterDimensions(wtFilt)
-
-  ### we want to mark WT last since that should be the most stringent
-  # Opting to mark Loss, then Long, then WT
-  if lossName:
-    labeledLoss = painter.doLabel(Lossholder,cellDimensions=lossDimensions,thresh=0)
-    if len(np.shape(cI)) == 4:
-      print "Warning: Shifting TA hits down one index in the z domain to make consistent hit detection."
-      dummy = np.zeros_like(labeledLoss[:,:,0])
-      labeledLoss = np.dstack((dummy,labeledLoss))[:,:,:-1]
-  else:
-    labeledLoss = np.zeros_like(lossMasked,dtype=int)
-  if ltName:
-    labeledLT = painter.doLabel(LTholder,cellDimensions=LTDimensions,thresh=0)
-    if len(np.shape(cI)) == 4:
-      print "Warning: Shifting LT hits down one index in the z domain to make consistent hit detection."
-      dummy = np.zeros_like(labeledLT[:,:,0])
-      labeledLT = np.dstack((dummy,labeledLT))[:,:,:-1]
-  else:
-    labeledLT = np.zeros_like(ltMasked,dtype=int)
-  if wtName:
-    labeledWT = painter.doLabel(WTholder,cellDimensions=WTDimensions,thresh=0)
-  else:
-    labeledWT = np.zeros_like(wtMasked,dtype=int)
-
-  ### perform masking
-  if lossName:
-    Lossmask = labeledLoss.copy()
-  else:
-    Lossmask = Lossholder.stackedHits > np.inf
-  if ltName:
-    LTmask = labeledLT.copy()
-  else:
-    LTmask = LTholder.stackedHits > np.inf
-  if wtName:
-    WTmask = labeledWT.copy()
-  else:
-    WTmask = WTholder.stackedHits > np.inf
-
-  WTmask[labeledLoss] = False
-  WTmask[labeledLT] = False
-  LTmask[labeledLoss] = False
-  LTmask[WTmask] = False # prevents double marking of WT and LT
-
-  ### Dampen brightness and mark hits
-  alpha = 1.0
-  hitValue = int(round(alpha * 255))
-  cI[...,2][Lossmask] = hitValue
-  cI[...,1][LTmask] = hitValue
-  cI[...,0][WTmask] = hitValue
-
-  return cI
-
 def setupAnnotatedImage(annotatedName, baseImageName):
   '''
   Function to be used in conjunction with Myocyte().
-  Uses the markPastedFilters() function to paste filters onto the annotated image.
+  Uses the util.markPastedFilters() function to paste filters onto the annotated image.
   This is so we don't have to generate a new annotated image everytime we 
   change filter sizes.
   '''
@@ -834,7 +800,7 @@ def setupAnnotatedImage(annotatedName, baseImageName):
   ltHits[ltHits > 0] = 255
   # loss is already adequately marked so we don't want it ran through the routine
   lossHits = np.zeros_like(wtHits)
-  coloredImage = markPastedFilters(lossHits,ltHits,wtHits,markedImage)
+  coloredImage = util.markPastedFilters(lossHits,ltHits,wtHits,markedImage)
   # add back in the loss hits
   coloredImage[:,:,2] = markedImage[:,:,2]  
 
@@ -1573,11 +1539,16 @@ def giveMarkedMyocyte(
       plt.gcf().savefig(tag+"_output"+fileExtension,dpi=300)
 
   if returnPastedFilter:
+    ### We create a dummy image to hold the marked hits
     dummy = np.zeros_like(cI)
-    dummy = markPastedFilters(lossMasked, ltMasked, wtMasked, dummy)
+    dummy = util.markPastedFilters(lossMasked, ltMasked, wtMasked, dummy)
+    
     ### apply mask again so as to avoid content > 1.0
     dummy = ReadResizeApplyMask(dummy,testImage,ImgTwoSarcSize,filterTwoSarcSize=ImgTwoSarcSize)
     cI[dummy==255] = 255
+
+    ### Now based on the marked hits, we can obtain an estimate of tubule content
+    #estimatedContent = estimateTubuleContentFromColoredImage(cI)
   
     if writeImage:
       ### mark mask outline on myocyte
@@ -1755,7 +1726,7 @@ def give3DMarkedMyocyte(
   cImg = cImg.astype(np.uint8)
   if returnPastedFilter:
     ## Use routine to mark unit cell sized cuboids around detections
-    cImg = markPastedFilters(TAstackedHits,
+    cImg = util.markPastedFilters(TAstackedHits,
                              LTstackedHits,
                              TTstackedHits,
                              cImg,
@@ -1783,7 +1754,7 @@ def give3DMarkedMyocyte(
   
   ### Save detection image
   if tag:
-    util.Save3DImg(cImg,tag+'.tif')
+    util.Save3DImg(cImg,tag+'.tif',switchChannels=True)
 
   end = time.time()
   print "Time for algorithm to run:",end-start,"seconds"
@@ -2141,7 +2112,8 @@ def validate3D():
                                scopeResolutions=scopeResolutions,
                                cellDimensions=cellDimensions,
                                fileName=testName,
-                               seed=1001)
+                               seed=1001,
+                               )
 
   ### Analyze the 3D cell
   markedImage = give3DMarkedMyocyte(testImage=testName,
@@ -2152,16 +2124,17 @@ def validate3D():
                                     taFilterName = taName,
                                     xiters = [0],
                                     yiters = [0],
-                                    ziters = [0])
+                                    ziters = [0],
+                                    tag = '3DValidationData_analysis')
 
   ### Assess the amount of TT,LT, and TA content there is in the image
   ttContent, ltContent, taContent = assessContent(markedImage)
 
   ### Check to see that they are in close agreement with previous values
   ###   NOTE: We have to have a lot of wiggle room since we're generating a new cell for each validation
-  assert(abs(ttContent - 305001) < 1), "TT validation failed."
-  assert(abs(ltContent -  54016) < 1), "LT validation failed."
-  assert(abs(taContent - 403054) < 1), "TA validation failed."
+  assert(abs(ttContent - 301215) < 1), "TT validation failed."
+  assert(abs(ltContent -  53293) < 1), "LT validation failed."
+  assert(abs(taContent - 409003) < 1), "TA validation failed."
   print "PASSED!"
 
 ###

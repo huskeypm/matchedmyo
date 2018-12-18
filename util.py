@@ -10,6 +10,7 @@ from scipy import ndimage
 import imutils
 import operator
 import tifffile
+import painter
 
 ### Temporarily raising error with tensorflow.
 ###   We should be getting rid of this soon
@@ -18,6 +19,9 @@ try:
 except:
   print "Tensorflow was not found on this computer. Routines with GPU implementation will not work."
  
+### Create an empty instance of a class
+class empty:
+  pass
 
 root = "myoimages/"
 
@@ -93,7 +97,7 @@ def LoadFilter(fileName):
 
   return filterImg
 
-def Save3DImg(img, fileName):
+def Save3DImg(img, fileName, switchChannels=False):
   '''
   This function will roll the axis of img and save the image in the img variable to the fileName location.
     This is necessary since the convention that I have been using in the analysis scheme is to have:
@@ -104,9 +108,11 @@ def Save3DImg(img, fileName):
   Inputs:
     img -> numpy array with dimensions [Row, Column, Z-stack]. Image to be saved.
     fileName -> str. String containing the location and file name with which image will be saved
+    switchChannels -> Bool. If True, switch the channels in index 0 and 2 of the last axis.
   '''
   ### Switch the color channels because tifffile has the same color convention as matplotlib
-  img = switchBRChannels(img)
+  if switchChannels:
+    img = switchBRChannels(img)
 
   ### Roll the third axis to the first position
   dummyImg = np.moveaxis(img,source=2,destination=0)
@@ -185,6 +191,26 @@ def viewer(tensor):
     print np.shape(result)
     print result
     return result
+
+def measureOccupiedVolumeFraction(inputArray):
+  '''This function measures the occupied volume (or area) fraction of a given array.
+  This could be used for measuring occupied volume (or area) fractions of unit cells or filters.
+
+  Inputs:
+    inputArray -> 3D array. The input 3D array that we wish to measure the 3D volume fraction of.
+  Outputs:
+    volFrac -> Float. The volume fraction of occupied (non-zero) elements in the array compared to 
+                 total elements in the array.
+  '''
+
+  ### Get number of non-zero elements
+  numNonzero = np.count_nonzero(inputArray)
+
+  ### Get ratio of nonzero compared to total elements in array
+  totalElements = np.prod(np.shape(inputArray))
+  volFrac = float(numNonzero) / float(totalElements)
+
+  return volFrac
 
 def markMaskOnMyocyte(img,imgName):
   '''
@@ -509,6 +535,7 @@ def saveFixedPunishmentFilter():
   cv2.imwrite(root+"WTPunishmentFilter.png",punishFilter)
 
 def saveAllMyo():
+      print "Generating and saving all 2D filters."
       saveFixedWTFilter()
       saveSimpleWTFilter()
       saveGaussLongFilter()
@@ -517,6 +544,7 @@ def saveAllMyo():
       saveSingleTTFilter()
       saveSingleTTPunishmentFilter()
       scopeResolutions = [10,10,5]
+      print "Generating and saving all 3D filters."
       print "WARNING: This is generating 3D filters with an assumed scope resolution of xy = 10 vx/um and z = 5 vx/um."
       generate3DTTFilter(scopeResolutions)
       generate3DLTFilter(scopeResolutions)
@@ -582,6 +610,11 @@ def generate3DTTFilter(scopeResolutions, # [vx/um]
   filt3D = ndimage.zoom(filt3D,zoom=zoomOut)
   punishFilt3D = ndimage.zoom(punishFilt3D, zoom=zoomOut)
 
+  # temporarily save the intremediate result for debug purposes
+  print np.max(filt3D)
+  print np.min(filt3D)
+  Save3DImg(filt3D.astype(np.uint16), './myoimages/DEBUG.tif')
+
   ### Threshold the filter to get rid of rotation numerical artifacts
   filt3DMean = np.mean(filt3D)
   #filt3DMax = np.max(filt3D)
@@ -642,7 +675,7 @@ def generate3DLTFilter(scopeResolutions, # [vx/um]
 
 def generate3DTAFilter(scopeResolutions, # [vx/um]
                        originalFilterName='./myoimages/LossFilter.png',
-                       lengthTARegion = 0.8, # [um]
+                       lengthTARegion = 0.9, # [um]
                        ):
   '''
   This function generates a 3D filter for the detection of prototypical longitudinal tubules
@@ -1195,6 +1228,96 @@ def autoDepadArray(img, verbose=False):
 ###################################################################################################
 ###################################################################################################
 ###################################################################################################
+
+def markPastedFilters(
+      lossMasked, ltMasked, wtMasked, cI,
+      lossName="./myoimages/LossFilter.png",
+      ltName="./myoimages/LongitudinalFilter.png",
+      wtName="./myoimages/newSimpleWTFilter.png"
+      ):
+  '''
+  Given masked stacked hits for the 3 filters and a doctored colored image, 
+  function will paste filter sized boxes around the characterized regions
+  and return the colored image with filter sized regions colored.
+
+  NOTE: Colored image was read in (not grayscale) and 1 was subtracted from
+  the image. This was necessary for the thresholding to work with the painter
+  function
+  '''
+  # exploiting architecture of painter function to mark hits for me
+  Lossholder = empty()
+  Lossholder.stackedHits = lossMasked
+  LTholder = empty()
+  LTholder.stackedHits = ltMasked
+  WTholder = empty()
+  WTholder.stackedHits = wtMasked
+
+  ### load in filters to get filter dimensions
+  if lossName:
+    lossFilt = LoadFilter(lossName)
+  if ltName:
+    ltFilt = LoadFilter(ltName)
+  if wtName:
+    wtFilt = LoadFilter(wtName)
+
+  ### get filter dimensions
+  if lossName:
+    lossDimensions = measureFilterDimensions(lossFilt)
+  if ltName:
+    LTDimensions = measureFilterDimensions(ltFilt)
+  if wtName:
+    WTDimensions = measureFilterDimensions(wtFilt)
+
+  ### we want to mark WT last since that should be the most stringent
+  # Opting to mark Loss, then Long, then WT
+  if lossName:
+    labeledLoss = painter.doLabel(Lossholder,cellDimensions=lossDimensions,thresh=0)
+    if len(np.shape(cI)) == 4:
+      print "Warning: Shifting TA hits down one index in the z domain to make consistent hit detection."
+      dummy = np.zeros_like(labeledLoss[:,:,0])
+      labeledLoss = np.dstack((dummy,labeledLoss))[:,:,:-1]
+  else:
+    labeledLoss = np.zeros_like(lossMasked,dtype=int)
+  if ltName:
+    labeledLT = painter.doLabel(LTholder,cellDimensions=LTDimensions,thresh=0)
+    if len(np.shape(cI)) == 4:
+      print "Warning: Shifting LT hits down one index in the z domain to make consistent hit detection."
+      dummy = np.zeros_like(labeledLT[:,:,0])
+      labeledLT = np.dstack((dummy,labeledLT))[:,:,:-1]
+  else:
+    labeledLT = np.zeros_like(ltMasked,dtype=int)
+  if wtName:
+    labeledWT = painter.doLabel(WTholder,cellDimensions=WTDimensions,thresh=0)
+  else:
+    labeledWT = np.zeros_like(wtMasked,dtype=int)
+
+  ### perform masking
+  if lossName:
+    Lossmask = labeledLoss.copy()
+  else:
+    Lossmask = Lossholder.stackedHits > np.inf
+  if ltName:
+    LTmask = labeledLT.copy()
+  else:
+    LTmask = LTholder.stackedHits > np.inf
+  if wtName:
+    WTmask = labeledWT.copy()
+  else:
+    WTmask = WTholder.stackedHits > np.inf
+
+  WTmask[labeledLoss] = False
+  WTmask[labeledLT] = False
+  LTmask[labeledLoss] = False
+  LTmask[WTmask] = False # prevents double marking of WT and LT
+
+  ### Dampen brightness and mark hits
+  alpha = 1.0
+  hitValue = int(round(alpha * 255))
+  cI[...,2][Lossmask] = hitValue
+  cI[...,1][LTmask] = hitValue
+  cI[...,0][WTmask] = hitValue
+
+  return cI
 
 # Prepare matrix of vectorized of FFT'd images
 def CalcX(
