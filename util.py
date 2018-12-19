@@ -955,6 +955,32 @@ def MaskRegion(region,sidx,margin,value=0):
       region[(sidx[0]-margin):(sidx[0]+margin+1),
                          (sidx[1]-margin):(sidx[1]+margin+1)]=value 
 
+def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize,filterTwoSarcSize=25):
+  # function to apply the image mask before outputting results
+  maskName = imgName[:-4]; fileType = imgName[-4:]
+  fileName = maskName+'_mask'+fileType
+  mask = cv2.imread(fileName)                       
+  try:
+    maskGray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+  except:
+    print "No mask named '"+fileName +"' was found. Circumventing masking."
+    return img
+  if ImgTwoSarcSize != None:
+    scale = float(filterTwoSarcSize) / float(ImgTwoSarcSize)
+    maskResized = cv2.resize(maskGray,None,fx=scale,fy=scale,interpolation=cv2.INTER_CUBIC)
+  else:
+    maskResized = maskGray
+  normed = maskResized.astype('float') / float(np.max(maskResized))
+  normed[normed < 1.0] = 0
+  dimensions = np.shape(img)
+  if len(dimensions) < 3:
+    combined = img * normed 
+  else:
+    combined = img
+    for i in range(dimensions[2]):
+      combined[:,:,i] = combined[:,:,i] * normed
+  return combined
+
 def ApplyCLAHE(grayImgList, tileGridSize, clipLimit=2.0, plot=False):
     clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
     clahedImage = clahe.apply(grayImgList) # stupid hack
