@@ -3,28 +3,28 @@
 Algorithm for the classification of subcellular features within isolated myocytes and tissue swatches. 
 
 # Package Dependencies and Installation Pages
-- OpenCV (cv2)
-  - opencv-python (3.4.1.15)
-- imutils (https://github.com/jrosebr1/imutils)
-  - imutils (0.4.6)
-- Numpy
-  - numpy (1.15.4)
-- Matplotlib
-  - matplotlib (2.2.3)
-- PyYAML
-  - PyYAML (3.12)
-- Scipy
-  - scipy (1.1.0)
-- Pandas
-  - pandas (0.23.4)
-- Pygame (https://www.pygame.org/download.shtml)
-  - pygame (1.9.3)
-- Python Image Library (PIL)
-  - Pillow (5.2.0)
-- SciKit Learn
-  - scikit-learn (0.19.1)
-- Tifffile
-  - tifffile (2018.10.18)
+* OpenCV (cv2)
+  * opencv-python (3.4.1.15)
+* imutils (https://github.com/jrosebr1/imutils)
+  * imutils (0.4.6)
+* Numpy
+  * numpy (1.15.4)
+* Matplotlib
+  * matplotlib (2.2.3)
+* PyYAML
+  * PyYAML (3.12)
+* Scipy
+  * scipy (1.1.0)
+* Pandas
+  * pandas (0.23.4)
+* Pygame (https://www.pygame.org/download.shtml)
+  * pygame (1.9.3)
+* Python Image Library (PIL)
+  * Pillow (5.2.0)
+* SciKit Learn
+  * scikit-learn (0.19.1)
+* Tifffile
+  * tifffile (2018.10.18)
 
 NOTE: All package dependencies are handled by a full Anaconda install except for imutils and pygame.
 If using a linux machine, installation of package dependencies can be handled by running './installation.bash' from within the MatchedMyo repository.
@@ -49,6 +49,14 @@ To preprocess a directory containing user supplied images, run:
 `python preprocessing.py -preprocessDirectory <PATH_TO_DIRECTORY>`
 
 # MASTER SCRIPT 
+`matchedmyo.py` contains all of the routines needed to analyze user-supplied images with command line functionality. All arguments for analysis routines have default values that can be changed
+via the specifed YAML file when calling the `matchedmyo.py` script as such:
+
+`python matchedmyo.py <ANALYSIS_ROUTINE> <IMAGE_NAME> -yaml <YAML_NAME>`
+
+Where ANALYSIS_ROUTINE is either giveMarkedMyocyte or give3DMarkedMyocyte, IMAGE_NAME is the path to and the name of the image to be analyzed, and -yaml indicates the optional
+YAML_NAME argument where parameters can be changed from their default.
+
 ## detect.py 
 To run with yaml: (follow ex.yml for an example) 
 `python detect.py -updatedSimpleYaml ex.yml`
