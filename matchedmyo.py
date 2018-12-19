@@ -7,6 +7,7 @@ This is THE script that all sophisticated, general user-level routines will be r
 '''
 
 import time
+import sys
 import util
 import numpy as np
 import optimizer
@@ -564,7 +565,10 @@ def give3DMarkedMyocyte(
   
   return cImg
 
-def giveTissueAnalysis():
+def giveTissueAnalysis(grayTissue,
+                       iters = [-50,0], #TODO: FIX THIS TO ACTUAL RANGE
+                       ttFilterName="./myoimages/newSimpleWTFilter.png",
+                       ttPunishFilterName="./myoimages/newSimpleWTPunishmentFilter.png"):
   '''This function is for the analysis and classification of subcellular morphology in confocal images
   of tissue sections containing many myocytes. This presents a different set of challengs than the 
   single myocyte analysis and for that reason, the longitudinal tubule response degrades significantly.
@@ -595,27 +599,30 @@ def giveTissueAnalysis():
   Written Files:
     "tissueDetections_<iteration>.pkl"
   '''
-  1
+  ### Load in tissue
+  grayTissue = LoadTissue()
+
   # ### Load in tissue
   # params = tis.params
   # grayTissue = tis.Setup().astype(np.float32)
   # grayTissue /= np.max(grayTissue)
-  # print "Size of single tissue image in Gigabytes:",sys.getsizeof(grayTissue) / 1e9
+  
+  print "Size of single tissue image in Gigabytes:",sys.getsizeof(grayTissue) / 1e9
 
   # ttFilterName = "./myoimages/newSimpleWTFilter.png"
   # ttPunishFilterName = "./myoimages/newSimpleWTPunishmentFilter.png"
 
-  # inputs = empty()
-  # inputs.imgOrig = grayTissue
+  inputs = empty()
+  inputs.imgOrig = grayTissue
   # inputs.useGPU = False
 
   # returnAngles = False
+  # returnAngles = True
 
-  # import time
-  # startTime = time.time()
+  startTime = time.time()
   # ### This is mombo memory intensive
   # thisIteration = [iteration]
-  # tissueResults = mFigs.WT_Filtering(inputs,thisIteration,ttFilterName,ttPunishFilterName,None,None,False)
+  tissueResults = TT_Filtering(inputs,iters,ttFilterName,ttPunishFilterName,None,None,False)
   # #print "before masking"
   # resultsImage = tissueResults.stackedHits > 0 
   # #print "after masking"
@@ -628,9 +635,9 @@ def giveTissueAnalysis():
   # #pkl.dump(resultsImage,open(name,'w'))
   # np.save(name,resultsImage)
   # #print "after dumping"
-  # endTime = time.time()
+  endTime = time.time()
 
-  # print "Time for algorithm to run:",endTime-startTime
+  print "Time for algorithm to run:",endTime-startTime
 
 ###################################################################################################
 ###################################################################################################
