@@ -32,7 +32,7 @@ class empty:
 ###################################################################################################
 ###################################################################################################
 
-def WT_Filtering(inputs,
+def TT_Filtering(inputs,
                  iters,
                  ttFilterName,
                  ttPunishFilterName,
@@ -108,7 +108,7 @@ def LT_Filtering(inputs,
 
   return LTresults
 
-def Loss_Filtering(inputs,
+def TA_Filtering(inputs,
                    lossFilterName,
                    iters=None,
                    lossThresh=None,
@@ -147,6 +147,76 @@ def Loss_Filtering(inputs,
   print "Time for TA filtering to complete:",end-start,"seconds"
 
   return Lossresults
+
+def analyzeTT_Angles(testImageName,
+                     inputs,
+                     iters,
+                     ImgTwoSarcSize,
+                     WTstackedHits,
+                     ttFilterName = "./myoimages/newSimpleWTFilter.png"
+                     ):
+  '''This function analyzes the tubule striation angle for the transverse tubule filter.
+  The routine does this by smoothing the original image with a small smoothing filter, constructing
+  a TT filter with a larger field of view (longer tubules in the filter), and calculating the SNR 
+  using this filter. Then, the routine uses the previously detected hits from the TT_Filtering()
+  function to mask out the hits from the larger FOV filter. Teh reason this is necessary is due to 
+  the fact that the original TT filter is very specific in terms of hits, but is extremely variable 
+  in terms of what rotation the hit occurs at.
+  
+  Inputs:
+    testImageName -> str. Name of the image that you are analyzing.
+    inputs -> class. Inputs class already constructed in the giveMarkedMyocyte() function.
+    iters -> list. List of iterations (rotations) at which we are analyzing filter response
+    ImgTwoSarcSize -> int. Size of the filter/image two sarcomere size.
+    WTstackedHits -> numpy array. Array where hits are marked as their SNR and non-hits are marked
+                       as zero.
+    ttFilterName -> str. Name of the transverse tubule filter used in this analysis.
+  '''
+
+  ### Read in original colored image
+  cImg = util.ReadImg(testImageName,cvtColor=False)
+
+  ### perform smoothing on the original image
+  dim = 5
+  kernel = np.ones((dim,dim),dtype=np.float32)
+  kernel /= np.sum(kernel)
+  smoothed = mF.matchedFilter(inputs.imgOrig,kernel,demean=False)
+
+  ### make longer WT filter so more robust to striation angle deviation
+  ttFilter = util.LoadFilter(ttFilterName)
+  longFilter = np.concatenate((ttFilter,ttFilter,ttFilter))
+    
+  rotInputs = empty()
+  rotInputs.imgOrig = smoothed
+  rotInputs.mfOrig = longFilter
+
+  params = optimizer.ParamDict(typeDict='WT')
+  params['snrThresh'] = 0 # to pull out max hit
+  params['filterMode'] = 'simple' # we want no punishment since that causes high variation
+    
+  ### perform simple filtering
+  smoothedWTresults = bD.DetectFilter(rotInputs,params,iters,returnAngles=True)
+  smoothedHits = smoothedWTresults.stackedAngles
+
+  ### pull out actual hits from smoothed results
+  smoothedHits[WTstackedHits == 0] = -1
+
+  coloredAngles = painter.colorAngles(cImg,smoothedHits,iters)
+
+  coloredAnglesMasked = util.ReadResizeApplyMask(coloredAngles,testImageName,
+                                            ImgTwoSarcSize,
+                                            filterTwoSarcSize=ImgTwoSarcSize)
+  stackedAngles = smoothedHits
+  dims = np.shape(stackedAngles)
+  angleCounts = []
+  for i in range(dims[0]):
+    for j in range(dims[1]):
+      rotArg = stackedAngles[i,j]
+      if rotArg != -1:
+        ### indicates this is a hit
+        angleCounts.append(iters[rotArg])
+
+  return angleCounts, coloredAnglesMasked
 
 ###################################################################################################
 ###################################################################################################
@@ -198,7 +268,7 @@ def giveMarkedMyocyte(
 
   ### WT filtering
   if ttFilterName != None:
-    WTresults = WT_Filtering(
+    WTresults = TT_Filtering(
       inputs = inputs,
       iters = iters,
       ttFilterName = ttFilterName,
@@ -227,7 +297,7 @@ def giveMarkedMyocyte(
 
   ### Loss filtering
   if lossFilterName != None:
-    Lossresults = Loss_Filtering(
+    Lossresults = TA_Filtering(
       inputs=inputs,
       lossFilterName = lossFilterName,
       lossThresh = lossThresh,
@@ -317,47 +387,11 @@ def giveMarkedMyocyte(
       plt.gcf().savefig(tag+"_output"+fileExtension,dpi=300)
 
   if returnAngles:
-    cImg = util.ReadImg(testImage,cvtColor=False)
-
-    ### perform smoothing on the original image
-    dim = 5
-    kernel = np.ones((dim,dim),dtype=np.float32)
-    kernel /= np.sum(kernel)
-    smoothed = mF.matchedFilter(inputs.imgOrig,kernel,demean=False)
-
-    ### make longer WT filter so more robust to striation angle deviation
-    ttFilter = util.LoadFilter(ttFilterName)
-    longFilter = np.concatenate((ttFilter,ttFilter,ttFilter))
-    
-    rotInputs = empty()
-    rotInputs.imgOrig = smoothed
-    rotInputs.mfOrig = longFilter
-
-    params = optimizer.ParamDict(typeDict='WT')
-    params['snrThresh'] = 0 # to pull out max hit
-    params['filterMode'] = 'simple' # we want no punishment since that causes high variation
-    
-    ### perform simple filtering
-    smoothedWTresults = bD.DetectFilter(rotInputs,params,iters,returnAngles=returnAngles)
-    smoothedHits = smoothedWTresults.stackedAngles
-
-    ### pull out actual hits from smoothed results
-    smoothedHits[WTstackedHits == 0] = -1
-
-    coloredAngles = painter.colorAngles(cImg,smoothedHits,iters)
-
-    coloredAnglesMasked = util.ReadResizeApplyMask(coloredAngles,testImage,
-                                              ImgTwoSarcSize,
-                                              filterTwoSarcSize=ImgTwoSarcSize)
-    stackedAngles = smoothedHits
-    dims = np.shape(stackedAngles)
-    angleCounts = []
-    for i in range(dims[0]):
-      for j in range(dims[1]):
-        rotArg = stackedAngles[i,j]
-        if rotArg != -1:
-          ### indicates this is a hit
-          angleCounts.append(iters[rotArg])
+    angleCounts, coloredAnglesMasked = analyzeTT_Angles(testImageName=testImage,
+                                                        inputs=inputs,
+                                                        iters=iters,
+                                                        ImgTwoSarcSize=ImgTwoSarcSize,
+                                                        WTstackedHits=WTstackedHits)
 
     if writeImage:
       #cv2.imwrite(tag+"_angles_output.png",coloredAnglesMasked)
@@ -439,7 +473,7 @@ def give3DMarkedMyocyte(
 
   ### WT filtering
   if ttFilterName != None:
-    TTresults = WT_Filtering(inputs,flattenedIters,ttFilterName,ttPunishFilterName,ttThresh,wtGamma,returnAngles)
+    TTresults = TT_Filtering(inputs,flattenedIters,ttFilterName,ttPunishFilterName,ttThresh,wtGamma,returnAngles)
     TTstackedHits = TTresults.stackedHits
   else:
     TTstackedHits = np.zeros_like(inputs.imgOrig)
@@ -455,7 +489,7 @@ def give3DMarkedMyocyte(
   if taFilterName != None:
     ## form tubule absence flattened rotation matrix. Choosing to look at tubule absence at one rotation right now.
     taIters = [[0,0,0]]
-    TAresults = Loss_Filtering(inputs,
+    TAresults = TA_Filtering(inputs,
                                taFilterName,
                                iters=taIters,
                                lossThresh=lossThresh,
@@ -529,6 +563,74 @@ def give3DMarkedMyocyte(
   print "Time for algorithm to run:",end-start,"seconds"
   
   return cImg
+
+def giveTissueAnalysis():
+  '''This function is for the analysis and classification of subcellular morphology in confocal images
+  of tissue sections containing many myocytes. This presents a different set of challengs than the 
+  single myocyte analysis and for that reason, the longitudinal tubule response degrades significantly.
+  Thus, we only include the analysis of transverse tubule filter hits and rotation angles as well as 
+  tubule absence filter hits.
+
+  Inputs:
+    TODO
+  '''
+  ### BEGIN CODE TAKEN FROM BRANCH OF GPU DETECT
+  '''
+  This function will take the previously preprocessed tissue and run the WT 
+  filter across the entire image. From this, we will apply a large smoothing
+  function across the entire detection image. This should hopefully provide
+  a nice gradient that shows TT-density loss as proximity to the infarct
+  increases
+
+  NOTE: This function is meant to be called repeatedly by a bash script.
+          Some library utilized herein is leaky and eats memory for 
+          breakfast.
+
+  Inputs:
+    iteration - rotation at which to perform the detection
+
+  Outputs:
+    None
+
+  Written Files:
+    "tissueDetections_<iteration>.pkl"
+  '''
+  1
+  # ### Load in tissue
+  # params = tis.params
+  # grayTissue = tis.Setup().astype(np.float32)
+  # grayTissue /= np.max(grayTissue)
+  # print "Size of single tissue image in Gigabytes:",sys.getsizeof(grayTissue) / 1e9
+
+  # ttFilterName = "./myoimages/newSimpleWTFilter.png"
+  # ttPunishFilterName = "./myoimages/newSimpleWTPunishmentFilter.png"
+
+  # inputs = empty()
+  # inputs.imgOrig = grayTissue
+  # inputs.useGPU = False
+
+  # returnAngles = False
+
+  # import time
+  # startTime = time.time()
+  # ### This is mombo memory intensive
+  # thisIteration = [iteration]
+  # tissueResults = mFigs.WT_Filtering(inputs,thisIteration,ttFilterName,ttPunishFilterName,None,None,False)
+  # #print "before masking"
+  # resultsImage = tissueResults.stackedHits > 0 
+  # #print "after masking"
+
+
+  # ### save tissue detection results
+  # #print "before dumping"
+  # name = "tissueDetections_"+str(iteration)
+  # ## consider replacing with numpy save function since it is much quicker
+  # #pkl.dump(resultsImage,open(name,'w'))
+  # np.save(name,resultsImage)
+  # #print "after dumping"
+  # endTime = time.time()
+
+  # print "Time for algorithm to run:",endTime-startTime
 
 ###################################################################################################
 ###################################################################################################
@@ -654,44 +756,14 @@ def main(args):
   functions[args.functionToCall]()#(args)
 
 
-### Begin argument parser for command line functionality  
-description = '''This is the main script for the analysis of 2D and 3D confocal images of 
-cardiomyocytes and cardiac tissues.
-'''
-parser = argparse.ArgumentParser(description=description)
-parser.add_argument('functionToCall', 
-                    type=str,
-                    help='The function to call within this script')
-args = parser.parse_args()
-main(args)
-
-
-
-#
-# MAIN routine executed when launching this script from command line 
-#
-# tag = "default_" 
-# if __name__ == "__main__":
-#   msg = helpmsg()
-#   remap = "none"
-
-#   if len(sys.argv) < 2:
-#       raise RuntimeError(msg)
-
-#   # Loops over each argument in the command line 
-#   for i,arg in enumerate(sys.argv):
-
-#     ### Validation Routines
-#     if(arg=="-validate"):
-#       validate()
-#       quit()
-
-#     if(arg=='-validate3D'):
-#       validate3D()
-#       quit()
-
-#     if(arg=='-fullValidation'):
-#       ## This routine MUST be run before changes are committed to the repo
-#       validate()
-#       validate3D()
-#       quit()
+### Begin argument parser for command line functionality IF function is called via command line
+if __name__ == "__main__":
+  description = '''This is the main script for the analysis of 2D and 3D confocal images of 
+  cardiomyocytes and cardiac tissues.
+  '''
+  parser = argparse.ArgumentParser(description=description)
+  parser.add_argument('functionToCall', 
+                      type=str,
+                      help='The function to call within this script')
+  args = parser.parse_args()
+  main(args)
