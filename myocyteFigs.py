@@ -69,7 +69,7 @@ def WT_results():
   correctColoredImg = util.switchBRChannels(coloredImg)
 
   ### make bar chart for content
-  wtContent, ltContent, lossContent = assessContent(coloredImg,testImage)
+  wtContent, ltContent, lossContent = util.assessContent(coloredImg,testImage)
   normedContents = [wtContent, ltContent, lossContent]
 
   ### generating figure
@@ -100,7 +100,7 @@ def WT_results():
   plt.gcf().savefig("fig3_ColoredAngles.pdf",dpi=300)
 
   ### save histogram of angles
-  giveAngleHistogram(angleCounts,iters,"fig3")
+  du.giveAngleHistogram(angleCounts,iters,"fig3")
 
 def HF_results(): 
   '''
@@ -113,7 +113,7 @@ def HF_results():
   markedImg = giveMarkedMyocyte(testImage=imgName,tag='fig4',writeImage=True)
 
   ### make bar chart for content
-  wtContent, ltContent, lossContent = assessContent(markedImg,imgName)
+  wtContent, ltContent, lossContent = util.assessContent(markedImg,imgName)
   normedContents = [wtContent, ltContent, lossContent]
 
   ### generating figure
@@ -175,7 +175,7 @@ def MI_results():
   ### report responses for each case
   for i,img in enumerate(results):
     ### assess content based on cell area
-    wtContent, ltContent, lossContent = assessContent(img,imgNames[i])
+    wtContent, ltContent, lossContent = util.assessContent(img,imgNames[i])
     ### store in lists
     ttResults.append(wtContent)
     ltResults.append(ltContent)
@@ -592,15 +592,15 @@ def saveWorkflowFig():
   plt.gcf().savefig("WorkflowFig_wtCorr.pdf")
 
   ### Assess content
-  wtC,ltC,ldC = assessContent(colorImg,imgName=imgName)
+  wtC,ltC,ldC = util.assessContent(colorImg,imgName=imgName)
 
   ### make a bar chart using routine
   content = [wtC,ltC,ldC]
   contentDict = {imgName:content}
-  giveBarChartfromDict(contentDict,"WorkflowFig_Content")
+  du.giveBarChartfromDict(contentDict,"WorkflowFig_Content")
 
   ### Make a histogram for the angles
-  giveAngleHistogram(angleCounts,iters,"WorkflowFig")
+  du.giveAngleHistogram(angleCounts,iters,"WorkflowFig")
 
 def test3DSimulatedData(LT_probability = [0.1], 
                         TA_probability = [0.1],
@@ -639,8 +639,8 @@ def test3DSimulatedData(LT_probability = [0.1],
     for TAp in TA_probability:
       ## Define test file name
       testName = "./myoimages/3DTestData_{}LT_{}TA.tif".format(
-        LTp.replace('.',''),
-        TAp.replace('.','')
+        str(LTp).replace('.',''),
+        str(TAp).replace('.','')
       )
 
       ## Simulate the small 3D cell
@@ -668,60 +668,6 @@ def test3DSimulatedData(LT_probability = [0.1],
 ###################################################################################################
 ###################################################################################################
 
-def shaveFig(fileName,padY=None,padX=None,whiteSpace=None):
-  '''
-  Aggravating way of shaving a figure's white space down to an acceptable level
-    and adding in enough whitespace to label the figure
-  '''
-
-  img = util.ReadImg(fileName,cvtColor=False)
-  imgDims = np.shape(img)
-
-  ### get sum along axis
-  rowSum = np.sum(img[:,:,0],axis=1).astype(np.float32)
-  colSum = np.sum(img[:,:,0],axis=0).astype(np.float32)
-
-  ### get average along axis
-  rowAvg = rowSum / float(imgDims[1])
-  colAvg = colSum / float(imgDims[0])
-
-  ### find where the first occurrence of non-white space is
-  firstNonWhiteRowIdx = np.argmax((rowAvg-255.)**2. != 0)
-  firstNonWhiteColIdx = np.argmax((colAvg-255.)**2. != 0)
-  invNonWhiteRowIdx = np.argmax((rowAvg[::-1]-255.)**2. != 0)
-  invNonWhiteColIdx = np.argmax((colAvg[::-1]-255.)**2. != 0)
-
-  ### add some padding in
-  if padX == None:
-    padX = 20
-  if padY == None:
-    padY = 60 
-  firstNonWhiteRowIdx -= padY
-  firstNonWhiteColIdx -= padX
-  invNonWhiteRowIdx -= padY
-  invNonWhiteColIdx -= padX
-
-  idxs = [firstNonWhiteRowIdx, invNonWhiteRowIdx, firstNonWhiteColIdx, invNonWhiteColIdx]
-  for i,idx in enumerate(idxs):
-    if idx <= 0:
-      idxs[i] = 1
-
-  if whiteSpace == None:
-    extraWhiteSpace = 100
-  else:
-    extraWhiteSpace = whiteSpace
-  
-  newImg = np.zeros((imgDims[0]-idxs[0]-idxs[1]+extraWhiteSpace,
-                     imgDims[1]-idxs[2]-idxs[3],3),
-                    dtype=np.uint8)
-
-  for channel in range(3):
-    newImg[extraWhiteSpace:,:,channel] = img[idxs[0]:-idxs[1],
-                                             idxs[2]:-idxs[3],channel]
-    newImg[:extraWhiteSpace,:,channel] = 255
-  
-  cv2.imwrite(fileName,newImg)
-
 def preprocessTissueCase(case):
   ### Preprocess subregions
   case.subregion, case.degreesOffCenter = pp.reorient(
@@ -736,52 +682,6 @@ def preprocessTissueCase(case):
   case.displayImg = case.displayImg.astype(np.uint8)
 
   return case
-
-def giveAvgStdofDicts(ShamDict,HFDict,MI_DDict,MI_MDict,MI_PDict):
-  ### make a big dictionary to iterate through
-  results = {'Sham':ShamDict,'HF':HFDict,'MI_D':MI_DDict,'MI_M':MI_MDict,'MI_P':MI_PDict}
-  ### make dictionaries to store results
-  avgDict = {}; stdDict = {}
-  for model,dictionary in results.iteritems():
-    ### make holders to store results
-    angleAvgs = []; angleStds = []
-    for name,angleCounts in dictionary.iteritems():
-      print name
-      if 'angle' not in name:
-        continue
-      angleAvgs.append(np.mean(angleCounts))
-      angleStds.append(np.std(angleCounts))
-      print "Average striation angle:",angleAvgs[-1]
-      print "Standard deviation of striation angle:",angleStds[-1]
-    avgDict[model] = angleAvgs
-    stdDict[model] = angleStds
-
-  ### Normalize Standard Deviations to Sham Standard Deviation
-  ShamAvgStd = np.mean(stdDict['Sham'])
-  stdStdDev = {}
-  for name,standDev in stdDict.iteritems():
-    standDev = np.asarray(standDev,dtype=float) / ShamAvgStd
-    stdDict[name] = np.mean(standDev)
-    stdStdDev[name] = np.std(standDev)
-
-  ### Make bar chart for angles 
-  # need to have results in ordered arrays...
-  names = ['Sham', 'HF', 'MI_D', 'MI_M', 'MI_P']
-  avgs = []; stds = []
-  for name in names:
-    avgs.append(avgDict[name])
-    stds.append(stdDict[name])
-  width = 0.25
-  N = 1
-  indices = np.arange(N) + width
-  fig,ax = plt.subplots()
-  for i,name in enumerate(names):
-    ax.bar(indices+i*width, stdDict[name], width, yerr=stdStdDev[name],ecolor='k',alpha=0.5)
-  ax.set_ylabel("Average Angle Standard Deviation Normalized to Sham")
-  xtickLocations = np.arange(len(names)) * width + width*3./2.
-  ax.set_xticks(xtickLocations)
-  ax.set_xticklabels(names,rotation='vertical')
-  plt.gcf().savefig("Whole_Dataset_Angles.pdf",dpi=300)
 
 def setupAnnotatedImage(annotatedName, baseImageName):
   '''
@@ -835,70 +735,6 @@ def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize,filterTwoSarcSize=25):
     for i in range(dimensions[2]):
       combined[:,:,i] = combined[:,:,i] * normed
   return combined
-
-def assessContent(markedImg,imgName=None):
-  '''This function analyzes the amount of TT, LT, and TA content that is present in a marked image
-  returned by giveMarkedMyocyte or give3DMarkedMyocyte.
-
-  Inputs:
-    markedImg -> numpy array. The marked image that is returned from the marking routines mentioned above.
-    imgName -> str. Name of the image. If this is specified, the routine will search for an image mask that 
-                 has been constructed to obfuscate the extracellular content/organelles. The naming convention
-                 for the masks is "<ORIGINAL_NAME>_masked.<FILETYPE>"
-
-  Outputs:
-    ttContent, ltContent, taContent
-  '''
-  ### Create copy of image
-  imgCopy = markedImg.copy()
-
-  ### Pull out content-specific channels
-  tt = imgCopy[...,0]
-  lt = imgCopy[...,1]
-  ta = imgCopy[...,2]
-
-  ### Get rid of everything that isn't a hit (hits are marked as 255)
-  tt[tt != 255] = 0
-  lt[lt != 255] = 0
-  ta[ta != 255] = 0
-
-  ### normalize
-  ttNormed = np.divide(tt, np.max(tt))
-  ltNormed = np.divide(lt, np.max(lt))
-  taNormed = np.divide(ta, np.max(ta))
-
-  ### calculate content
-  ttContent = np.sum(ttNormed)
-  ltContent = np.sum(ltNormed)
-  taContent = np.sum(taNormed)
-
-  if isinstance(imgName, (str)):
-    if len(np.shape(imgCopy)) == 4:
-      raise RuntimeError("WARNING: Masking is not implemented in 3D so the assessment of content does not include this. \
-                          This may skew results.")
-    ## if imgName is included, we normalize content to cell area
-    dummy = np.multiply(np.ones_like(markedImg[:,:,0]), 255)
-    mask = ReadResizeApplyMask(dummy,imgName,25,25)
-    mask[mask <= 254] = 0
-    mask[mask > 0] = 1
-    cellArea = np.sum(mask,dtype=float)
-    ttContent /= cellArea
-    ltContent /= cellArea
-    taContent /= cellArea
-    print "TT Content:", ttContent
-    print "LT Content:", ltContent
-    print "Loss Content:", taContent
-    print "Sum of Content:", ttContent+ltContent+taContent
-    ## these should sum to 1 exactly but I'm leaving wiggle room
-    assert (ttContent+ltContent+taContent) < 1.2, ("Something went " 
-            +"wrong with the normalization of content to the cell area calculated "
-            +"by the mask. Double check the masking routine.") 
-  else:
-    print "TT Content:", ttContent
-    print "LT Content:", ltContent
-    print "TA Content:", taContent  
-
-  return ttContent, ltContent, taContent
 
 ###################################################################################################
 ###################################################################################################
@@ -986,151 +822,6 @@ def displayTissueCaseHits(case,
   plt.imshow(coloredImage,vmin=0,vmax=255)
   plt.gcf().savefig(tag+"_hits.pdf",dpi=600)
 
-def giveAngleHistogram(angleCounts,iters,tag):
-  ### Make a histogram for the angles
-  iters = np.asarray(iters,dtype='float')
-  binSpace = iters[-1] - iters[-2]
-  myBins = iters - binSpace / 2.
-  myBins= np.append(myBins,myBins[-1] + binSpace)
-  plt.figure()
-  n, bins, patches = plt.hist(angleCounts, bins=myBins,
-                              normed=True,
-                              align='mid',
-                              facecolor='green', alpha=0.5)
-  plt.xlabel('Rotation Angle')
-  plt.ylabel('Probability')
-  plt.gcf().savefig(tag+"_angle_histogram.pdf",dpi=300)
-  plt.close()
-
-def giveBarChartfromDict(dictionary,tag):
-  ### instantiate lists to contain contents
-  wtC = []; ltC = []; lossC = []
-  for name,content in dictionary.iteritems():
-    if "angle" in name:
-      continue
-    wtC.append(content[0])
-    ltC.append(content[1])
-    lossC.append(content[2])
-
-  wtC = np.asarray(wtC)
-  ltC = np.asarray(ltC)
-  lossC = np.asarray(lossC)
-
-  wtAvg = np.mean(wtC)
-  ltAvg = np.mean(ltC)
-  lossAvg = np.mean(lossC)
-
-  wtStd = np.std(wtC)
-  ltStd = np.std(ltC)
-  lossStd = np.std(lossC)
-
-  ### now make a bar chart from this
-  colors = ["blue","green","red"]
-  marks = ["WT", "LT", "Loss"]
-  width = 0.25
-  N = 1
-  indices = np.arange(N) + width
-  fig,ax = plt.subplots()
-  rects1 = ax.bar(indices, wtAvg, width, color=colors[0],yerr=wtStd,ecolor='k')
-  rects2 = ax.bar(indices+width, ltAvg, width, color=colors[1],yerr=ltStd,ecolor='k')
-  rects3 = ax.bar(indices+2*width, lossAvg, width, color=colors[2],yerr=lossStd,ecolor='k')
-  ax.set_ylabel('Normalized Content')
-  ax.legend(marks)
-  ax.set_xticks([])
-  ax.set_ylim([0,1])
-  plt.gcf().savefig(tag+'_BarChart.pdf',dpi=300)
-
-def giveMIBarChart(MI_D, MI_M, MI_P):
-  '''
-  Gives combined bar chart for all three proximities to the infarct.
-  MI_D, MI_M, and MI_P are all dictionaries with structure:
-    dict['file name'] = [wtContent, ltContent, lossContent]
-  where the contents are floats
-  '''
-
-  wtAvgs = {}; wtStds = {}; ltAvgs = {}; ltStds = {}; lossAvgs = {}; lossStds = {};
-
-  DwtC = []; DltC = []; DlossC = [];
-  for name, content in MI_D.iteritems():
-    if 'angle' in name:
-      continue
-    wtC = content[0]
-    ltC = content[1]
-    lossC = content[2]
-    DwtC.append(wtC)
-    DltC.append(ltC)
-    DlossC.append(lossC)
-  wtAvgs['D'] = np.mean(DwtC)
-  wtStds['D'] = np.std(DwtC)
-  ltAvgs['D'] = np.mean(DltC)
-  ltStds['D'] = np.std(DltC)
-  lossAvgs['D'] = np.mean(DlossC)
-  lossStds['D'] = np.std(DlossC)
-
-  MwtC = []; MltC = []; MlossC = [];
-  for name, content in MI_M.iteritems():
-    if 'angle' in name:
-      continue
-    wtC = content[0]
-    ltC = content[1]
-    lossC = content[2]
-    MwtC.append(wtC)
-    MltC.append(ltC)
-    MlossC.append(lossC)
-  wtAvgs['M'] = np.mean(MwtC)
-  wtStds['M'] = np.std(MwtC)
-  ltAvgs['M'] = np.mean(MltC)
-  ltStds['M'] = np.std(MltC)
-  lossAvgs['M'] = np.mean(MlossC)
-  lossStds['M'] = np.std(MlossC)
-
-
-  PwtC = []; PltC = []; PlossC = [];
-  for name, content in MI_P.iteritems():
-    if 'angle' in name:
-      continue
-    wtC = content[0]
-    ltC = content[1]
-    lossC = content[2]
-    PwtC.append(wtC)
-    PltC.append(ltC)
-    PlossC.append(lossC)
-  wtAvgs['P'] = np.mean(PwtC)
-  wtStds['P'] = np.std(PwtC)
-  ltAvgs['P'] = np.mean(PltC)
-  ltStds['P'] = np.std(PltC)
-  lossAvgs['P'] = np.mean(PlossC)
-  lossStds['P'] = np.std(PlossC)
-
-  colors = ["blue","green","red"]
-  marks = ["WT", "LT", "Loss"]
-  width = 1.0
-  N = 11
-  indices = np.arange(N)*width + width/4.
-  fig,ax = plt.subplots()
-
-  ### plot WT
-  rects1 = ax.bar(indices[0], wtAvgs['D'], width, color=colors[0],yerr=wtStds['D'],ecolor='k',label='WT')
-  rects2 = ax.bar(indices[1], wtAvgs['M'], width, color=colors[0],yerr=wtStds['M'],ecolor='k',label='WT')
-  rects3 = ax.bar(indices[2], wtAvgs['P'], width, color=colors[0],yerr=wtStds['P'],ecolor='k',label='WT')
-
-  ### plot LT
-  rects4 = ax.bar(indices[4], ltAvgs['D'], width, color=colors[1],yerr=ltStds['D'],ecolor='k',label='LT')
-  rects5 = ax.bar(indices[5], ltAvgs['M'], width, color=colors[1],yerr=ltStds['M'],ecolor='k',label='LT')
-  rects6 = ax.bar(indices[6], ltAvgs['P'], width, color=colors[1],yerr=ltStds['P'],ecolor='k',label='LT')
-
-  ### plot Loss
-  rects7 = ax.bar(indices[8], lossAvgs['D'], width, color=colors[2],yerr=lossStds['D'],ecolor='k',label='Loss')
-  rects8 = ax.bar(indices[9], lossAvgs['M'], width, color=colors[2],yerr=lossStds['M'],ecolor='k',label='Loss')
-  rects9 = ax.bar(indices[10],lossAvgs['P'], width, color=colors[2],yerr=lossStds['P'],ecolor='k',label='Loss')
-
-  ax.set_ylabel('Normalized Content')
-  ax.legend(handles=[rects1,rects4,rects7])
-  newInd = indices + width/2.
-  ax.set_xticks(newInd)
-  ax.set_xticklabels(['D', 'M','P','','D','M','P','','D','M','P'])
-  ax.set_ylim([0,1])
-  plt.gcf().savefig('MI_BarChart.pdf',dpi=300)
 
 ###################################################################################################
 ###################################################################################################
@@ -1234,7 +925,7 @@ def analyzeAllMyo(root="/net/share/dfco222/data/TT/LouchData/processedWithIntell
     print "Percentage of WT hits within 5 degrees of minor axis:", float(hitsInRange)/float(totalHits) * 100.
 
     ### assess content
-    wtC, ltC, lossC = assessContent(markedMyocyte,imgName=root+name)
+    wtC, ltC, lossC = util.assessContent(markedMyocyte,imgName=root+name)
     content = np.asarray([wtC, ltC, lossC],dtype=float)
 
     ### store content in respective dictionary
@@ -1256,13 +947,13 @@ def analyzeAllMyo(root="/net/share/dfco222/data/TT/LouchData/processedWithIntell
         MI_P[name+'_angles'] = angleCounts
 
     ### make angle histogram for the data
-    giveAngleHistogram(angleCounts,iters,tag=name[:-4])
+    du.giveAngleHistogram(angleCounts,iters,tag=name[:-4])
 
   ### use function to construct and write bar charts for each content dictionary
-  giveBarChartfromDict(Sham,'Sham')
-  giveBarChartfromDict(HF,'HF')
-  giveMIBarChart(MI_D,MI_M,MI_P)
-  giveAvgStdofDicts(Sham,HF,MI_D,MI_M,MI_P)
+  du.giveBarChartfromDict(Sham,'Sham')
+  du.giveBarChartfromDict(HF,'HF')
+  du.giveMIBarChart(MI_D,MI_M,MI_P)
+  du.giveAvgStdofDicts(Sham,HF,MI_D,MI_M,MI_P)
 
 def analyzeSingleMyo(name,twoSarcSize):
    realName = name#+"_processed.png"
@@ -1273,7 +964,7 @@ def analyzeSingleMyo(name,twoSarcSize):
                                      writeImage=True,
                                      returnAngles=True)
    ### assess content
-   wtC, ltC, lossC = assessContent(markedMyocyte,imgName=realName)
+   wtC, ltC, lossC = util.assessContent(markedMyocyte,imgName=realName)
    #content = np.asarray([wtC, ltC, lossC],dtype=float)
    #content /= np.max(content)
 
@@ -2088,7 +1779,7 @@ def validate(testImage="./myoimages/MI_M_45_processed.png",
   print "\nThe following content values are for validation purposes only.\n"
 
   # calculate wt, lt, and loss content  
-  ttContent, ltContent, taContent = assessContent(markedImg)
+  ttContent, ltContent, taContent = util.assessContent(markedImg)
 
   assert(abs(ttContent - 103050) < 1), "TT validation failed."
   assert(abs(ltContent -  68068) < 1), "LT validation failed."
@@ -2145,7 +1836,7 @@ def validate3D():
   print "\nThe following content values are for validation purposes only.\n"
 
   ### Assess the amount of TT, LT, and TA content there is in the image 
-  ttContent, ltContent, taContent = assessContent(markedImage)
+  ttContent, ltContent, taContent = util.assessContent(markedImage)
 
   ### Check to see that they are in close agreement with previous values
   ###   NOTE: We have to have a lot of wiggle room since we're generating a new cell for each validation
@@ -2264,7 +1955,7 @@ if __name__ == "__main__":
       quit()
 
     if(arg=="-full_ROC"):
-      figS1()
+      full_ROC()
       quit()
 
     if(arg=="-tissueBloodVessel"):
@@ -2374,7 +2065,7 @@ if __name__ == "__main__":
         padY = None
         padX = None
         whiteSpace = None
-      shaveFig(fileName,padY=padY,padX=padX,whiteSpace=whiteSpace)
+      du.shaveFig(fileName,padY=padY,padX=padX,whiteSpace=whiteSpace)
       quit()
 
   raise RuntimeError("Arguments not understood")

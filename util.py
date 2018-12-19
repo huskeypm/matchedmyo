@@ -1209,6 +1209,70 @@ def autoDepadArray(img, verbose=False):
 ###################################################################################################
 ###################################################################################################
 
+def assessContent(markedImg,imgName=None):
+  '''This function analyzes the amount of TT, LT, and TA content that is present in a marked image
+  returned by giveMarkedMyocyte or give3DMarkedMyocyte.
+
+  Inputs:
+    markedImg -> numpy array. The marked image that is returned from the marking routines mentioned above.
+    imgName -> str. Name of the image. If this is specified, the routine will search for an image mask that 
+                 has been constructed to obfuscate the extracellular content/organelles. The naming convention
+                 for the masks is "<ORIGINAL_NAME>_masked.<FILETYPE>"
+
+  Outputs:
+    ttContent, ltContent, taContent
+  '''
+  ### Create copy of image
+  imgCopy = markedImg.copy()
+
+  ### Pull out content-specific channels
+  tt = imgCopy[...,0]
+  lt = imgCopy[...,1]
+  ta = imgCopy[...,2]
+
+  ### Get rid of everything that isn't a hit (hits are marked as 255)
+  tt[tt != 255] = 0
+  lt[lt != 255] = 0
+  ta[ta != 255] = 0
+
+  ### normalize
+  ttNormed = np.divide(tt, np.max(tt))
+  ltNormed = np.divide(lt, np.max(lt))
+  taNormed = np.divide(ta, np.max(ta))
+
+  ### calculate content
+  ttContent = np.sum(ttNormed)
+  ltContent = np.sum(ltNormed)
+  taContent = np.sum(taNormed)
+
+  if isinstance(imgName, (str)):
+    if len(np.shape(imgCopy)) == 4:
+      raise RuntimeError("WARNING: Masking is not implemented in 3D so the assessment of content does not include this. \
+                          This may skew results.")
+    ## if imgName is included, we normalize content to cell area
+    dummy = np.multiply(np.ones_like(markedImg[:,:,0]), 255)
+    mask = ReadResizeApplyMask(dummy,imgName,25,25)
+    mask[mask <= 254] = 0
+    mask[mask > 0] = 1
+    cellArea = np.sum(mask,dtype=float)
+    ttContent /= cellArea
+    ltContent /= cellArea
+    taContent /= cellArea
+    print "TT Content:", ttContent
+    print "LT Content:", ltContent
+    print "Loss Content:", taContent
+    print "Sum of Content:", ttContent+ltContent+taContent
+    ## these should sum to 1 exactly but I'm leaving wiggle room
+    assert (ttContent+ltContent+taContent) < 1.2, ("Something went " 
+            +"wrong with the normalization of content to the cell area calculated "
+            +"by the mask. Double check the masking routine.") 
+  else:
+    print "TT Content:", ttContent
+    print "LT Content:", ltContent
+    print "TA Content:", taContent  
+
+  return ttContent, ltContent, taContent
+
 def estimateTubuleContentFromColoredImage(cI,
                                           totalCellSpace = None,
                                           taFilterName = './myoimages/LossFilter.png',
