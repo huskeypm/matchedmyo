@@ -553,9 +553,9 @@ def give3DMarkedMyocyte(
                              LTstackedHits,
                              TTstackedHits,
                              cImg,
-                             wtName = ttFilterName,
+                             ttName = ttFilterName,
                              ltName = ltFilterName,
-                             lossName = taFilterName)
+                             taName = taFilterName)
 
     ### 'Measure' cell volume just by getting measure of containing array
     cellVolume = np.float(np.product(inputs.imgOrig.shape))
