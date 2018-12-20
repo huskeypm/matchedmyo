@@ -12,10 +12,37 @@ import matplotlib.pylab as plt
 import twoDtense as tdt
 
 
-##
-## For a single matched filter, this function iterates over passed-in angles 
-## and reports highest correlation output for each iteration 
-## 
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Class Definitions
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
+class ClassificationResults:
+  '''This class holds the information obtained by running the classification algorithm.
+  '''
+  def __init__(self,
+               correlated,
+               stackedHits,
+               stackedAngles):
+    self.correlated = correlated
+    self.stackedHits = stackedHits
+    self.stackedAngles = stackedAngles
+
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Functions for Matched Filtering
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
 def DetectFilter(
   inputs,  # basically contains test data and matched filter 
   paramDict,  # parameter dictionary  
@@ -38,10 +65,6 @@ def DetectFilter(
   if inputs is None:
     raise RuntimeError("PLACEHOLDER TO REMIND ONE TO USE INPUT/PARAMDICT OBJECTS")
 
-  # store
-  result = empty()
-  result.stackedDict = dict()
-
   # do correlations across all iter
   if paramDict['useGPU']:
     result,timeElapsed = tdt.doTFloop(
@@ -56,7 +79,7 @@ def DetectFilter(
       result.stackedHits[result.stackedHits < paramDict['snrThresh']] = 0.
 
   else:
-    result.correlated = painter.correlateThresher(
+    correlated = painter.correlateThresher(
        inputs,
        paramDict,
        iters=iters,
@@ -64,26 +87,33 @@ def DetectFilter(
        filterMode=filterMode,
        label=label,
        efficientRotationStorage=inputs.efficientRotationStorage
-       )
+    )
 
     # stack hits to form 'total field' of hits
     if returnAngles:
-      result.stackedHits, result.stackedAngles = painter.StackHits(
-                  result.correlated,
+      stackedHits, stackedAngles = painter.StackHits(
+                  correlated,
                   paramDict,
                   iters,
                   display=display,
                   returnAngles=returnAngles,
                   efficientRotationStorage=inputs.efficientRotationStorage)
     else:
-      result.stackedHits= painter.StackHits(
-        result.correlated,
+      stackedHits= painter.StackHits(
+        correlated,
         paramDict,
         iters,
         display=display,
-        efficientRotationStorage=inputs.efficientRotationStorage)
+        efficientRotationStorage=inputs.efficientRotationStorage
+      )
+      stackedAngles = None
 
-
+  ### Store in ClassificationResults class
+  result = ClassificationResults(
+    correlated = correlated,
+    stackedHits = stackedHits,
+    stackedAngles = stackedAngles
+  )
 
   return result
 
@@ -179,11 +209,6 @@ def TestFilters(
     filter1Result = DetectFilter(inputs,params,iters,display=display,
                                  filterMode="filter1",label=label,
                                  returnAngles=returnAngles)
-    #plt.figure()
-    #plt.imshow(filter1Result.stackedHits)
-    #plt.colorbar()
-    #plt.show()
-    #quit()
     daColors['green']= filter1Result.stackedHits
       
     ### filter 2 
