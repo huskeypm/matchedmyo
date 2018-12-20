@@ -77,19 +77,25 @@ def correlateThresher(
     if efficientRotationStorage: 
       correlated = {}
 
-      ## We need to create storage array for maximum SNR at each pixel/voxel
-      correlated['maxSNRArray'] = np.zeros_like(img)
+      ## We need to create storage array for SNR at each pixel/voxel
+      if params['inverseSNR']:
+        ## If we use inverse SNR (meaning the SNR must be below a certain value to signify a hit), 
+        ##   we need to create an array that has arbitrarily high starting numbers
+        correlated['SNRArray'] = np.ones_like(img) * 5. * params['snrThresh']
+      else:
+        ## Otherwise, we can just instantiate the SNRArray with zeros
+        correlated['SNRArray'] = np.zeros_like(img)
 
       ## We also need to create a storage array for the rotation which the maximum SNR occurred.
       if len(np.shape(img)) == 3:
         ## This means that the image is 3D and we must store the rotation arrays in 3 different arrays
-        correlated['rotMaxSNRArray'] = {}
-        correlated['rotMaxSNRArray']['x'] = np.zeros_like(img, dtype=np.int8) - 1
-        correlated['rotMaxSNRArray']['y'] = np.zeros_like(img, dtype=np.int8) - 1
-        correlated['rotMaxSNRArray']['z'] = np.zeros_like(img, dtype=np.int8) - 1
+        correlated['rotSNRArray'] = {}
+        correlated['rotSNRArray']['x'] = np.zeros_like(img, dtype=np.int8) - 1
+        correlated['rotSNRArray']['y'] = np.zeros_like(img, dtype=np.int8) - 1
+        correlated['rotSNRArray']['z'] = np.zeros_like(img, dtype=np.int8) - 1
       else:
         ## Otherwise we only need one array to store the single rotation
-        correlated['rotMaxSNRArray'] = np.zeros_like(img,dtype=np.int8) - 1
+        correlated['rotSNRArray'] = np.zeros_like(img,dtype=np.int8) - 1
     else:
       ## Store all 'hits' at each angle 
       correlated = []
@@ -130,23 +136,26 @@ def correlateThresher(
       ## Check to see what our storage scheme is and store accordingly
       if efficientRotationStorage:
         ## Get element-wise comparison of this rotation's SNR to all previous SNRs
-        SNRcomparison = np.greater(result.snr, correlated['maxSNRArray'])
+        if params['inverseSNR']:
+          ## If we're using the inverseSNR scheme of hit detection, we need which SNRs are less
+          ##   at this rotation than previous SNRs at previous rotations 
+          SNRcomparison = np.less(result.snr, correlated['SNRArray'])
+        else:
+          ## Otherwise, we just pick out the SNRs which are greater at this rotation compared to
+          ##   previous rotations
+          SNRcomparison = np.greater(result.snr, correlated['SNRArray'])
 
         ## Pick out the greater SNRs and store in maxSNRArray
-        #print SNRcomparison
-        #print np.shape(SNRcomparison)
-        #print np.shape(result.snr)
-        #print correlated['maxSNRArray'][SNRcomparison]
-        correlated['maxSNRArray'][SNRcomparison] = result.snr[SNRcomparison]
+        correlated['SNRArray'][SNRcomparison] = result.snr[SNRcomparison]
 
         ## Pick out the rotations at which the maximum SNR is located at the current location and 
-        ## store in the array
+        ##   store in the array
         if len(np.shape(img)) == 3:
-          correlated['rotMaxSNRArray']['x'][SNRcomparison] = i[0]
-          correlated['rotMaxSNRArray']['y'][SNRcomparison] = i[1]
-          correlated['rotMaxSNRArray']['z'][SNRcomparison] = i[2]
+          correlated['rotSNRArray']['x'][SNRcomparison] = i[0]
+          correlated['rotSNRArray']['y'][SNRcomparison] = i[1]
+          correlated['rotSNRArray']['z'][SNRcomparison] = i[2]
         else:  
-          correlated['rotMaxSNRArray'][SNRcomparison] = i
+          correlated['rotSNRArray'][SNRcomparison] = i
 
       else:
         ## Store results contain both correlation plane and snr
@@ -237,20 +246,24 @@ def StackHits(correlated,  # an array of 'correlation planes'
     ###   work already. Else, we'll have to do some more work to stack the detection or hits.
     if efficientRotationStorage:
       ## We've already wrote the previous routines in a way that we have the maximum SNR and stackedAngles 
-      ##   in a format compatible with the other routines
-      stackedHits = correlated['maxSNRArray']
+      ##   in a format close to compatible with the other routines. We just need to mask out non-hits
+      stackedHits = util2.makeMask(paramDict['snrThresh'],
+                                   img = correlated['SNRArray'],
+                                   doKMeans = doKMeans,
+                                   inverseThresh = paramDict['inverseSNR'])
       if returnAngles:
-        stackedAngles = correlated['rotMaxSNRArray']
+        ## Now we fix the stackedAngles format
+        stackedAngles = correlated['rotSNRArray']
         return stackedHits, stackedAngles
       else:
         return stackedHits
-    ##
-    ## select hits based on those entries about the snrThresh 
-    ##
+
+    ### Otherwise, we have to do some work to pick out the SNRs of our hits across all rotations
+    ###   First, we select hits based on those entries about the snrThresh 
     maskList = []
     simpleCorrMaskList = []
     for i, iteration in enumerate(iters):
-        # routine for identifying 'unique' hits
+        ## routine for identifying 'unique' hits
         try:
           daMask = util2.makeMask(paramDict['snrThresh'],img = correlated[i].snr,
                                   doKMeans=doKMeans, inverseThresh=paramDict['inverseSNR'])
@@ -258,12 +271,12 @@ def StackHits(correlated,  # an array of 'correlation planes'
           print "DC: Using workaround for tissue param dictionary. Fix me."
           daMask = util2.makeMask(paramDict['snrThresh'], img=correlated[i].snr,
                                   doKMeans=doKMeans)
-        # pull out where there is a hit on the simple correlation for use in rotation angle
+        ## pull out where there is a hit on the simple correlation for use in rotation angle
         hitMask = daMask > 0.
         simpleCorrMask = correlated[i].corr
         simpleCorrMask[np.logical_not(hitMask)] = 0
                                   
-        #  print debugging info                                    
+        ##  print debugging info                                    
         if display:
             plt.figure()
             plt.subplot(2,1,1)
