@@ -249,7 +249,8 @@ def giveMarkedMyocyte(
       returnAngles=False,
       returnPastedFilter=True,
       useGPU=False,
-      fileExtension=".pdf"
+      fileExtension=".pdf",
+      efficientRotationStorage=True
       ):
   '''
   This function is the main workhorse for the detection of features in 2D myocytes.
@@ -266,6 +267,7 @@ def giveMarkedMyocyte(
   inputs = empty()
   inputs.imgOrig = util.ReadResizeApplyMask(img,testImage,25,25) # just applies mask
   inputs.useGPU = useGPU
+  inputs.efficientRotationStorage = efficientRotationStorage
 
   ### WT filtering
   if ttFilterName != None:
@@ -430,7 +432,8 @@ def give3DMarkedMyocyte(
       yiters=[-10,0,10],
       ziters=[-10,0,10],
       returnAngles=False,
-      returnPastedFilter=True
+      returnPastedFilter=True,
+      efficientRotationStorage=True
       ):
   '''
   This function is for the detection and marking of subcellular features in three dimensions. 
@@ -464,6 +467,7 @@ def give3DMarkedMyocyte(
   inputs.imgOrig = util.ReadImg(testImage,renorm=True)
   inputs.useGPU = False
   inputs.scopeResolutions = scopeResolutions
+  inputs.efficientRotationStorage = efficientRotationStorage
 
   ### Form flattened iteration matrix containing all possible rotation combinations
   flattenedIters = []

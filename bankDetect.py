@@ -63,15 +63,25 @@ def DetectFilter(
        printer=display,
        filterMode=filterMode,
        label=label,
+       efficientRotationStorage=inputs.efficientRotationStorage
        )
 
     # stack hits to form 'total field' of hits
     if returnAngles:
       result.stackedHits, result.stackedAngles = painter.StackHits(
-                  result.correlated,paramDict,iters,display=display,returnAngles=returnAngles)
+                  result.correlated,
+                  paramDict,
+                  iters,
+                  display=display,
+                  returnAngles=returnAngles,
+                  efficientRotationStorage=inputs.efficientRotationStorage)
     else:
-      result.stackedHits= painter.StackHits(result.correlated,paramDict,iters,
-        display=display)
+      result.stackedHits= painter.StackHits(
+        result.correlated,
+        paramDict,
+        iters,
+        display=display,
+        efficientRotationStorage=inputs.efficientRotationStorage)
 
 
 

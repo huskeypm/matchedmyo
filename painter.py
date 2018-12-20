@@ -75,10 +75,21 @@ def correlateThresher(
     
     ### Form storage arrays/lists needed for the analysis
     if efficientRotationStorage: 
+      correlated = {}
+
       ## We need to create storage array for maximum SNR at each pixel/voxel
-      maxSNRArray = np.zeros_like(img)
+      correlated['maxSNRArray'] = np.zeros_like(img)
+
       ## We also need to create a storage array for the rotation which the maximum SNR occurred.
-      rotMaxSNRArray = np.zeros_like(img,dtype=np.int8)
+      if len(np.shape(img)) == 3:
+        ## This means that the image is 3D and we must store the rotation arrays in 3 different arrays
+        correlated['rotMaxSNRArray'] = {}
+        correlated['rotMaxSNRArray']['x'] = np.zeros_like(img, dtype=np.int8) - 1
+        correlated['rotMaxSNRArray']['y'] = np.zeros_like(img, dtype=np.int8) - 1
+        correlated['rotMaxSNRArray']['z'] = np.zeros_like(img, dtype=np.int8) - 1
+      else:
+        ## Otherwise we only need one array to store the single rotation
+        correlated['rotMaxSNRArray'] = np.zeros_like(img,dtype=np.int8) - 1
     else:
       ## Store all 'hits' at each angle 
       correlated = []
@@ -119,20 +130,29 @@ def correlateThresher(
       ## Check to see what our storage scheme is and store accordingly
       if efficientRotationStorage:
         ## Get element-wise comparison of this rotation's SNR to all previous SNRs
-        SNRcomparison = np.greater(result.snr, maxSNRArray)
+        SNRcomparison = np.greater(result.snr, correlated['maxSNRArray'])
 
         ## Pick out the greater SNRs and store in maxSNRArray
-        maxSNRArray[SNRcomparison] = result.snr
+        #print SNRcomparison
+        #print np.shape(SNRcomparison)
+        #print np.shape(result.snr)
+        #print correlated['maxSNRArray'][SNRcomparison]
+        correlated['maxSNRArray'][SNRcomparison] = result.snr[SNRcomparison]
 
-        ## Pick out the rotations at which the maximum SNR is located thus far
-        rotMaxSNRArray[SNRcomparison] = 
+        ## Pick out the rotations at which the maximum SNR is located at the current location and 
+        ## store in the array
+        if len(np.shape(img)) == 3:
+          correlated['rotMaxSNRArray']['x'][SNRcomparison] = i[0]
+          correlated['rotMaxSNRArray']['y'][SNRcomparison] = i[1]
+          correlated['rotMaxSNRArray']['z'][SNRcomparison] = i[2]
+        else:  
+          correlated['rotMaxSNRArray'][SNRcomparison] = i
 
+      else:
+        ## Store results contain both correlation plane and snr
+        result.rFN = np.copy(rFN)
+        correlated.append(result) 
 
-      ## Store results contain both correlation plane and snr
-      result.rFN = np.copy(rFN)
-      correlated.append(result) 
-
-    
     ## Write the correlation planes if this is desired
     if printer and not efficientRotationStorage: 
        if label==None:
@@ -174,16 +194,56 @@ def StackHits(correlated,  # an array of 'correlation planes'
               display=False,
               rescaleCorr=False,
               doKMeans=False, #True,
-              returnAngles=False):
+              returnAngles=False,
+              efficientRotationStorage=False):
+    '''This function goes through and 'stacks' the hits across all rotations if this hasn't been 
+    done previously. This is necessary when efficientRotationStorage is False.
+
+    Inputs:
+      correlated -> list or dict. If efficientRotationStorage is False. Correlated is a list of
+                      results classes (see correlateThresher function for objects in class).
+                      If efficientRotationStorage is True, this is a dict. The keys of which
+                      can also be seen in correlateThresher.
+      paramDict -> dict. Dictionary containing parameters for the characterization routines. 
+                     Generated via optimizer.ParamDict() function.
+      iters -> list of ints (2D classification) or list of list of int (3D classification).
+                List of rotations to consider for the classification.
+      display -> Bool. If True, saves plots for debugging.
+      rescaleCorr -> Deprecated.
+      doKMeans -> Deprecated.
+      returnAngles -> Boolean. If True, return the angles with which the greatest SNR appears.
+      efficientRotationStorage -> Bool. If True, correlated already contains 'stacked' hits
+                                    and that simplifies this routine immensely.
+    
+    Outputs:
+      stacked -> array. Array with same dimensions as image where hits are marked with their 
+                   maximum SNR across all rotations and non-hits are marked with NaNs
+      if returnAngles:
+        if image is 2D:
+          stackedAngles -> array. Array with same shape as image where hits are marked as their
+                             rotation of maximum SNR and non-hits are marked as -1.
+        elif image is 3D:
+          stackedAngles -> dict. Dictionary containing arrays containing rotation info for 
+                            x, y, and z where keys are 'x', 'y', and 'z', respectively.
+    '''
      # TODO
     if rescaleCorr:
       raise RuntimeError("Why is this needed? IGNORING")
     if display:
       print "Call me debug" 
-    # Function that iterates through correlations at varying rotations of a single filter,
-    # constructs a mask consisting of 'NaNs' and returns a list of these masked correlations
 
-
+    ### Check to see if we previously used the new storage technique
+    ###   if we did, then we can use a shortcut with this routine since we've done a lot of the leg
+    ###   work already. Else, we'll have to do some more work to stack the detection or hits.
+    if efficientRotationStorage:
+      ## We've already wrote the previous routines in a way that we have the maximum SNR and stackedAngles 
+      ##   in a format compatible with the other routines
+      stackedHits = correlated['maxSNRArray']
+      if returnAngles:
+        stackedAngles = correlated['rotMaxSNRArray']
+        return stackedHits, stackedAngles
+      else:
+        return stackedHits
     ##
     ## select hits based on those entries about the snrThresh 
     ##
