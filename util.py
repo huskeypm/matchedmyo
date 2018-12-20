@@ -955,7 +955,7 @@ def MaskRegion(region,sidx,margin,value=0):
       region[(sidx[0]-margin):(sidx[0]+margin+1),
                          (sidx[1]-margin):(sidx[1]+margin+1)]=value 
 
-def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize,filterTwoSarcSize=25):
+def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize=25,filterTwoSarcSize=25):
   # function to apply the image mask before outputting results
   maskName = imgName[:-4]; fileType = imgName[-4:]
   fileName = maskName+'_mask'+fileType

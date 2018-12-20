@@ -16,12 +16,37 @@ import matplotlib.pyplot as plt
 import painter
 import matchedFilter as mF
 import argparse
+import yaml
 
 
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Class Definitions
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
 
-### Make an empty class instance
-class empty:
-  pass
+class Inputs:
+  '''Class for the storage of inputs for running through the classification routines,
+  giveMarkedMyocyte and give3DMarkedMyocyte. This class is accessed at all levels of 
+  characterization so it's convenient to have a way to pass parameters around.
+  '''
+  def __init__(self,
+               imgOrig,
+               mfOrig=None,
+               scopeResolutions=None,
+               useGPU=False,
+               efficientRotationStorage=True
+               ):
+    self.imgOrig = imgOrig
+    self.mfOrig = mfOrig
+    self.scopeResolutions = scopeResolutions
+    self.useGPU = useGPU
+    self.efficientRotationStorage = efficientRotationStorage
+
 
 ###################################################################################################
 ###################################################################################################
@@ -187,10 +212,8 @@ def analyzeTT_Angles(testImageName,
   ttFilter = util.LoadFilter(ttFilterName)
   longFilter = np.concatenate((ttFilter,ttFilter,ttFilter))
     
-  rotInputs = empty()
-  rotInputs.imgOrig = smoothed
-  rotInputs.mfOrig = longFilter
-  rotInputs.efficientRotationStorage = inputs.efficientRotationStorage
+  rotInputs = Inputs(imgOrig = smoothed,
+                     mfOrig = longFilter)
 
   params = optimizer.ParamDict(typeDict='WT')
   params['snrThresh'] = 0 # to pull out max hit
@@ -273,10 +296,7 @@ def giveMarkedMyocyte(
   img = util.ReadImg(testImage,renorm=True)
 
   ### defining inputs to be read by DetectFilter function
-  inputs = empty()
-  inputs.imgOrig = util.ReadResizeApplyMask(img,testImage,25,25) # just applies mask
-  inputs.useGPU = useGPU
-  inputs.efficientRotationStorage = efficientRotationStorage
+  inputs = Inputs(imgOrig = util.ReadResizeApplyMask(img,testImage))
 
   ### WT filtering
   if ttFilterName != None:
@@ -472,11 +492,10 @@ def give3DMarkedMyocyte(
   start = time.time()
 
   ### Read in preprocessed test image and store in inputs class for use in all subroutines
-  inputs = empty()
-  inputs.imgOrig = util.ReadImg(testImage,renorm=True)
-  inputs.useGPU = False
-  inputs.scopeResolutions = scopeResolutions
-  inputs.efficientRotationStorage = efficientRotationStorage
+  inputs = Inputs(
+    imgOrig = util.ReadImg(testImage, renorm=True),
+    scopeResolutions = scopeResolutions
+  )
 
   ### Form flattened iteration matrix containing all possible rotation combinations
   flattenedIters = []
@@ -779,6 +798,9 @@ def main(args):
   ### Get a list of all function names in the script
   functions = globals()
 
+  ### Load in the yaml file
+  #yamlDict = yaml.load(open(args.yamlFile))
+
   functions[args.functionToCall]()#(args)
 
 
@@ -791,5 +813,8 @@ if __name__ == "__main__":
   parser.add_argument('functionToCall', 
                       type=str,
                       help='The function to call within this script')
+  parser.add_argument('--yamlFile',
+                      type=str,
+                      help='The name of the .yml file containing parameters for classification')
   args = parser.parse_args()
   main(args)
