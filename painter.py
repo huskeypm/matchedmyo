@@ -16,7 +16,6 @@ from scipy import signal
 import util 
 import util2
 
-class empty:pass
 
 ##
 ## Performs matched filtering over desired angles
@@ -102,8 +101,6 @@ def correlateThresher(
 
     ### Iterate over all filter rotations desired
     for i in iters:
-      result = empty()
-
       ## Check dimensionality of iteration and rotate filters accordingly
       if type(i) == list:
         ## This is 3D

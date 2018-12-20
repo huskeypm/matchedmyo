@@ -12,7 +12,44 @@ import matplotlib.pylab as plt
 dir_path = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(dir_path+"/gpu/")
 import simple_GPU_MF as sMF
+
+
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Class Definitions
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
+class Results:
+  '''This class contains all of the information that is necessary to keep for the results of 
+  filtering
+  '''
+
+  def __init__(self,
+               snr,
+               corr,
+               corrPunishment=None
+               ):
+    self.snr=snr
+    self.corr=corr
+    self.corrPunishment=corrPunishment
+
+### Defining empty class for rapid prototyping
 class empty:pass
+
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Filtering Functions
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
 
 # This script determines detections by integrating the correlation response
 # over a small area, then dividing that by the response of a 'lobe' filter 
@@ -79,10 +116,6 @@ def lobeDetect(
 
     return results
 
-
-
-
-
 # TODO phase this out 
 def CalcInvFilter(inputs,paramDict,corr):
       penaltyscale = paramDict['penaltyscale'] 
@@ -142,16 +175,20 @@ def punishmentFilter(
     except:
       raise RuntimeError("Punishment filter weighting term (gamma) not found\
                           within paramDict")
-    results=empty()
+
     ## get correlation plane w filter 
-    results.corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF']) 
-    results.corrPunishment = mF.matchedFilter(img,mfPunishment,parsevals=False,demean=False)
+    corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF']) 
+    corrPunishment = mF.matchedFilter(img,mfPunishment,parsevals=False,demean=False)
 
     ######
-    snr = results.corr / (cM + gamma * results.corrPunishment)
+    snr = corr / (cM + gamma * corrPunishment)
 
-    results.snr = snr
-    #results.corr = corr
+    ### Store results
+    results = Results(
+      snr = snr,
+      corr = corr,
+      corrPunishment = corrPunishment
+    )
 
     return results 
 
@@ -167,16 +204,18 @@ def simpleDetect(
   mf  = inputs.mf  # raw (preprocessed image) 
 
   ## get correlation plane w filter 
-  results = empty()
-  results.corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF']) 
+  corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF']) 
   
   if paramDict['useFilterInv']:
-      results.snr = CalcInvFilter(inputs,paramDict,results.corr)
+      snr = CalcInvFilter(inputs,paramDict, corr)
 
   else:
-      results.snr = results.corr  /paramDict['sigma_n']
+      snr = corr / paramDict['sigma_n']
 
-
+  results = Results(
+    snr = snr,
+    corr = corr
+  )
 
   return results
 
@@ -195,10 +234,10 @@ def regionalDeviation(inputs,paramDict):
   results = empty()
 
   if paramDict['useGPU'] == False:
-    results.corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF'])
+    corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF'])
   else:
     print "deprecated. Switch GPU filtering over to new scheme"
-    results.corr = sMF.MF(img,mf,useGPU=True)
+    corr = sMF.MF(img,mf,useGPU=True)
 
 
   ####### FINAL ITERATION OF CONVOLUTION BASED STD DEV
@@ -225,20 +264,24 @@ def regionalDeviation(inputs,paramDict):
   ### Find common hits
   stdDevHits = stdDev < paramDict['stdDevThresh']
   if paramDict['inverseSNR'] == False:
-    simpleHits = results.corr > paramDict['snrThresh']
+    simpleHits = corr > paramDict['snrThresh']
   else:
-    simpleHits = results.corr < paramDict['snrThresh']
+    simpleHits = corr < paramDict['snrThresh']
   commonHits = np.multiply(stdDevHits, simpleHits)
 
   ### store in a resulting image with arbitrary snr
   if paramDict['inverseSNR'] == False:
-    resultImage = np.zeros_like(img)
-    resultImage[commonHits] = 5 * paramDict['snrThresh']
+    snr = np.zeros_like(img)
+    snr[commonHits] = 5 * paramDict['snrThresh']
   else:
-    resultImage = np.ones_like(img) * 5. * paramDict['snrThresh']
-    resultImage[commonHits] = 0.
-  results.snr = resultImage
+    snr = np.ones_like(img) * 5. * paramDict['snrThresh']
+    snr[commonHits] = 0.
   
+  results = Results(
+    snr = snr,
+    corr = corr
+  )
+
   return results
 
 def filterRatio(inputs,paramDict):
@@ -261,16 +304,25 @@ def filterRatio(inputs,paramDict):
 
   return results
 
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Function That Routes Classification to Correct Filtering Function
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
 
-
-#
-# Calls different modes of selecting best hits 
-#
 def FilterSingle(
   inputs, # object with specific filters, etc needed for matched filtering
   paramDict = dict(),# pass in parameters through here
-  mode = None # ['logMode','dylanmode','lobemode']
+  mode = None
   ):
+
+  '''This function calls different modes of selecting best hits
+  '''
+
   if mode is not None:
       print "WARNING: replacing with paramDict"
     
@@ -289,7 +341,10 @@ def FilterSingle(
   else: 
     #raise RuntimeError("need to define mode") 
     print "Patiently ignoring you until this is implemented" 
-    results = empty()
+    results = Results(
+      snr = None,
+      corr = None
+    )
 
   return results
 
