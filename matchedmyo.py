@@ -190,6 +190,7 @@ def analyzeTT_Angles(testImageName,
   rotInputs = empty()
   rotInputs.imgOrig = smoothed
   rotInputs.mfOrig = longFilter
+  rotInputs.efficientRotationStorage = inputs.efficientRotationStorage
 
   params = optimizer.ParamDict(typeDict='WT')
   params['snrThresh'] = 0 # to pull out max hit
@@ -207,15 +208,23 @@ def analyzeTT_Angles(testImageName,
   coloredAnglesMasked = util.ReadResizeApplyMask(coloredAngles,testImageName,
                                             ImgTwoSarcSize,
                                             filterTwoSarcSize=ImgTwoSarcSize)
-  stackedAngles = smoothedHits
-  dims = np.shape(stackedAngles)
-  angleCounts = []
-  for i in range(dims[0]):
-    for j in range(dims[1]):
-      rotArg = stackedAngles[i,j]
-      if rotArg != -1:
-        ### indicates this is a hit
-        angleCounts.append(iters[rotArg])
+
+  ### Check to see if we've used the new efficient way of storing information in the algorithm.
+  ###   If we have, we already have the rotational information stored
+  if rotInputs.efficientRotationStorage:
+    angleCounts = smoothedHits.flatten()
+  else:
+    ## Otherwise, we have to go through and manually pick out rotations from their indexes in the 
+    ##  iters list
+    stackedAngles = smoothedHits
+    dims = np.shape(stackedAngles)
+    angleCounts = []
+    for i in range(dims[0]):
+      for j in range(dims[1]):
+        rotArg = stackedAngles[i,j]
+        if rotArg != -1:
+          ### indicates this is a hit
+          angleCounts.append(iters[rotArg])
 
   return angleCounts, coloredAnglesMasked
 
@@ -671,8 +680,8 @@ def validate(testImage="./myoimages/MI_M_45_processed.png",
     display -> Bool. If True, display the marked image
   '''
   
-  # run algorithm
-  markedImg = giveMarkedMyocyte(testImage=testImage)
+  ### Run algorithm to pull out content and rotation info
+  markedImg, _, angleCounts = giveMarkedMyocyte(testImage=testImage,returnAngles=True)
 
   if display:
     plt.figure()
@@ -681,12 +690,18 @@ def validate(testImage="./myoimages/MI_M_45_processed.png",
 
   print "\nThe following content values are for validation purposes only.\n"
 
-  # calculate wt, lt, and loss content  
+  ### Calculate TT, LT, and TA content  
   ttContent, ltContent, taContent = util.assessContent(markedImg)
 
   assert(abs(ttContent - 103050) < 1), "TT validation failed."
   assert(abs(ltContent -  68068) < 1), "LT validation failed."
   assert(abs(taContent - 156039) < 1), "TA validation failed."
+
+  ### Calculate the number of hits at rotation equal to 5 degrees
+  numHits = np.count_nonzero(np.asarray(angleCounts) == 5)
+  print "Number of Hits at Rotation = 5 Degrees:", numHits
+  assert(abs(numHits - 1621) < 1), "Rotation validation failed"
+
   print "\nPASSED!\n"
 
 def validate3D():
