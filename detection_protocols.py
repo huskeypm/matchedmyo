@@ -9,9 +9,9 @@ import sys
 import os
 import util
 import matplotlib.pylab as plt
-dir_path = os.path.dirname(os.path.realpath(__file__))
-sys.path.append(dir_path+"/gpu/")
-import simple_GPU_MF as sMF
+# dir_path = os.path.dirname(os.path.realpath(__file__))
+# sys.path.append(dir_path+"/gpu/")
+#import simple_GPU_MF as sMF
 
 
 ###################################################################################################
@@ -236,8 +236,8 @@ def regionalDeviation(inputs,paramDict):
   if paramDict['useGPU'] == False:
     corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF'])
   else:
-    print "deprecated. Switch GPU filtering over to new scheme"
-    corr = sMF.MF(img,mf,useGPU=True)
+    raise RuntimeError("GPU Use is Deprecated")
+    # corr = sMF.MF(img,mf,useGPU=True)
 
 
   ####### FINAL ITERATION OF CONVOLUTION BASED STD DEV
@@ -297,8 +297,9 @@ def filterRatio(inputs,paramDict):
     results.corrPunishment = mF.matchedFilter(img,mfPunish,parsevals=False,demean=paramDict['demeanMF'])
     #results.corr = sMF.MF(img,mf,useGPU=False)
   elif paramDict['useGPU'] == True:
-    results.corr = sMF.MF(img,mf,useGPU=True)
-    results.corrPunishment = sMF.MF(img,mfPunish,useGPU=True)
+    raise RuntimeError("GPU Use is Deprecated")
+    # results.corr = sMF.MF(img,mf,useGPU=True)
+    # results.corrPunishment = sMF.MF(img,mfPunish,useGPU=True)
 
   results.snr = results.corr  / results.corrPunishment
 
