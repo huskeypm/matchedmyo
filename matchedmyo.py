@@ -60,8 +60,9 @@ class Inputs:
 
 def TT_Filtering(inputs,
                  iters,
-                 ttFilterName,
-                 ttPunishFilterName,
+                 #ttFilterName,
+                 #ttPunishFilterName,
+                 paramDict,
                  ttThresh=None,
                  ttGamma=None,
                  returnAngles=False):
@@ -72,25 +73,31 @@ def TT_Filtering(inputs,
   start = time.time()
 
   ### Specify necessary inputs
-  ttFilter = util.LoadFilter(ttFilterName)
+  #ttFilter = util.LoadFilter(ttFilterName)
+  ## Read in filter
+  ttFilter = util.LoadFilter(paramDict['filterName'])
   inputs.mfOrig = ttFilter
-  if len(np.shape(inputs.imgOrig)) == 3:
-    WTparams = optimizer.ParamDict(typeDict='TT3D')
-  elif len(np.shape(inputs.imgOrig)) == 2:
-    WTparams = optimizer.ParamDict(typeDict='TT')
-  else:
-    raise RuntimeError("The number of dimensions of the image stored in inputs.imgOrig is {}. \
-                       This is not supported currently.".format(len(np.shape(inputs.imgOrig))))
-  WTparams['covarianceMatrix'] = np.ones_like(inputs.imgOrig)
-  WTparams['mfPunishment'] = util.LoadFilter(ttPunishFilterName)
-  WTparams['useGPU'] = inputs.useGPU
+
+  #if len(np.shape(inputs.imgOrig)) == 3:
+  #  WTparams = optimizer.ParamDict(typeDict='TT3D')
+  #elif len(np.shape(inputs.imgOrig)) == 2:
+  #  WTparams = optimizer.ParamDict(typeDict='TT')
+  #else:
+  #  raise RuntimeError("The number of dimensions of the image stored in inputs.imgOrig is {}. \
+  #                     This is not supported currently.".format(len(np.shape(inputs.imgOrig))))
+  paramDict['covarianceMatrix'] = np.ones_like(inputs.imgOrig)
+  paramDict['mfPunishment'] = util.LoadFilter(paramDict['punishFilterName'])
+  print "phase out GPU"
+  paramDict['useGPU'] = inputs.useGPU
+
+  ## Check to see if parameters are manually specified
   if ttThresh != None:
-    WTparams['snrThresh'] = ttThresh
+    paramDict['snrThresh'] = ttThresh
   if ttGamma != None:
-    WTparams['gamma'] = ttGamma
+    paramDict['gamma'] = ttGamma
 
   ### Perform filtering
-  WTresults = bD.DetectFilter(inputs,WTparams,iters,returnAngles=returnAngles)  
+  WTresults = bD.DetectFilter(inputs,paramDict,iters,returnAngles=returnAngles)  
 
   end = time.time()
   print "Time for WT filtering to complete:",end-start,"seconds"
@@ -99,9 +106,7 @@ def TT_Filtering(inputs,
 
 def LT_Filtering(inputs,
                  iters,
-                 ltFilterName,
-                 ltThresh=None,
-                 ltStdThresh=None,
+                 paramDict,
                  returnAngles=False
                  ):
   '''
@@ -112,22 +117,12 @@ def LT_Filtering(inputs,
   start = time.time()
 
   ### Specify necessary inputs
-  inputs.mfOrig = util.LoadFilter(ltFilterName)
-  if len(np.shape(inputs.imgOrig)) == 3:
-    LTparams = optimizer.ParamDict(typeDict='LT3D')
-  elif len(np.shape(inputs.imgOrig)) == 2:
-    LTparams = optimizer.ParamDict(typeDict='LT')
-  else:
-    raise RuntimeError("The number of dimensions of the image stored in inputs.imgOrig is {}. \
-                       This is not supported currently.".format(len(np.shape(inputs.imgOrig))))
-  if ltThresh != None:
-    LTparams['snrThresh'] = ltThresh
-  if ltStdThresh != None:
-    LTparams['stdDevThresh'] = ltStdThresh
-  LTparams['useGPU'] = inputs.useGPU
+  inputs.mfOrig = util.LoadFilter(paramDict['filterName'])
+  print "Seriously, phase out GPU"
+  paramDict['useGPU'] = inputs.useGPU
 
   ### Perform filtering
-  LTresults = bD.DetectFilter(inputs,LTparams,iters,returnAngles=returnAngles)
+  LTresults = bD.DetectFilter(inputs,paramDict,iters,returnAngles=returnAngles)
 
   end = time.time()
   print "Time for LT filtering to complete:",end-start,"seconds"
@@ -135,12 +130,13 @@ def LT_Filtering(inputs,
   return LTresults
 
 def TA_Filtering(inputs,
-                   lossFilterName,
-                   iters=None,
-                   lossThresh=None,
-                   lossStdThresh=None,
-                   returnAngles=False,
-                   ):
+                 paramDict,
+                  #  lossFilterName,
+                 iters=None,
+                  #  lossThresh=None,
+                  #  lossStdThresh=None,
+                 returnAngles=False,
+                 ):
   '''
   Takes inputs class that contains original image and performs Loss filtering on the image
   '''
@@ -148,26 +144,19 @@ def TA_Filtering(inputs,
   start = time.time()
 
   ### Specify necessary inputs
-  inputs.mfOrig = util.LoadFilter(lossFilterName)
-  if len(np.shape(inputs.imgOrig)) == 3:
-    Lossparams = optimizer.ParamDict(typeDict='TA3D')
-  elif len(np.shape(inputs.imgOrig)) == 2:
-    Lossparams = optimizer.ParamDict(typeDict='TA')
-  else:
-    raise RuntimeError("The number of dimensions of the image stored in inputs.imgOrig is {}. \
-                       This is not supported currently.".format(len(np.shape(inputs.imgOrig))))
-  Lossparams['useGPU'] = inputs.useGPU
+  inputs.mfOrig = util.LoadFilter(paramDict['filterName'])
+  print "PHASE OUT GPU"
+  paramDict['useGPU'] = inputs.useGPU
+  
+  ## Check to see if iters (filter rotations are specified) if they aren't we'll just use 0 and 45
+  ##   degrees since the loss filter is symmetric
   if iters != None:
     Lossiters = iters
   else:
-    Lossiters = [0, 45] # don't need many rotations for loss filtering
-  if lossThresh != None:
-    Lossparams['snrThresh'] = lossThresh
-  if lossStdThresh != None:
-    Lossparams['stdDevThresh'] = lossStdThresh
-
+    Lossiters = [0, 45] 
+  
   ### Perform filtering
-  Lossresults = bD.DetectFilter(inputs,Lossparams,Lossiters,returnAngles=returnAngles)
+  Lossresults = bD.DetectFilter(inputs,paramDict,Lossiters,returnAngles=returnAngles)
 
   end = time.time()
   print "Time for TA filtering to complete:",end-start,"seconds"
@@ -271,18 +260,19 @@ def giveMarkedMyocyte(
       ImgTwoSarcSize=None,
       tag = "default_",
       writeImage = False,
-      ttThresh=None,
-      ltThresh=None,
-      lossThresh=None,
-      wtGamma=None,
-      ltStdThresh=None,
-      lossStdThresh=None,
+      # ttThresh=None,
+      # ltThresh=None,
+      # lossThresh=None,
+      # wtGamma=None,
+      # ltStdThresh=None,
+      # lossStdThresh=None,
       iters=[-25,-20,-15,-10,-5,0,5,10,15,20,25],
       returnAngles=False,
       returnPastedFilter=True,
       useGPU=False,
       fileExtension=".pdf",
-      efficientRotationStorage=True
+      efficientRotationStorage=True,
+      yamlFileName = None
       ):
   '''
   This function is the main workhorse for the detection of features in 2D myocytes.
@@ -298,42 +288,41 @@ def giveMarkedMyocyte(
   ### defining inputs to be read by DetectFilter function
   inputs = Inputs(imgOrig = util.ReadResizeApplyMask(img,testImage))
 
-  ### WT filtering
+  ### Read in the yaml file if it is specified
+  yamlDict = util.load_yaml(yamlFileName)
+
+  ### Form parameter dictionaries for the classification
+  paramDicts = util.makeParamDicts(inputs=inputs,yamlDict=yamlDict)
+
+  ### Transverse Tubule Filtering
   if ttFilterName != None:
     WTresults = TT_Filtering(
       inputs = inputs,
       iters = iters,
-      ttFilterName = ttFilterName,
-      ttPunishFilterName = wtPunishFilterName,
-      ttThresh = ttThresh,
-      ttGamma = wtGamma,
+      paramDict = paramDicts['TT'],
       returnAngles = returnAngles
     )
     WTstackedHits = WTresults.stackedHits
   else:
     WTstackedHits = np.zeros_like(inputs.imgOrig)
 
-  ### LT filtering
+  ### Longitudinal Tubule Filtering
   if ltFilterName != None:
     LTresults = LT_Filtering(
       inputs = inputs,
       iters = iters,
-      ltFilterName = ltFilterName,
-      ltThresh = ltThresh,
-      ltStdThresh = ltStdThresh,
+      paramDict = paramDicts['LT'],
       returnAngles = returnAngles
     )
     LTstackedHits = LTresults.stackedHits
   else:
     LTstackedHits = np.zeros_like(inputs.imgOrig)
 
-  ### Loss filtering
+  ### Tubule Absence Filtering
   if lossFilterName != None:
     Lossresults = TA_Filtering(
       inputs=inputs,
-      lossFilterName = lossFilterName,
-      lossThresh = lossThresh,
-      lossStdThresh = lossStdThresh,
+      paramDict = paramDicts['TA'],
       returnAngles = returnAngles
     )
     LossstackedHits = Lossresults.stackedHits
@@ -462,7 +451,8 @@ def give3DMarkedMyocyte(
       ziters=[-10,0,10],
       returnAngles=False,
       returnPastedFilter=True,
-      efficientRotationStorage=True
+      efficientRotationStorage=True,
+      yamlFileName=None
       ):
   '''
   This function is for the detection and marking of subcellular features in three dimensions. 
@@ -497,6 +487,12 @@ def give3DMarkedMyocyte(
     scopeResolutions = scopeResolutions
   )
 
+  ### Read in the yaml file if it is specified
+  yamlDict = util.load_yaml(yamlFileName)
+
+  ### Form parameter dictionaries for classification
+  paramDicts = util.makeParamDicts(inputs,yamlDict=yamlDict)
+
   ### Form flattened iteration matrix containing all possible rotation combinations
   flattenedIters = []
   for i in xiters:
@@ -504,30 +500,40 @@ def give3DMarkedMyocyte(
       for k in ziters:
         flattenedIters.append( [i,j,k] )
 
-  ### WT filtering
+  ### Transverse Tubule Filtering
   if ttFilterName != None:
-    TTresults = TT_Filtering(inputs,flattenedIters,ttFilterName,ttPunishFilterName,ttThresh,wtGamma,returnAngles)
+    TTresults = TT_Filtering(
+      inputs,
+      flattenedIters,
+      paramDict = paramDicts['TT'],
+      returnAngles = returnAngles
+    )
     TTstackedHits = TTresults.stackedHits
   else:
     TTstackedHits = np.zeros_like(inputs.imgOrig)
 
-  ### LT filtering
+  ### Longitudinal Tubule Filtering
   if ltFilterName != None:
-    LTresults = LT_Filtering(inputs,flattenedIters,ltFilterName,ltThresh,ltStdThresh,returnAngles)
+    LTresults = LT_Filtering(
+      inputs,
+      flattenedIters,
+      paramDict = paramDicts['LT'],
+      returnAngles = returnAngles
+    )
     LTstackedHits = LTresults.stackedHits
   else:
     LTstackedHits = np.zeros_like(inputs.imgOrig)
 
-  ### Loss filtering
+  ### Tubule Absence Filtering
   if taFilterName != None:
     ## form tubule absence flattened rotation matrix. Choosing to look at tubule absence at one rotation right now.
     taIters = [[0,0,0]]
-    TAresults = TA_Filtering(inputs,
-                               taFilterName,
-                               iters=taIters,
-                               lossThresh=lossThresh,
-                               lossStdThresh=lossStdThresh,
-                               returnAngles=returnAngles)
+    TAresults = TA_Filtering(
+      inputs,
+      iters=taIters,
+      paramDict = paramDicts['TA'],
+      returnAngles = returnAngles
+    )
     TAstackedHits = TAresults.stackedHits
   else:
     TAstackedHits = np.zeros_like(inputs.imgOrig)

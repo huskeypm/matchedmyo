@@ -162,27 +162,35 @@ def ParamDict(typeDict=''):
     # optimized as of June 5, 2018
     paramDict['gamma'] = 3.
     paramDict['snrThresh'] = 0.35
+    paramDict['filterName'] = './myoimages/newSimpleWTFilter.png'
+    paramDict['punishFilterName'] = './myoimages/newSimpleWTPunishmentFilter.png'
     if '3D' in typeDict:
       # optimized as of December 4, 2018
       paramDict['snrThresh'] = 0.8
+      paramDict['filterName'] = './myoimages/TT_3D.tif'
+      paramDict['punishFilterName'] = './myoimages/TT_Punishment_3D.tif'
   elif 'LT' in typeDict:
     paramDict['filterMode'] = 'regionalDeviation'
     # optimized as of June 5, 2018 
     paramDict['snrThresh'] = 0.6 
     paramDict['stdDevThresh'] = 0.2
+    paramDict['filterName'] = './myoimages/LongitudinalFilter.png'
     if '3D' in typeDict:
       # optimized as of December 4, 2018
       paramDict['snrThresh'] = 0.9
       paramDict['stdDevThresh'] = 1.
+      paramDict['filterName'] = './myoimages/LT_3D.tif'
   elif 'TA' in typeDict:
     # optimized as of June 5, 2018
     paramDict['filterMode'] = 'regionalDeviation'
     paramDict['inverseSNR'] = True
     paramDict['snrThresh'] = 0.04 
     paramDict['stdDevThresh'] = 0.1
+    paramDict['filterName'] = './myoimages/LossFilter.png'
     if '3D' in typeDict:
       # optimized as of December 4, 2018
       paramDict['stdDevThresh'] = 0.5
+      paramDict['filterName'] = './myoimages/TA_3D.tif'
 
   return paramDict
 
