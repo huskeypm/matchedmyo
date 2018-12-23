@@ -63,7 +63,7 @@ def SetupParams():
   snrThresh = 12            
   lossScale = 10 # " over which loss region should be considered
   lossRegionCutoff = 40
-  paramDict = optimizer.ParamDict(typeDict='WT')
+  paramDict = optimizer.ParamDict(typeDict='TT')
   #paramDict = {
       #'doCLAHE':False,      
       #'useFilterInv':False,      

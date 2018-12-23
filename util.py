@@ -12,6 +12,8 @@ import operator
 import tifffile
 import painter
 import bankDetect as bD
+import yaml
+import optimizer
 
 ### Temporarily raising error with tensorflow.
 ###   We should be getting rid of this soon
@@ -1629,6 +1631,44 @@ def dissimilar(
     
     f = cv2.resize(f, None, fx = 1/s, fy = 1/s, interpolation = cv2.INTER_CUBIC)
     return f, Hs,Ks
+
+
+
+###################################################################################################
+###################################################################################################
+###################################################################################################
+###
+### Setup/YAML Routines
+###
+###################################################################################################
+###################################################################################################
+###################################################################################################
+
+def load_yaml(fileName):
+  '''Function to load in the yaml file that is specified in 'fileName' and returns a dictionary'''
+
+  with open(fileName) as yam:
+    data = yaml.load(yam)
+  
+  return data
+
+def makeParamDicts(yamlFileName=None):
+  '''This function forms the parameter dictionaries for each filtering type, TT, LT, and TA and 
+  inserts specified values for those parameters if they were specified in the yaml file.
+
+  Inputs:
+    yamlFileName -> str. Name of the yaml file to be loaded in. Template yaml file is found in this
+                      repo as TEMPLATE.yml
+
+  Outputs:
+    storageDict -> dict. Dictionary containing parameter dictionaries with 'TT', 'LT', and 'TA' 
+                     being the keys.
+  '''
+
+  ### Read in the yamlFile if it is specified
+  storageDict = dict()
+  if not yamlFileName:
+    storageDict['TT'] = optimizer.ParamDict(typeDict='TT')
 
 
 ###################################################################################################
