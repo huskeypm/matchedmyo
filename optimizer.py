@@ -157,7 +157,7 @@ def ParamDict(typeDict=''):
     paramDict['useFilterInv'] = True
     paramDict['penaltyscale'] = 1.2
     paramDict['doCLAHE'] = True
-  elif 'WT' in typeDict:
+  elif 'TT' in typeDict:
     paramDict['filterMode'] = 'punishmentFilter'
     # optimized as of June 5, 2018
     paramDict['gamma'] = 3.
@@ -174,7 +174,7 @@ def ParamDict(typeDict=''):
       # optimized as of December 4, 2018
       paramDict['snrThresh'] = 0.9
       paramDict['stdDevThresh'] = 1.
-  elif 'Loss' in typeDict:
+  elif 'TA' in typeDict:
     # optimized as of June 5, 2018
     paramDict['filterMode'] = 'regionalDeviation'
     paramDict['inverseSNR'] = True

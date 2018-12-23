@@ -75,9 +75,9 @@ def TT_Filtering(inputs,
   ttFilter = util.LoadFilter(ttFilterName)
   inputs.mfOrig = ttFilter
   if len(np.shape(inputs.imgOrig)) == 3:
-    WTparams = optimizer.ParamDict(typeDict='WT3D')
+    WTparams = optimizer.ParamDict(typeDict='TT3D')
   elif len(np.shape(inputs.imgOrig)) == 2:
-    WTparams = optimizer.ParamDict(typeDict='WT')
+    WTparams = optimizer.ParamDict(typeDict='TT')
   else:
     raise RuntimeError("The number of dimensions of the image stored in inputs.imgOrig is {}. \
                        This is not supported currently.".format(len(np.shape(inputs.imgOrig))))
@@ -150,9 +150,9 @@ def TA_Filtering(inputs,
   ### Specify necessary inputs
   inputs.mfOrig = util.LoadFilter(lossFilterName)
   if len(np.shape(inputs.imgOrig)) == 3:
-    Lossparams = optimizer.ParamDict(typeDict='Loss3D')
+    Lossparams = optimizer.ParamDict(typeDict='TA3D')
   elif len(np.shape(inputs.imgOrig)) == 2:
-    Lossparams = optimizer.ParamDict(typeDict='Loss')
+    Lossparams = optimizer.ParamDict(typeDict='TA')
   else:
     raise RuntimeError("The number of dimensions of the image stored in inputs.imgOrig is {}. \
                        This is not supported currently.".format(len(np.shape(inputs.imgOrig))))

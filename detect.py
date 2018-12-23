@@ -222,7 +222,7 @@ def updatedSimple(imgName,
   img = lightlyPreprocess(img,filterTwoSarcomereSize)
 
   ### Construct parameter dictionary
-  paramDict = optimizer.ParamDict(typeDict="WT")
+  paramDict = optimizer.ParamDict(typeDict="TT")
   paramDict['mfPunishment'] = mfPunishment
   paramDict['covarianceMatrix'] = np.ones_like(img)
 
@@ -382,7 +382,7 @@ def do2DGPUFiltering():
   import tissue
 
   inputs = empty()
-  paramDict = optimizer.ParamDict(typeDict="WT")
+  paramDict = optimizer.ParamDict(typeDict="TT")
 
   # grab image, store colored image, work with gray image
   tisParams = tissue.params

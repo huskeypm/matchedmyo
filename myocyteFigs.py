@@ -735,7 +735,8 @@ def displayTissueCaseHits(case,
   TTy,TTx = util.measureFilterDimensions(case.inputs.mfOrig)
 
   ## mark unit cells on the image where the filters responded
-  case.pasted = painter.doLabel(case.results,dx=TTx,dy=TTy,
+  case.pasted = painter.doLabel(case.results,
+                                cellDimensions=[TTx,TTy],
                                 thresh=case.params['snrThresh'])
 
   ## convert pasted filter image to cv2 friendly format and normalize original subregion
@@ -779,7 +780,8 @@ def displayTissueCaseHits(case,
   ### Do the same thing for the TA case
   if displayTA:
     TAy,TAx = util.measureFilterDimensions(case.TAinputs.mfOrig)
-    case.TApasted = painter.doLabel(case.TAresults,dx=TAx,dy=TAy,
+    case.TApasted = painter.doLabel(case.TAresults,
+                                    cellDimensions=[TAx,TAy],
                                     thresh=case.TAparams['snrThresh'])
     case.TApasted = np.asarray(case.TApasted
                                / np.max(case.TApasted)
@@ -827,7 +829,7 @@ def analyzeTissueCase(case,
   ttPunishmentFilter = util.LoadFilter(ttPunishmentFilterName)
 
   ### Setup parameter dictionaries
-  case.params = optimizer.ParamDict(typeDict="WT")
+  case.params = optimizer.ParamDict(typeDict="TT")
   case.params['covarianceMatrix'] = np.ones_like(case.subregion)
   case.params['mfPunishment'] = ttPunishmentFilter
   case.params['useGPU'] = useGPU
@@ -852,7 +854,7 @@ def analyzeTissueCase(case,
     case.TAIters = [-45,0]
     lossFilter = util.LoadFilter(lossFilterName)
     case.TAinputs.mfOrig = lossFilter
-    case.TAparams = optimizer.ParamDict(typeDict='Loss')
+    case.TAparams = optimizer.ParamDict(typeDict='TA')
 
     ### Perform filtering for TA detection
     case.TAresults = bD.DetectFilter(case.TAinputs,
@@ -1002,7 +1004,7 @@ def rocData():
   dataSet.filter1Label = "TT"
   dataSet.filter1Name = root+'newSimpleWTFilter.png'
   optimizer.SetupTests(dataSet,meanFilter=True)
-  paramDict = optimizer.ParamDict(typeDict='WT')
+  paramDict = optimizer.ParamDict(typeDict='TT')
   paramDict['covarianceMatrix'] = np.ones_like(dataSet.filter1TestData)
   paramDict['mfPunishment'] = util.LoadFilter(root+"newSimpleWTPunishmentFilter.png")
   
@@ -1035,7 +1037,7 @@ def rocData():
   dataSet.filter1Label = "Loss"
   dataSet.filter1Name = root+"LossFilter.png"
   optimizer.SetupTests(dataSet,meanFilter=True)
-  paramDict = optimizer.ParamDict(typeDict='Loss')
+  paramDict = optimizer.ParamDict(typeDict='TA')
   lossIters = [0,45]
 
   optimizer.GenFigROC_TruePos_FalsePos(
@@ -1061,7 +1063,7 @@ def myocyteROC(data, myoName,
   data.filter1Label = "TT"
   data.filter1Name = root + 'newSimpleWTFilter.png'
   optimizer.SetupTests(data,meanFilter=True)
-  WTparams = optimizer.ParamDict(typeDict='WT')
+  WTparams = optimizer.ParamDict(typeDict='TT')
   WTparams['covarianceMatrix'] = np.ones_like(data.filter1TestData)
   WTparams['mfPunishment'] = util.LoadFilter(root+"newSimpleWTPunishmentFilter.png")
 
@@ -1097,7 +1099,7 @@ def myocyteROC(data, myoName,
   data.filter1Label = "Loss"
   data.filter1Name = root+"LossFilter.png"
   optimizer.SetupTests(data,meanFilter=True)
-  Lossparams = optimizer.ParamDict(typeDict='Loss')
+  Lossparams = optimizer.ParamDict(typeDict='TA')
   LossIters = [0,45]
 
   # write filter performance data for Loss into hdf5 file
@@ -1168,7 +1170,7 @@ def optimizeWT():
   dataSet.filter1Name = root+'newSimpleWTFilter.png'
   optimizer.SetupTests(dataSet,meanFilter=True)
 
-  paramDict = optimizer.ParamDict(typeDict='WT')
+  paramDict = optimizer.ParamDict(typeDict='TT')
   paramDict['covarianceMatrix'] = np.ones_like(dataSet.filter1TestData)
   paramDict['mfPunishment'] = util.LoadFilter(root+"newSimpleWTPunishmentFilter.png") 
   #snrThreshRange = np.linspace(0.01, 0.15, 35)
@@ -1219,7 +1221,7 @@ def optimizeLoss():
   dataSet.filter1Name = root+'LossFilter.png'
   optimizer.SetupTests(dataSet)
 
-  paramDict = optimizer.ParamDict(typeDict='Loss')
+  paramDict = optimizer.ParamDict(typeDict='TA')
   snrThreshRange = np.linspace(0.05,0.3, 20)
   stdDevThreshRange = np.linspace(0.05, 0.2, 20)
 
@@ -1258,7 +1260,7 @@ def scoreTest():
   optimizer.SetupTests(dataSet)
   dataSet.filter1Thresh = 5.5
 
-  paramDict = optimizer.ParamDict(typeDict='WT')
+  paramDict = optimizer.ParamDict(typeDict='TT')
   paramDict['covarianceMatrix'] = np.ones_like(dataSet.filter1TestData)
 
   filter1PS,filter1NS = optimizer.TestParams_Single(
