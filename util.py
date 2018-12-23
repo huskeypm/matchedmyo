@@ -1647,12 +1647,15 @@ def dissimilar(
 def load_yaml(fileName):
   '''Function to load in the yaml file that is specified in 'fileName' and returns a dictionary'''
 
-  with open(fileName) as yam:
-    data = yaml.load(yam)
+  if fileName:
+    with open(fileName) as yam:
+      data = yaml.load(yam)
+  else:
+    data = None
   
   return data
 
-def makeParamDicts(yamlFileName=None):
+def makeParamDicts(inputs,yamlFileName=None,yamlDict=None):
   '''This function forms the parameter dictionaries for each filtering type, TT, LT, and TA and 
   inserts specified values for those parameters if they were specified in the yaml file.
 
@@ -1664,11 +1667,39 @@ def makeParamDicts(yamlFileName=None):
     storageDict -> dict. Dictionary containing parameter dictionaries with 'TT', 'LT', and 'TA' 
                      being the keys.
   '''
-
-  ### Read in the yamlFile if it is specified
+  ### Form dictionary that contains default parameters
   storageDict = dict()
-  if not yamlFileName:
-    storageDict['TT'] = optimizer.ParamDict(typeDict='TT')
+
+  ## Check dimensionality of image to specify correct parameter dictionaries
+  dim = len(np.shape(inputs.imgOrig))
+  filterTypes = ['TT','LT','TA']
+  if dim == 3:
+    filterTypes = [filtType + '3D' for filtType in filterTypes]
+
+  ### Assign default parameters
+  storageDict['TT'] = optimizer.ParamDict(typeDict=filterTypes[0])
+  storageDict['LT'] = optimizer.ParamDict(typeDict=filterTypes[1])
+  storageDict['TA'] = optimizer.ParamDict(typeDict=filterTypes[2])
+
+  ### Check to see if a yaml file is specified or read-in already
+  if yamlFileName or yamlDict:
+    ## If the file name is specified, we have to read in the dictionary from the yaml file
+    if yamlFileName:
+      ## Read in the yaml file
+      yamlDict = load_yaml(yamlFileName)
+
+    ## Iterate through and assign non-default parameters to correct dictionaries
+    for key, paramDict in yamlDict.iteritems():
+      ## Check to see if the key is pointing to a parameter dictionary
+      if not any(key == filt for filt in ['TT','LT','TA']):
+        continue
+      
+      ## Go through and assign all specified non-default parameters in the yaml file to the 
+      ##   storageDict
+      for parameterName, parameter in paramDict.iteritems():
+        storageDict[key][parameterName] = parameter
+  
+  return storageDict
 
 
 ###################################################################################################
