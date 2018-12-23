@@ -1,7 +1,7 @@
 from copy import copy
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.colors as colors
+#import matplotlib.colors as colors
 import matplotlib.mlab as mlab
 import cv2
 from scipy.misc import toimage
@@ -9,12 +9,11 @@ from scipy.ndimage.filters import *
 from scipy import ndimage
 import matchedFilter as mF
 import imutils
-from imtools import *
-from matplotlib import cm
+#from matplotlib import cm
 import detection_protocols as dps
 from scipy import signal
 import util 
-import util2
+#import util2
 
 
 ##
@@ -186,10 +185,6 @@ def correlateThresher(
 
     return correlated  # a list of objects that contain SNR, etc 
 
-def CalcSNR(signalResponse,sigma_n=1):
-  print "PHASE ME OUT" 
-  return signalResponse/sigma_n
-
 ##
 ## Collects all hits above some criterion for a given angle and 'stacks' them
 ## into a single image
@@ -244,10 +239,9 @@ def StackHits(correlated,  # an array of 'correlation planes'
     if efficientRotationStorage:
       ## We've already wrote the previous routines in a way that we have the maximum SNR and stackedAngles 
       ##   in a format close to compatible with the other routines. We just need to mask out non-hits
-      stackedHits = util2.makeMask(paramDict['snrThresh'],
-                                   img = correlated['SNRArray'],
-                                   doKMeans = doKMeans,
-                                   inverseThresh = paramDict['inverseSNR'])
+      stackedHits = util.makeMask(paramDict['snrThresh'],
+                                  img = correlated['SNRArray'],
+                                  inverseThresh = paramDict['inverseSNR'])
       if returnAngles:
         ## Now we fix the stackedAngles format
         stackedAngles = correlated['rotSNRArray']
@@ -262,12 +256,11 @@ def StackHits(correlated,  # an array of 'correlation planes'
     for i, iteration in enumerate(iters):
         ## routine for identifying 'unique' hits
         try:
-          daMask = util2.makeMask(paramDict['snrThresh'],img = correlated[i].snr,
-                                  doKMeans=doKMeans, inverseThresh=paramDict['inverseSNR'])
+          daMask = util.makeMask(paramDict['snrThresh'],img = correlated[i].snr,
+                                  inverseThresh=paramDict['inverseSNR'])
         except:
           print "DC: Using workaround for tissue param dictionary. Fix me."
-          daMask = util2.makeMask(paramDict['snrThresh'], img=correlated[i].snr,
-                                  doKMeans=doKMeans)
+          daMask = util.makeMask(paramDict['snrThresh'], img=correlated[i].snr)
         ## pull out where there is a hit on the simple correlation for use in rotation angle
         hitMask = daMask > 0.
         simpleCorrMask = correlated[i].corr
@@ -342,32 +335,6 @@ def colorAngles(rawOrig, stackedAngles,iters,leftChannel='red',rightChannel='blu
         coloredImg[i,j,channelDict[leftChannel]] = int(255 - rotArg*spacing)
         coloredImg[i,j,channelDict[rightChannel]] = int(rotArg*spacing)
   return coloredImg
-
-def paintME(myImg, myFilter1,  threshold = 190, cropper=[24,129,24,129],iters = [0,30,60,90], fused =True):
-  correlateThresher(myImg, myFilter1,  threshold, cropper,iters, fused, False)
-  for i, val in enumerate(iters):
- 
-    if fused:
-      palette = cm.gray
-      palette.set_bad('m', 1.0)
-      placer = ReadImg('fusedCorrelated_{}.png'.format(val))
-    else:
-      palette = cm.gray
-      palette.set_bad('b', 1.0)
-      placer = ReadImg('bulkCorrelated_{}.png'.format(val))
-    plt.figure()
-
-    #print "num maxes", np.shape(np.argwhere(placer>threshold))
-    Zm = np.ma.masked_where(placer > threshold, placer)
-    fig, ax1 = plt.subplots()
-    plt.axis("off")
-    im = ax1.pcolormesh(Zm, cmap=palette)
-    plt.title('Correlated_Angle_{}'.format(val))
-    plt.savefig('falseColor_{}.png'.format(val))
-    plt.axis('equal')
-    plt.close()
-    
-                
 
 # Basically just finds a 'unit cell' sized area around each detection 
 # for the purpose of interpolating the data 
