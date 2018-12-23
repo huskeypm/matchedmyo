@@ -7,8 +7,9 @@ PKH
 import matplotlib.pylab as plt
 import numpy as np
 import cv2
-import imtools as it 
+import util
 import random as rand
+
 def rotater(img, ang):
     rows,cols = img.shape
     M = cv2.getRotationMatrix2D((cols/2,rows/2),ang,1)
@@ -89,7 +90,7 @@ def makeMask(threshold = 245,
       correlated = img
     # test if string
     elif isinstance(imgName, (str)):
-      correlated = it.ReadImg(imgName)
+      correlated = util.ReadImg(imgName)
     else:
       raise RuntimeError("Need to pass in arg") 
 
