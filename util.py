@@ -967,7 +967,7 @@ def makeMask(threshold = 245,
       correlated = img
     # test if string
     elif isinstance(imgName, (str)):
-      correlated = util.ReadImg(imgName)
+      correlated = ReadImg(imgName)
     else:
       raise RuntimeError("Need to pass in arg") 
 
