@@ -956,6 +956,35 @@ def MaskRegion(region,sidx,margin,value=0):
       region[(sidx[0]-margin):(sidx[0]+margin+1),
                          (sidx[1]-margin):(sidx[1]+margin+1)]=value 
 
+# either load in data from file (imgName!=None) or pass in data (img!=None)
+def makeMask(threshold = 245, 
+             img=None,
+             imgName=None,
+             inverseThresh=False
+             ):
+    # test if numpy array
+    if isinstance(img, (list, tuple, np.ndarray)): 
+      correlated = img
+    # test if string
+    elif isinstance(imgName, (str)):
+      correlated = util.ReadImg(imgName)
+    else:
+      raise RuntimeError("Need to pass in arg") 
+
+    imgDim = np.shape(correlated)
+
+    corr = np.copy(correlated.flatten())
+    masker = (np.zeros_like(corr))
+    if inverseThresh == False:
+      pts =np.argwhere(corr>threshold)
+      masker[pts] = corr[pts]
+    else:
+      pts =np.argwhere(corr<threshold)
+      masker[pts] = 1.
+    newmasker= np.reshape(masker,imgDim)            
+
+    return newmasker
+
 def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize=25,filterTwoSarcSize=25):
   # function to apply the image mask before outputting results
   maskName = imgName[:-4]; fileType = imgName[-4:]
