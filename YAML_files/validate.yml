@@ -1,2 +1,5 @@
 imageName: './myoimages/MI_M_45_processed.png'
-filterTypes: ['TT','LT','TA']
+filterTypes: 
+  'TT': True
+  'LT': True
+  'TA': True

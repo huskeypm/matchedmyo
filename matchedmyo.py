@@ -41,14 +41,15 @@ class Inputs:
                scopeResolutions=None,
                useGPU=False,
                efficientRotationStorage=True,
-               ttFilterName = './myoimages/newSimpleWTFilter.png',
-               ttPunishFilterName = './myoimages/newSimpleWTPunishmentFilter.png',
-               ltFilterName = './myoimages/LongitudinalFilter.png',
-               taFilterName = './myoimages/LossFilter.png',
-               ttFiltering = False,
-               ltFiltering = False,
-               taFiltering = False,
-               yamlDict = None
+              #  ttFilterName = './myoimages/newSimpleWTFilter.png',
+              #  ttPunishFilterName = './myoimages/newSimpleWTPunishmentFilter.png',
+              #  ltFilterName = './myoimages/LongitudinalFilter.png',
+              #  taFilterName = './myoimages/LossFilter.png',
+              #  ttFiltering = False,
+              #  ltFiltering = False,
+              #  taFiltering = False,
+               paramDicts = None,
+               yamlDict = None,
                ):
     '''
     Inputs:
@@ -64,28 +65,115 @@ class Inputs:
       yamlDict -> dict. Dictionary read in by the setupYamlInputs() method. yamlFileName must be 
                     specified first.
     '''
+
+    ### Store global class-level parameters
     self.imageName = imageName
     self.yamlFileName = yamlFileName
     self.mfOrig = mfOrig
-    self.scopeResolutions = scopeResolutions
     self.useGPU = useGPU
     self.efficientRotationStorage = efficientRotationStorage
-    self.ttFilterName = ttFilterName
-    self.ttPunishFilterName = ttPunishFilterName
-    self.ltFilterName = ltFilterName
-    self.taFilterName = taFilterName
-    self.ttFiltering = ttFiltering
-    self.ltFiltering = ltFiltering
-    self.taFiltering = taFiltering
+    self.paramDicts = paramDicts
 
+    ## Setup default dictionaries for classification
+    self.setupDefaultDict()
+    self.setupDefaultParamDicts()
+
+    ## Update default dictionaries according to yaml file
     if yamlFileName:
       self.setupYamlInputs()
     else:
       self.yamlDict = None
 
+  def setupDefaultDict(self):
+    '''This method sets up a dictionary to hold default classification inputs. This will then be 
+    updated by updateInputs() method.'''
+    dic = dict()
+    
+    ### Globabl parameters
+    dic['imageName'] = ''
+    dic['scopeResolutions'] = []
+    dic['efficientRotationStore'] = True
+    dic['iters'] = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
+    
+    ### Filtering flags to turn on or off
+    dic['filterTypes'] = {
+      'TT':False,
+      'LT':False,
+      'TA':False
+    }
+
+    ### Specify filter names
+    dic['ttFilterName'] = './myoimages/newSimpleWTFilter.png'
+    dic['ttPunishFilterName'] = './myoimages/newSimpleWTPunishmentFilter.png'
+    dic['ltFilterName'] = './myoimages/LongitudinalFilter.png'
+    dic['taFilterName'] = './myoimages/LossFilter.png'
+
+    ### Store in the class
+    self.dic = dic
+
+  def updateDefaultDict(self):
+    '''This method updates the default inputs dictionary formed from setupDefulatDict() method
+    with the inputs specified in the yaml file.'''
+
+    ### Iterate through all keys specified in yaml and figure out if they have a default value.
+    ###   If they do, then we assign the non-default value specified in the yaml file in the 
+    ###   dictionary we already formed.
+    for key, value in self.yamlDict.iteritems():
+      ## Check to see if the key is pointing to the parameter dictionary. If it is, skip this
+      ##   since we have functions that update it already
+      if key == 'paramDicts':
+        continue
+      
+      ## Here we check if the key is present within the default dictionary. If it is, we can then
+      ##   see if a non-default value is specified for it.
+      try:
+        ## checking to see if a default value is specified
+        if self.dic[key] != None:
+          ## if it is, we store the non-default value
+          self.dic[key] = value
+      except:
+        ## if the key is not already specified in the default dictionary, then we continue on
+        pass
+    
   def load_yaml(self):
     '''Function to read and store the yaml dictionary'''
     self.yamlDict = util.load_yaml(self.yamlFileName)
+
+  def setupDefaultParamDicts(self):
+    '''This function forms the default parameter dictionaries for each filtering type, TT, LT, and 
+    TA.'''
+    ### Form dictionary that contains default parameters
+    storageDict = dict()
+
+    ## Check dimensionality of image to specify correct parameter dictionaries
+    filterTypes = ['TT','LT','TA']
+
+    ### Assign default parameters
+    storageDict['TT'] = optimizer.ParamDict(typeDict=filterTypes[0])
+    storageDict['LT'] = optimizer.ParamDict(typeDict=filterTypes[1])
+    storageDict['TA'] = optimizer.ParamDict(typeDict=filterTypes[2])
+
+    self.paramDicts = storageDict
+
+  def updateParamDicts(self):
+    '''This function updates the parameter dictionaries previously formed in the method, 
+    setupDefaultParamDicts() with the specifications in the yaml file.'''
+    ## Default parameter dictionary is set to 2D, so if image is 3D, we need to update these
+    if self.dic['dimensions'] == 3:
+      ## Loop through and update each parameter dictionary
+      for filteringType in self.paramDicts.keys():
+        self.paramDicts[filteringType] = optimizer.ParamDict(typeDict=filteringType+'_3D')
+
+    ## Iterate through and assign non-default parameters to correct dictionaries
+    for key, paramDict in self.yamlDict.iteritems():
+      ## Check to see if the key is pointing to a parameter dictionary
+      if not any(key == filt for filt in ['TT','LT','TA']):
+        continue
+
+      ## Go through and assign all specified non-default parameters in the yaml file to the 
+      ##   storageDict
+      for parameterName, parameter in paramDict.iteritems():
+        self.paramDicts[key][parameterName] = parameter
 
   def updateInputs(self):
     '''This function updates the inputs class that's formed in matchedmyo.py script 
@@ -93,73 +181,19 @@ class Inputs:
     Also updates parameteres based on parameters that are specified in the yaml dictionary 
     that is stored within this class.'''
 
-    ### This is a bunch of catches to test if parameters are specified. TODO: Change this to dict-
-    ###   like structure
-    ## Turn on or off TT filtering
-    try:
-      if 'TT' in self.yamlDict['filterTypes']:
-        self.ttFiltering = True
-        ## Try to update the TT Filter Name
-        try:
-          self.ttFilterName = self.yamlDict['ttFilterName']
-        except:
-          pass
-        ## Try to update the TT Punishment Filter Name
-        try:
-          self.ttPunishFilterName = self.yamlDict['ttPunishFilterName']
-        except:
-          pass
-    except:
-      pass
+    ### Read in the original image and determine number of dimensions from this
+    self.imgOrig = util.ReadImg(self.yamlDict['imageName'], renorm=True)
+    self.dic['dimensions'] = len(self.imgOrig.shape)
 
-    ## Turn on or off LT filtering
-    try:
-      if 'LT' in self.yamlDict['filterTypes']:
-        self.ltFiltering = True
-        ## Try to update the lt filter name
-        try:
-          self.ltFilterName = self.yamlDict['ltFilterName']
-        except:
-          pass
-    except:
-      pass
-
-    ## Turn on or off TA filtering
-    try:
-      if 'TA' in self.yamlDict['filterTypes']:
-        self.taFiltering = True
-        ## Try to update the ta Filter Name
-        try:
-          self.taFilterName = self.yamlDict['taFilterName']
-        except:
-          pass
-    except:
-      pass
-
-    ## Update rotations
-    try:
-      self.iters = self.yamlDict['rotations']
-    except:
-      pass
-
-    ## Supply the image name
-    try:
-      self.imageName = self.yamlDict['imageName']
-    except:
-      pass
-
-    ## Supply scope resolutions
-    try:
-      self.scopeResolutions = self.yamlDict['scopeResolutions']
-    except:
-      pass
-
-    ### Read in the image and store
-    self.imgOrig = util.ReadImg(self.imageName, renorm=True)
+    ### Form the correct default parameter dictionaries from this dimensionality measurement
+    self.updateDefaultDict()
+    self.updateParamDicts()
 
   def setupYamlInputs(self):
     '''This function sets up inputs if a yaml file name is specified'''
     self.load_yaml()
+    # self.setupDefaultDict()
+    # self.setupDefaultParamDicts()
     self.updateInputs()
 
 
@@ -187,11 +221,11 @@ def TT_Filtering(inputs,
 
   ### Specify necessary inputs
   ## Read in filter
-  ttFilter = util.LoadFilter(paramDict['filterName'])
+  ttFilter = util.LoadFilter(inputs.dic['ttFilterName'])
   inputs.mfOrig = ttFilter
 
   paramDict['covarianceMatrix'] = np.ones_like(inputs.imgOrig)
-  paramDict['mfPunishment'] = util.LoadFilter(paramDict['punishFilterName'])
+  paramDict['mfPunishment'] = util.LoadFilter(inputs.dic['ttPunishFilterName'])
   print "phase out GPU"
   paramDict['useGPU'] = inputs.useGPU
 
@@ -222,7 +256,7 @@ def LT_Filtering(inputs,
   start = time.time()
 
   ### Specify necessary inputs
-  inputs.mfOrig = util.LoadFilter(paramDict['filterName'])
+  inputs.mfOrig = util.LoadFilter(inputs.dic['ltFilterName'])
   print "Seriously, phase out GPU"
   paramDict['useGPU'] = inputs.useGPU
 
@@ -246,7 +280,7 @@ def TA_Filtering(inputs,
   start = time.time()
 
   ### Specify necessary inputs
-  inputs.mfOrig = util.LoadFilter(paramDict['filterName'])
+  inputs.mfOrig = util.LoadFilter(inputs.dic['taFilterName'])
   print "PHASE OUT GPU"
   paramDict['useGPU'] = inputs.useGPU
   
@@ -389,15 +423,15 @@ def giveMarkedMyocyte(
   # util.updateInputsFromYaml(inputs, yamlDict)
 
   ## Form parameter dictionaries for the classification
-  paramDicts = util.makeParamDicts(inputs=inputs)
+  #paramDicts = util.makeParamDicts(inputs=inputs)
 
   ### Perform Filtering Routines
   ## Transverse Tubule Filtering
-  if inputs.ttFiltering:
+  if inputs.dic['filterTypes']['TT']:
     WTresults = TT_Filtering(
       inputs = inputs,
       iters = iters,
-      paramDict = paramDicts['TT'],
+      paramDict = inputs.paramDicts['TT'],
       returnAngles = returnAngles
     )
     WTstackedHits = WTresults.stackedHits
@@ -405,11 +439,11 @@ def giveMarkedMyocyte(
     WTstackedHits = np.zeros_like(inputs.imgOrig)
 
   ## Longitudinal Tubule Filtering
-  if inputs.ltFiltering:
+  if inputs.dic['filterTypes']['LT']:
     LTresults = LT_Filtering(
       inputs = inputs,
       iters = iters,
-      paramDict = paramDicts['LT'],
+      paramDict = inputs.paramDicts['LT'],
       returnAngles = returnAngles
     )
     LTstackedHits = LTresults.stackedHits
@@ -417,10 +451,10 @@ def giveMarkedMyocyte(
     LTstackedHits = np.zeros_like(inputs.imgOrig)
 
   ## Tubule Absence Filtering
-  if inputs.taFiltering:
+  if inputs.dic['filterTypes']['TA']:
     Lossresults = TA_Filtering(
       inputs=inputs,
-      paramDict = paramDicts['TA'],
+      paramDict = inputs.paramDicts['TA'],
       returnAngles = returnAngles
     )
     LossstackedHits = Lossresults.stackedHits
@@ -601,7 +635,7 @@ def give3DMarkedMyocyte(
   # yamlDict = util.load_yaml(yamlFileName)
 
   ### Form parameter dictionaries for classification
-  paramDicts = util.makeParamDicts(inputs=inputs)
+  #paramDicts = util.makeParamDicts(inputs=inputs)
 
   ### Form flattened iteration matrix containing all possible rotation combinations
   flattenedIters = []
@@ -611,11 +645,11 @@ def give3DMarkedMyocyte(
         flattenedIters.append( [i,j,k] )
 
   ### Transverse Tubule Filtering
-  if inputs.ttFiltering:
+  if inputs.dic['filterTypes']['TT']:
     TTresults = TT_Filtering(
       inputs,
       flattenedIters,
-      paramDict = paramDicts['TT'],
+      paramDict = inputs.paramDicts['TT'],
       returnAngles = returnAngles
     )
     TTstackedHits = TTresults.stackedHits
@@ -623,11 +657,11 @@ def give3DMarkedMyocyte(
     TTstackedHits = np.zeros_like(inputs.imgOrig)
 
   ### Longitudinal Tubule Filtering
-  if inputs.ltFiltering:
+  if inputs.dic['filterTypes']['LT']:
     LTresults = LT_Filtering(
       inputs,
       flattenedIters,
-      paramDict = paramDicts['LT'],
+      paramDict = inputs.paramDicts['LT'],
       returnAngles = returnAngles
     )
     LTstackedHits = LTresults.stackedHits
@@ -635,13 +669,13 @@ def give3DMarkedMyocyte(
     LTstackedHits = np.zeros_like(inputs.imgOrig)
 
   ### Tubule Absence Filtering
-  if inputs.taFiltering:
+  if inputs.dic['filterTypes']['TA']:
     ## form tubule absence flattened rotation matrix. Choosing to look at tubule absence at one rotation right now.
     taIters = [[0,0,0]]
     TAresults = TA_Filtering(
       inputs,
       iters=taIters,
-      paramDict = paramDicts['TA'],
+      paramDict = inputs.paramDicts['TA'],
       returnAngles = returnAngles
     )
     TAstackedHits = TAresults.stackedHits
@@ -669,9 +703,9 @@ def give3DMarkedMyocyte(
                              LTstackedHits,
                              TTstackedHits,
                              cImg,
-                             ttName = inputs.ttFilterName,
-                             ltName = inputs.ltFilterName,
-                             taName = inputs.taFilterName)
+                             ttName = inputs.dic['ttFilterName'],
+                             ltName = inputs.dic['ltFilterName'],
+                             taName = inputs.dic['taFilterName'])
 
     ### 'Measure' cell volume just by getting measure of containing array
     cellVolume = np.float(np.product(inputs.imgOrig.shape))
@@ -680,9 +714,9 @@ def give3DMarkedMyocyte(
     estimatedContent = util.estimateTubuleContentFromColoredImage(
       cImg,
       totalCellSpace=cellVolume,
-      taFilterName = inputs.taFilterName,
-      ltFilterName = inputs.ltFilterName,
-      ttFilterName = inputs.ttFilterName
+      taFilterName = inputs.dic['taFilterName'],
+      ltFilterName = inputs.dic['ltFilterName'],
+      ttFilterName = inputs.dic['ttFilterName']
     )
 
   else:
@@ -811,7 +845,6 @@ def validate(args,
   '''This function serves as a validation routine for the 2D functionality of this repo.
   
   Inputs:
-    testImage -> str. File path pointing to the image to be validated
     display -> Bool. If True, display the marked image
   '''
   ### Specify the yaml file NOTE: This will be done via command line for main classification routines
@@ -886,7 +919,7 @@ def validate3D(args):
   util.generateSimulated3DCell(LT_probability=ltProb,
                                TA_probability=taProb,
                                noiseAmplitude=noiseAmplitude,
-                               scopeResolutions=inputs.scopeResolutions,
+                               scopeResolutions=inputs.dic['scopeResolutions'],
                                cellDimensions=cellDimensions,
                                fileName=testName,
                                seed=1001,

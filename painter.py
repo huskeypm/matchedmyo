@@ -104,14 +104,14 @@ def correlateThresher(
       if type(i) == list:
         ## This is 3D
         ## pad/rotate filter
-        rFN = util.rotate3DArray_Nonhomogeneous(filterRef,i,inputs.scopeResolutions)
+        rFN = util.rotate3DArray_Nonhomogeneous(filterRef,i,inputs.dic['scopeResolutions'])
         ## Depad the array to reduce computational expense
         rFN = util.autoDepadArray(rFN)
         inputs.mf = rFN
 
         ## check to see if we need to rotate other matched filters for the detection
         if params['filterMode'] == 'punishmentFilter':
-          params['mfPunishmentRot'] = util.rotate3DArray_Nonhomogeneous(params['mfPunishment'].copy(),i,inputs.scopeResolutions)
+          params['mfPunishmentRot'] = util.rotate3DArray_Nonhomogeneous(params['mfPunishment'].copy(),i,inputs.dic['scopeResolutions'])
           params['mfPunishmentRot'] = util.autoDepadArray(params['mfPunishmentRot'])
       else:
         ## This is 2D

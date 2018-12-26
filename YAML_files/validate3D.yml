@@ -1,5 +1,8 @@
 imageName: './myoimages/3DValidationData.tif'
-filterTypes: ['TT','LT','TA']
+filterTypes: 
+    'TT': True
+    'LT': True
+    'TA': True
 scopeResolutions: [10,10,5] #voxels per micron
 ttFilterName: './myoimages/TT_3D.tif'
 ttPunishFilterName: './myoimages/TT_Punishment_3D.tif'
