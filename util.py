@@ -1655,50 +1655,50 @@ def load_yaml(fileName):
   
   return data
 
-def makeParamDicts(inputs):
-  '''This function forms the parameter dictionaries for each filtering type, TT, LT, and TA and 
-  inserts specified values for those parameters if they were specified in the yaml file.
+# def makeParamDicts(inputs):
+#   '''This function forms the parameter dictionaries for each filtering type, TT, LT, and TA and 
+#   inserts specified values for those parameters if they were specified in the yaml file.
 
-  Inputs:
-    inputs -> Inputs class defined in matchedmyo.py
+#   Inputs:
+#     inputs -> Inputs class defined in matchedmyo.py
 
-  Outputs:
-    storageDict -> dict. Dictionary containing parameter dictionaries with 'TT', 'LT', and 'TA' 
-                     being the keys.
-  '''
-  ### Form dictionary that contains default parameters
-  storageDict = dict()
+#   Outputs:
+#     storageDict -> dict. Dictionary containing parameter dictionaries with 'TT', 'LT', and 'TA' 
+#                      being the keys.
+#   '''
+#   ### Form dictionary that contains default parameters
+#   storageDict = dict()
 
-  ## Check dimensionality of image to specify correct parameter dictionaries
-  dim = len(np.shape(inputs.imgOrig))
-  filterTypes = ['TT','LT','TA']
-  if dim == 3:
-    filterTypes = [filtType + '3D' for filtType in filterTypes]
+#   ## Check dimensionality of image to specify correct parameter dictionaries
+#   dim = len(np.shape(inputs.imgOrig))
+#   filterTypes = ['TT','LT','TA']
+#   if dim == 3:
+#     filterTypes = [filtType + '3D' for filtType in filterTypes]
 
-  ### Assign default parameters
-  storageDict['TT'] = optimizer.ParamDict(typeDict=filterTypes[0])
-  storageDict['LT'] = optimizer.ParamDict(typeDict=filterTypes[1])
-  storageDict['TA'] = optimizer.ParamDict(typeDict=filterTypes[2])
+#   ### Assign default parameters
+#   storageDict['TT'] = optimizer.ParamDict(typeDict=filterTypes[0])
+#   storageDict['LT'] = optimizer.ParamDict(typeDict=filterTypes[1])
+#   storageDict['TA'] = optimizer.ParamDict(typeDict=filterTypes[2])
 
-  ### Check to see if a yaml file is specified or read-in already
-  if inputs.yamlFileName or inputs.yamlDict:
-    ## If the file name is specified, we have to read in the dictionary from the yaml file
-    if inputs.yamlFileName and not inputs.yamlDict:
-      ## Read in the yaml file
-      yamlDict = load_yaml(inputs.yamlFileName)
+#   ### Check to see if a yaml file is specified or read-in already
+#   if inputs.yamlFileName or inputs.yamlDict:
+#     ## If the file name is specified, we have to read in the dictionary from the yaml file
+#     if inputs.yamlFileName and not inputs.yamlDict:
+#       ## Read in the yaml file
+#       yamlDict = load_yaml(inputs.yamlFileName)
 
-    ## Iterate through and assign non-default parameters to correct dictionaries
-    for key, paramDict in inputs.yamlDict.iteritems():
-      ## Check to see if the key is pointing to a parameter dictionary
-      if not any(key == filt for filt in ['TT','LT','TA']):
-        continue
+#     ## Iterate through and assign non-default parameters to correct dictionaries
+#     for key, paramDict in inputs.yamlDict.iteritems():
+#       ## Check to see if the key is pointing to a parameter dictionary
+#       if not any(key == filt for filt in ['TT','LT','TA']):
+#         continue
       
-      ## Go through and assign all specified non-default parameters in the yaml file to the 
-      ##   storageDict
-      for parameterName, parameter in paramDict.iteritems():
-        storageDict[key][parameterName] = parameter
+#       ## Go through and assign all specified non-default parameters in the yaml file to the 
+#       ##   storageDict
+#       for parameterName, parameter in paramDict.iteritems():
+#         storageDict[key][parameterName] = parameter
   
-  return storageDict
+#   return storageDict
 
 
 ###################################################################################################
