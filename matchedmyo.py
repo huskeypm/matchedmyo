@@ -99,6 +99,16 @@ class Inputs:
     try:
       if 'TT' in self.yamlDict['filterTypes']:
         self.ttFiltering = True
+        ## Try to update the TT Filter Name
+        try:
+          self.ttFilterName = self.yamlDict['ttFilterName']
+        except:
+          pass
+        ## Try to update the TT Punishment Filter Name
+        try:
+          self.ttPunishFilterName = self.yamlDict['ttPunishFilterName']
+        except:
+          pass
     except:
       pass
 
@@ -106,6 +116,11 @@ class Inputs:
     try:
       if 'LT' in self.yamlDict['filterTypes']:
         self.ltFiltering = True
+        ## Try to update the lt filter name
+        try:
+          self.ltFilterName = self.yamlDict['ltFilterName']
+        except:
+          pass
     except:
       pass
 
@@ -113,6 +128,11 @@ class Inputs:
     try:
       if 'TA' in self.yamlDict['filterTypes']:
         self.taFiltering = True
+        ## Try to update the ta Filter Name
+        try:
+          self.taFilterName = self.yamlDict['taFilterName']
+        except:
+          pass
     except:
       pass
 
@@ -125,6 +145,12 @@ class Inputs:
     ## Supply the image name
     try:
       self.imageName = self.yamlDict['imageName']
+    except:
+      pass
+
+    ## Supply scope resolutions
+    try:
+      self.scopeResolutions = self.yamlDict['scopeResolutions']
     except:
       pass
 
@@ -330,13 +356,7 @@ def analyzeTT_Angles(testImageName,
 ###################################################################################################
 
 def giveMarkedMyocyte(
-      # ttFilterName="./myoimages/newSimpleWTFilter.png",
-      # ltFilterName="./myoimages/LongitudinalFilter.png",
-      # lossFilterName="./myoimages/LossFilter.png",
-      # wtPunishFilterName="./myoimages/newSimpleWTPunishmentFilter.png",
-      # ltPunishFilterName="./myoimages/newLTPunishmentFilter.png",
       inputs,
-      # testImage="./myoimages/MI_D_73_annotation.png",
       ImgTwoSarcSize=None,
       tag = "default_",
       writeImage = False,
@@ -345,8 +365,7 @@ def giveMarkedMyocyte(
       returnPastedFilter=True,
       useGPU=False,
       fileExtension=".pdf",
-      efficientRotationStorage=True,
-      # yamlFileName = None
+      # efficientRotationStorage=True,
       ):
   '''
   This function is the main workhorse for the detection of features in 2D myocytes.
@@ -367,7 +386,7 @@ def giveMarkedMyocyte(
   # yamlDict = util.load_yaml(yamlFileName)
 
   ## Store non-default parameters from yaml file into inputs
-  #util.updateInputsFromYaml(inputs, yamlDict)
+  # util.updateInputsFromYaml(inputs, yamlDict)
 
   ## Form parameter dictionaries for the classification
   paramDicts = util.makeParamDicts(inputs=inputs)
@@ -533,13 +552,14 @@ def giveMarkedMyocyte(
   return cI 
 
 def give3DMarkedMyocyte(
-      testImage,
-      scopeResolutions,
-      ttFilterName=None,
-      ltFilterName=None,
-      taFilterName=None,
-      ttPunishFilterName=None,
-      ltPunishFilterName=None,
+      # testImage,
+      # scopeResolutions,
+      # ttFilterName=None,
+      # ltFilterName=None,
+      # taFilterName=None,
+      # ttPunishFilterName=None,
+      # ltPunishFilterName=None,
+      inputs,
       ImgTwoSarcSize=None,
       tag = None,
       xiters=[-10,0,10],
@@ -547,8 +567,7 @@ def give3DMarkedMyocyte(
       ziters=[-10,0,10],
       returnAngles=False,
       returnPastedFilter=True,
-      efficientRotationStorage=True,
-      yamlFileName=None
+      # efficientRotationStorage=True,
       ):
   '''
   This function is for the detection and marking of subcellular features in three dimensions. 
@@ -557,12 +576,6 @@ def give3DMarkedMyocyte(
     testImage -> str. Name of the image to be analyzed. NOTE: This image has previously been preprocessed by 
                    XXX routine.
     scopeResolutions -> list of values (ints or floats). List of resolutions of the confocal microscope for x, y, and z.
-    ttFilterName -> str. Name of the transverse tubule filter to be used
-    ltFiltername -> str. Name of the longitudinal filter to be used
-    lossFilterName -> str. Name of the tubule absence filter to be used
-    ttPunishFilterName -> str. Name of the transverse tubule punishment filter to be used
-    ltPunishFilterName -> str. Name of the longitudinal tubule punishment filter to be used NOTE: Delete?
-    
     tag -> str. Base name of the written files 
     xiters -> list of ints. Rotations with which the filters will be rotated about the x axis (yz plane)
     yiters -> list of ints. Rotations with which the filters will be rotated about the y axis (xz plane)
@@ -578,16 +591,17 @@ def give3DMarkedMyocyte(
   start = time.time()
 
   ### Read in preprocessed test image and store in inputs class for use in all subroutines
-  inputs = Inputs(
-    imgOrig = util.ReadImg(testImage, renorm=True),
-    scopeResolutions = scopeResolutions
-  )
+  # inputs = Inputs(
+  #   # imgOrig = util.ReadImg(testImage, renorm=True),
+  #   # scopeResolutions = scopeResolutions
+  #   yamlFileName=args.yamlFile
+  # )
 
   ### Read in the yaml file if it is specified
-  yamlDict = util.load_yaml(yamlFileName)
+  # yamlDict = util.load_yaml(yamlFileName)
 
   ### Form parameter dictionaries for classification
-  paramDicts = util.makeParamDicts(inputs,yamlDict=yamlDict)
+  paramDicts = util.makeParamDicts(inputs=inputs)
 
   ### Form flattened iteration matrix containing all possible rotation combinations
   flattenedIters = []
@@ -597,7 +611,7 @@ def give3DMarkedMyocyte(
         flattenedIters.append( [i,j,k] )
 
   ### Transverse Tubule Filtering
-  if ttFilterName != None:
+  if inputs.ttFiltering:
     TTresults = TT_Filtering(
       inputs,
       flattenedIters,
@@ -609,7 +623,7 @@ def give3DMarkedMyocyte(
     TTstackedHits = np.zeros_like(inputs.imgOrig)
 
   ### Longitudinal Tubule Filtering
-  if ltFilterName != None:
+  if inputs.ltFiltering:
     LTresults = LT_Filtering(
       inputs,
       flattenedIters,
@@ -621,7 +635,7 @@ def give3DMarkedMyocyte(
     LTstackedHits = np.zeros_like(inputs.imgOrig)
 
   ### Tubule Absence Filtering
-  if taFilterName != None:
+  if inputs.taFiltering:
     ## form tubule absence flattened rotation matrix. Choosing to look at tubule absence at one rotation right now.
     taIters = [[0,0,0]]
     TAresults = TA_Filtering(
@@ -655,9 +669,9 @@ def give3DMarkedMyocyte(
                              LTstackedHits,
                              TTstackedHits,
                              cImg,
-                             ttName = ttFilterName,
-                             ltName = ltFilterName,
-                             taName = taFilterName)
+                             ttName = inputs.ttFilterName,
+                             ltName = inputs.ltFilterName,
+                             taName = inputs.taFilterName)
 
     ### 'Measure' cell volume just by getting measure of containing array
     cellVolume = np.float(np.product(inputs.imgOrig.shape))
@@ -666,9 +680,9 @@ def give3DMarkedMyocyte(
     estimatedContent = util.estimateTubuleContentFromColoredImage(
       cImg,
       totalCellSpace=cellVolume,
-      taFilterName = taFilterName,
-      ltFilterName = ltFilterName,
-      ttFilterName = ttFilterName
+      taFilterName = inputs.taFilterName,
+      ltFilterName = inputs.ltFilterName,
+      ttFilterName = inputs.ttFilterName
     )
 
   else:
@@ -800,9 +814,12 @@ def validate(args,
     testImage -> str. File path pointing to the image to be validated
     display -> Bool. If True, display the marked image
   '''
+  ### Specify the yaml file NOTE: This will be done via command line for main classification routines
+  yamlFile = './YAML_files/validate.yml'
+
   ### Setup inputs for classification run
   inputs = Inputs(
-    yamlFileName = args.yamlFile
+    yamlFileName = yamlFile
   )
 
   ### Run algorithm to pull out content and rotation info
@@ -838,10 +855,12 @@ def validate3D(args):
   Inputs:
     None
   '''
+  ### Specify the yaml file. NOTE: This will be done via command line for main classification routines
+  yamlFile = './YAML_files/validate3D.yml'
 
   ### Setup input parameters
   inputs = Inputs(
-    yamlFileName = './YAML_files/validate3D.yml'
+    yamlFileName = yamlFile
   )
 
   ### Define parameters for the simulation of the cell
@@ -852,16 +871,16 @@ def validate3D(args):
   ## Amplitude of the Guassian White Noise
   noiseAmplitude = 0.
   ## Define scope resolutions for generating the filters and the cell. This is in x, y, and z resolutions
-  scopeResolutions = [10,10,5] #[vx / um]
+  # scopeResolutions = [10,10,5] #[vx / um]
   ## x, y, and z Dimensions of the simulated cell [microns]
   cellDimensions = [10, 10, 20]
   ## Define test file name
   testName = "./myoimages/3DValidationData.tif"
   ## Give names for your filters. NOTE: These are hardcoded in the filter generation routines in util.py
-  ttName = './myoimages/TT_3D.tif'
-  ttPunishName = './myoimages/TT_Punishment_3D.tif'
-  ltName = './myoimages/LT_3D.tif'
-  taName = './myoimages/TA_3D.tif'
+  # ttName = './myoimages/TT_3D.tif'
+  # ttPunishName = './myoimages/TT_Punishment_3D.tif'
+  # ltName = './myoimages/LT_3D.tif'
+  # taName = './myoimages/TA_3D.tif'
 
   ### Simulate the small 3D cell
   util.generateSimulated3DCell(LT_probability=ltProb,
@@ -874,12 +893,13 @@ def validate3D(args):
                                )
 
   ### Analyze the 3D cell
-  markedImage = give3DMarkedMyocyte(testImage=testName,
-                                    scopeResolutions = scopeResolutions,
-                                    ttFilterName = ttName,
-                                    ttPunishFilterName = ttPunishName,
-                                    ltFilterName = ltName,
-                                    taFilterName = taName,
+  markedImage = give3DMarkedMyocyte(#testImage=testName,
+                                    # scopeResolutions = scopeResolutions,
+                                    #ttFilterName = ttName,
+                                    #ttPunishFilterName = ttPunishName,
+                                    #ltFilterName = ltName,
+                                    #taFilterName = taName,
+                                    inputs = inputs,
                                     xiters = [0],
                                     yiters = [0],
                                     ziters = [0],
@@ -911,20 +931,19 @@ def run(args):
   '''This runs the main classification routines from command line
   '''
 
-  ### Load in the yaml file
-  yamlDict = util.load_yaml(args.yamlFile)
-
-  ### Load in the image
+  ### Setup the inputs class
   inputs = Inputs(
-    imgOrig = util.ReadImg(yamlDict['imageName'])
+    yamlFileName=args.yamlFile
   )
 
   ### Determine if classification is 2D or 3D and run the correct routine for it
   dim = len(np.shape(inputs.imgOrig))
   if dim == 2:
-    giveMarkedMyocyte(inputs = inputs, yamlFileName=args.yamlFile)
+    giveMarkedMyocyte(inputs = inputs)
   elif dim == 3:
-    give3DMarkedMyocyte(inputs = inputs, yamlFileName=args.yamlFile)
+    give3DMarkedMyocyte(inputs = inputs)
+  else:
+    raise RuntimeError("The dimensions of the image specified in {} is not supported.".format(args.yamlFile))
 
 def main(args):
   '''The routine through which all command line functionality is routed.
