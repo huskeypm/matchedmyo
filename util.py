@@ -1655,13 +1655,12 @@ def load_yaml(fileName):
   
   return data
 
-def makeParamDicts(inputs,yamlFileName=None,yamlDict=None):
+def makeParamDicts(inputs):
   '''This function forms the parameter dictionaries for each filtering type, TT, LT, and TA and 
   inserts specified values for those parameters if they were specified in the yaml file.
 
   Inputs:
-    yamlFileName -> str. Name of the yaml file to be loaded in. Template yaml file is found in this
-                      repo as TEMPLATE.yml
+    inputs -> Inputs class defined in matchedmyo.py
 
   Outputs:
     storageDict -> dict. Dictionary containing parameter dictionaries with 'TT', 'LT', and 'TA' 
@@ -1682,14 +1681,14 @@ def makeParamDicts(inputs,yamlFileName=None,yamlDict=None):
   storageDict['TA'] = optimizer.ParamDict(typeDict=filterTypes[2])
 
   ### Check to see if a yaml file is specified or read-in already
-  if yamlFileName or yamlDict:
+  if inputs.yamlFileName or inputs.yamlDict:
     ## If the file name is specified, we have to read in the dictionary from the yaml file
-    if yamlFileName:
+    if inputs.yamlFileName and not inputs.yamlDict:
       ## Read in the yaml file
-      yamlDict = load_yaml(yamlFileName)
+      yamlDict = load_yaml(inputs.yamlFileName)
 
     ## Iterate through and assign non-default parameters to correct dictionaries
-    for key, paramDict in yamlDict.iteritems():
+    for key, paramDict in inputs.yamlDict.iteritems():
       ## Check to see if the key is pointing to a parameter dictionary
       if not any(key == filt for filt in ['TT','LT','TA']):
         continue
