@@ -41,13 +41,6 @@ class Inputs:
                scopeResolutions=None,
                useGPU=False,
                efficientRotationStorage=True,
-              #  ttFilterName = './myoimages/newSimpleWTFilter.png',
-              #  ttPunishFilterName = './myoimages/newSimpleWTPunishmentFilter.png',
-              #  ltFilterName = './myoimages/LongitudinalFilter.png',
-              #  taFilterName = './myoimages/LossFilter.png',
-              #  ttFiltering = False,
-              #  ltFiltering = False,
-              #  taFiltering = False,
                paramDicts = None,
                yamlDict = None,
                ):
@@ -94,6 +87,9 @@ class Inputs:
     dic['scopeResolutions'] = []
     dic['efficientRotationStore'] = True
     dic['iters'] = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
+    dic['returnAngles'] = False
+    dic['returnPastedFilter'] = True
+    dic['outputFileTag'] = False
     
     ### Filtering flags to turn on or off
     dic['filterTypes'] = {
@@ -129,7 +125,7 @@ class Inputs:
       try:
         ## checking to see if a default value is specified
         if self.dic[key] != None:
-          ## if it is, we store the non-default value
+          ## if it is, we store the non-default value(s)
           self.dic[key] = value
       except:
         ## if the key is not already specified in the default dictionary, then we continue on
@@ -208,11 +204,10 @@ class Inputs:
 ###################################################################################################
 
 def TT_Filtering(inputs,
-                 iters,
                  paramDict,
                  ttThresh=None,
                  ttGamma=None,
-                 returnAngles=False):
+                 ):
   '''
   Takes inputs class that contains original image and performs WT filtering on the image
   '''
@@ -236,7 +231,12 @@ def TT_Filtering(inputs,
     paramDict['gamma'] = ttGamma
 
   ### Perform filtering
-  WTresults = bD.DetectFilter(inputs,paramDict,iters,returnAngles=returnAngles)  
+  WTresults = bD.DetectFilter(
+    inputs,
+    paramDict,
+    inputs.dic['iters'],
+    returnAngles=inputs.dic['returnAngles']
+  )  
 
   end = time.time()
   print "Time for WT filtering to complete:",end-start,"seconds"
@@ -244,9 +244,7 @@ def TT_Filtering(inputs,
   return WTresults
 
 def LT_Filtering(inputs,
-                 iters,
                  paramDict,
-                 returnAngles=False
                  ):
   '''
   Takes inputs class that contains original image and performs LT filtering on the image
@@ -261,7 +259,12 @@ def LT_Filtering(inputs,
   paramDict['useGPU'] = inputs.useGPU
 
   ### Perform filtering
-  LTresults = bD.DetectFilter(inputs,paramDict,iters,returnAngles=returnAngles)
+  LTresults = bD.DetectFilter(
+    inputs,
+    paramDict,
+    inputs.dic['iters'],
+    returnAngles=inputs.dic['returnAngles']
+  )
 
   end = time.time()
   print "Time for LT filtering to complete:",end-start,"seconds"
@@ -271,7 +274,6 @@ def LT_Filtering(inputs,
 def TA_Filtering(inputs,
                  paramDict,
                  iters=None,
-                 returnAngles=False,
                  ):
   '''
   Takes inputs class that contains original image and performs Loss filtering on the image
@@ -292,7 +294,12 @@ def TA_Filtering(inputs,
     Lossiters = [0, 45] 
   
   ### Perform filtering
-  Lossresults = bD.DetectFilter(inputs,paramDict,Lossiters,returnAngles=returnAngles)
+  Lossresults = bD.DetectFilter(
+    inputs,
+    paramDict,
+    Lossiters,
+    returnAngles=inputs.dic['returnAngles']
+  )
 
   end = time.time()
   print "Time for TA filtering to complete:",end-start,"seconds"
@@ -301,7 +308,6 @@ def TA_Filtering(inputs,
 
 def analyzeTT_Angles(testImageName,
                      inputs,
-                     iters,
                      ImgTwoSarcSize,
                      WTstackedHits,
                      ttFilterName = "./myoimages/newSimpleWTFilter.png"
@@ -348,13 +354,13 @@ def analyzeTT_Angles(testImageName,
   params['filterMode'] = 'simple' # we want no punishment since that causes high variation
     
   ### perform simple filtering
-  smoothedWTresults = bD.DetectFilter(rotInputs,params,iters,returnAngles=True)
+  smoothedWTresults = bD.DetectFilter(rotInputs,params,inputs.dic['iters'],returnAngles=True)
   smoothedHits = smoothedWTresults.stackedAngles
 
   ### pull out actual hits from smoothed results
   smoothedHits[WTstackedHits == 0] = -1
 
-  coloredAngles = painter.colorAngles(cImg,smoothedHits,iters)
+  coloredAngles = painter.colorAngles(cImg,smoothedHits,inputs.dic['iters'])
 
   coloredAnglesMasked = util.ReadResizeApplyMask(coloredAngles,testImageName,
                                             ImgTwoSarcSize,
@@ -375,7 +381,7 @@ def analyzeTT_Angles(testImageName,
         rotArg = stackedAngles[i,j]
         if rotArg != -1:
           ### indicates this is a hit
-          angleCounts.append(iters[rotArg])
+          angleCounts.append(inputs.dic['iters'][rotArg])
 
   return angleCounts, coloredAnglesMasked
 
@@ -393,13 +399,8 @@ def giveMarkedMyocyte(
       inputs,
       ImgTwoSarcSize=None,
       tag = "default_",
-      writeImage = False,
-      iters=[-25,-20,-15,-10,-5,0,5,10,15,20,25],
-      returnAngles=False,
-      returnPastedFilter=True,
       useGPU=False,
       fileExtension=".pdf",
-      # efficientRotationStorage=True,
       ):
   '''
   This function is the main workhorse for the detection of features in 2D myocytes.
@@ -409,30 +410,12 @@ def giveMarkedMyocyte(
  
   start = time.time()
 
-  ### Setup Parameters/Inputs
-  ## Read in preprocessed image
-  #img = util.ReadImg(testImage,renorm=True)
-
-  ## defining inputs to be read by DetectFilter function
-  #inputs = Inputs(imgOrig = util.ReadResizeApplyMask(img,testImage))
-
-  ## Read in the yaml file if it is specified
-  # yamlDict = util.load_yaml(yamlFileName)
-
-  ## Store non-default parameters from yaml file into inputs
-  # util.updateInputsFromYaml(inputs, yamlDict)
-
-  ## Form parameter dictionaries for the classification
-  #paramDicts = util.makeParamDicts(inputs=inputs)
-
   ### Perform Filtering Routines
   ## Transverse Tubule Filtering
   if inputs.dic['filterTypes']['TT']:
     WTresults = TT_Filtering(
       inputs = inputs,
-      iters = iters,
       paramDict = inputs.paramDicts['TT'],
-      returnAngles = returnAngles
     )
     WTstackedHits = WTresults.stackedHits
   else:
@@ -442,9 +425,7 @@ def giveMarkedMyocyte(
   if inputs.dic['filterTypes']['LT']:
     LTresults = LT_Filtering(
       inputs = inputs,
-      iters = iters,
       paramDict = inputs.paramDicts['LT'],
-      returnAngles = returnAngles
     )
     LTstackedHits = LTresults.stackedHits
   else:
@@ -455,7 +436,6 @@ def giveMarkedMyocyte(
     Lossresults = TA_Filtering(
       inputs=inputs,
       paramDict = inputs.paramDicts['TA'],
-      returnAngles = returnAngles
     )
     LossstackedHits = Lossresults.stackedHits
   else:
@@ -507,7 +487,7 @@ def giveMarkedMyocyte(
     filterTwoSarcSize=ImgTwoSarcSize
   )
 
-  if not returnPastedFilter:
+  if not inputs.dic['returnPastedFilter']:
     ### create holders for marking channels
     WTcopy = cI[:,:,0]
     LTcopy = cI[:,:,1]
@@ -523,7 +503,7 @@ def giveMarkedMyocyte(
       cI,
       inputs.yamlDict['imageName']
     )
-    if writeImage:
+    if inputs.dic['outputFileTag'] != False:
       ### mark mask outline on myocyte
       #cI_written = util.markMaskOnMyocyte(cI,testImage)
       cI_written = cI
@@ -531,9 +511,9 @@ def giveMarkedMyocyte(
       ### write output image
       plt.figure()
       plt.imshow(util.switchBRChannels(cI_written))
-      plt.gcf().savefig(tag+"_output"+fileExtension,dpi=300)
+      plt.gcf().savefig(inputs.dic['outputFileTag']+"_output"+fileExtension,dpi=300)
 
-  if returnPastedFilter:
+  if inputs.dic['returnPastedFilter']:
     ### We create a dummy image to hold the marked hits
     dummy = np.zeros_like(cI)
     dummy = util.markPastedFilters(lossMasked, ltMasked, wtMasked, dummy)
@@ -550,30 +530,27 @@ def giveMarkedMyocyte(
     ### Now based on the marked hits, we can obtain an estimate of tubule content
     estimatedContent = util.estimateTubuleContentFromColoredImage(cI)
   
-    if writeImage:
+    if inputs.dic['outputFileTag'] != False:
       ### mark mask outline on myocyte
-      #cI_written = util.markMaskOnMyocyte(cI.copy(),testImage)
       cI_written = cI
 
       ### write outputs	  
       plt.figure()
       plt.imshow(util.switchBRChannels(cI_written))
-      plt.gcf().savefig(tag+"_output"+fileExtension,dpi=300)
+      plt.gcf().savefig(inputs.dic['outputFileTag']+"_output"+fileExtension,dpi=300)
 
-  if returnAngles:
+  if inputs.dic['returnAngles']:
     angleCounts, coloredAnglesMasked = analyzeTT_Angles(
       testImageName=inputs.yamlDict['imageName'],
       inputs=inputs,
-      iters=iters,
       ImgTwoSarcSize=ImgTwoSarcSize,
       WTstackedHits=WTstackedHits
     )
 
-    if writeImage:
-      #cv2.imwrite(tag+"_angles_output.png",coloredAnglesMasked)
+    if inputs.dic['outputFileTag'] != False:
       plt.figure()
       plt.imshow(util.switchBRChannels(coloredAnglesMasked))
-      plt.gcf().savefig(tag+"_angles_output"+fileExtension)
+      plt.gcf().savefig(inputs.dic['outputFileTag']+"_angles_output"+fileExtension,dpi=300)
     
     end = time.time()
     tElapsed = end - start
@@ -586,22 +563,13 @@ def giveMarkedMyocyte(
   return cI 
 
 def give3DMarkedMyocyte(
-      # testImage,
-      # scopeResolutions,
-      # ttFilterName=None,
-      # ltFilterName=None,
-      # taFilterName=None,
-      # ttPunishFilterName=None,
-      # ltPunishFilterName=None,
       inputs,
       ImgTwoSarcSize=None,
-      tag = None,
       xiters=[-10,0,10],
       yiters=[-10,0,10],
       ziters=[-10,0,10],
       returnAngles=False,
       returnPastedFilter=True,
-      # efficientRotationStorage=True,
       ):
   '''
   This function is for the detection and marking of subcellular features in three dimensions. 
@@ -610,7 +578,7 @@ def give3DMarkedMyocyte(
     testImage -> str. Name of the image to be analyzed. NOTE: This image has previously been preprocessed by 
                    XXX routine.
     scopeResolutions -> list of values (ints or floats). List of resolutions of the confocal microscope for x, y, and z.
-    tag -> str. Base name of the written files 
+    # tag -> str. Base name of the written files 
     xiters -> list of ints. Rotations with which the filters will be rotated about the x axis (yz plane)
     yiters -> list of ints. Rotations with which the filters will be rotated about the y axis (xz plane)
     ziters -> list of ints. Rotations with which the filters will be rotated about the z axis (xy plane)
@@ -624,19 +592,6 @@ def give3DMarkedMyocyte(
   '''
   start = time.time()
 
-  ### Read in preprocessed test image and store in inputs class for use in all subroutines
-  # inputs = Inputs(
-  #   # imgOrig = util.ReadImg(testImage, renorm=True),
-  #   # scopeResolutions = scopeResolutions
-  #   yamlFileName=args.yamlFile
-  # )
-
-  ### Read in the yaml file if it is specified
-  # yamlDict = util.load_yaml(yamlFileName)
-
-  ### Form parameter dictionaries for classification
-  #paramDicts = util.makeParamDicts(inputs=inputs)
-
   ### Form flattened iteration matrix containing all possible rotation combinations
   flattenedIters = []
   for i in xiters:
@@ -644,13 +599,15 @@ def give3DMarkedMyocyte(
       for k in ziters:
         flattenedIters.append( [i,j,k] )
 
+  ### Store the flattened iteration matrix in the inputs structure
+  inputs.dic['iters'] = flattenedIters
+
   ### Transverse Tubule Filtering
   if inputs.dic['filterTypes']['TT']:
     TTresults = TT_Filtering(
       inputs,
-      flattenedIters,
       paramDict = inputs.paramDicts['TT'],
-      returnAngles = returnAngles
+      # returnAngles = returnAngles
     )
     TTstackedHits = TTresults.stackedHits
   else:
@@ -660,9 +617,8 @@ def give3DMarkedMyocyte(
   if inputs.dic['filterTypes']['LT']:
     LTresults = LT_Filtering(
       inputs,
-      flattenedIters,
       paramDict = inputs.paramDicts['LT'],
-      returnAngles = returnAngles
+      # returnAngles = returnAngles
     )
     LTstackedHits = LTresults.stackedHits
   else:
@@ -676,7 +632,7 @@ def give3DMarkedMyocyte(
       inputs,
       iters=taIters,
       paramDict = inputs.paramDicts['TA'],
-      returnAngles = returnAngles
+      # returnAngles = returnAngles
     )
     TAstackedHits = TAresults.stackedHits
   else:
@@ -739,8 +695,8 @@ def give3DMarkedMyocyte(
     print "WARNING: Striation angle analysis is not yet available in 3D"
   
   ### Save detection image
-  if tag:
-    util.Save3DImg(cImg,tag+'.tif',switchChannels=True)
+  if inputs.dic['outputFileTag'] != False:
+    util.Save3DImg(cImg,inputs.dic['outputFileTag']+'.tif',switchChannels=True)
 
   end = time.time()
   print "Time for algorithm to run:",end-start,"seconds"
@@ -857,8 +813,7 @@ def validate(args,
 
   ### Run algorithm to pull out content and rotation info
   markedImg, _, angleCounts = giveMarkedMyocyte(
-    inputs=inputs,
-    returnAngles=True
+    inputs=inputs
   )
 
   if display:
@@ -936,7 +891,8 @@ def validate3D(args):
                                     xiters = [0],
                                     yiters = [0],
                                     ziters = [0],
-                                    tag = '3DValidationData_analysis')
+                                    # tag = '3DValidationData_analysis'
+                                    )
 
   print "\nThe following content values are for validation purposes only.\n"
 
@@ -964,10 +920,13 @@ def run(args):
   '''This runs the main classification routines from command line
   '''
 
+  print args.yamlFile
   ### Setup the inputs class
   inputs = Inputs(
     yamlFileName=args.yamlFile
   )
+
+  print inputs.dic['outputFileTag']
 
   ### Determine if classification is 2D or 3D and run the correct routine for it
   dim = len(np.shape(inputs.imgOrig))

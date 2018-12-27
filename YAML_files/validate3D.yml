@@ -1,4 +1,5 @@
 imageName: './myoimages/3DValidationData.tif'
+outputFileTag: '3DValidationData_analysis'
 filterTypes: 
     'TT': True
     'LT': True

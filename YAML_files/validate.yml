@@ -3,3 +3,4 @@ filterTypes:
   'TT': True
   'LT': True
   'TA': True
+returnAngles: True
