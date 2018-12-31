@@ -165,16 +165,19 @@ class Inputs:
         self.paramDicts[filteringType] = optimizer.ParamDict(typeDict=filteringType+'_3D')
 
     ## Iterate through and assign non-default parameters to correct dictionaries
-    for key, paramDict in self.yamlDict.iteritems():
-      ## Check to see if the key is pointing to a parameter dictionary
-      if not any(key == filt for filt in ['TT','LT','TA']):
-        continue
+    try:
+      ## If this works, there are parameter options specified
+      yamlParamDictOptions = self.yamlDict['paramDicts']
+      for filterType, paramDict in yamlParamDictOptions.iteritems():
+        ## Go through and assign all specified non-default parameters in the yaml file to the 
+        ##   storageDict
+        for parameterName, parameter in paramDict.iteritems():
+          self.paramDicts[filterType][parameterName] = parameter
 
-      ## Go through and assign all specified non-default parameters in the yaml file to the 
-      ##   storageDict
-      for parameterName, parameter in paramDict.iteritems():
-        self.paramDicts[key][parameterName] = parameter
-
+    except:
+      # if the above doesn't work, then there are no parameter options specified and we can exit 
+      return
+    
   def updateInputs(self):
     '''This function updates the inputs class that's formed in matchedmyo.py script 
     
@@ -413,7 +416,6 @@ def analyzeTT_Angles(testImageName,
 def giveMarkedMyocyte(
       inputs,
       ImgTwoSarcSize=None,
-      tag = "default_",
       useGPU=False,
       fileExtension=".pdf",
       ):
@@ -503,19 +505,20 @@ def giveMarkedMyocyte(
     Losscopy = markedImage[:,:,2]
 
     ### color corrresponding channels
-    WTcopy[wtMasked == 255] = 255
-    LTcopy[ltMasked == 255] = 255
-    Losscopy[lossMasked == 255] = 255
+    WTcopy[wtMasked > 0] = 255
+    LTcopy[ltMasked > 0] = 255
+    Losscopy[lossMasked > 0] = 255
 
     ### mark mask outline on myocyte
     markedImage = util.markMaskOnMyocyte(
-      inputs.colorImage,
+      markedImage,
       inputs.yamlDict['imageName']
     )
+
     if inputs.dic['outputFileTag'] != False:
       ### mark mask outline on myocyte
       #cI_written = util.markMaskOnMyocyte(cI,testImage)
-      cI_written = inputs.colorImage
+      cI_written = markedImage
 
       ### write output image
       plt.figure()
@@ -928,14 +931,10 @@ def validate3D(args):
 def run(args):
   '''This runs the main classification routines from command line
   '''
-
-  print args.yamlFile
   ### Setup the inputs class
   inputs = Inputs(
     yamlFileName=args.yamlFile
   )
-
-  print inputs.dic['outputFileTag']
 
   ### Determine if classification is 2D or 3D and run the correct routine for it
   dim = len(np.shape(inputs.imgOrig))

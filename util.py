@@ -1370,9 +1370,10 @@ def estimateTubuleContentFromColoredImage(cI,
   TTvolFrac = measureOccupiedVolumeFraction(TTfilter)
 
   ### Find the occupied area/volume of each filter's hits
-  totalTAhits = np.count_nonzero(TAchannel == np.max(TAchannel))
-  totalLThits = np.count_nonzero(LTchannel == np.max(LTchannel))
-  totalTThits = np.count_nonzero(TTchannel == np.max(TTchannel))
+  hitValue = 255
+  totalTAhits = np.count_nonzero(TAchannel == hitValue)
+  totalLThits = np.count_nonzero(LTchannel == hitValue)
+  totalTThits = np.count_nonzero(TTchannel == hitValue)
 
   ### Multiply the total number of hits by the amount of occupied space in the filter
   correctedTAContent = totalTAhits * TAvolFrac
