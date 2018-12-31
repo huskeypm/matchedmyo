@@ -1457,7 +1457,6 @@ def markPastedFilters(
 
   ### load in filters to get filter dimensions
   if inputs.dic['filterTypes']['TA']:
-    print taName
     taFilt = LoadFilter(taName)
   if inputs.dic['filterTypes']['LT']:
     ltFilt = LoadFilter(ltName)
@@ -1515,13 +1514,14 @@ def markPastedFilters(
   LTmask[TTmask] = False # prevents double marking of WT and LT
 
   ### Dampen brightness and mark hits
+  markedImage = inputs.colorImage.copy()
   alpha = 1.0
   hitValue = int(round(alpha * 255))
-  inputs.colorImage[...,2][TAmask] = hitValue
-  inputs.colorImage[...,1][LTmask] = hitValue
-  inputs.colorImage[...,0][TTmask] = hitValue
+  markedImage[...,2][TAmask] = hitValue
+  markedImage[...,1][LTmask] = hitValue
+  markedImage[...,0][TTmask] = hitValue
 
-  return inputs.colorImage
+  return markedImage
 
 # Prepare matrix of vectorized of FFT'd images
 def CalcX(

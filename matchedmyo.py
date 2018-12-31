@@ -497,9 +497,10 @@ def giveMarkedMyocyte(
 
   if not inputs.dic['returnPastedFilter']:
     ### create holders for marking channels
-    WTcopy = inputs.colorImage[:,:,0]
-    LTcopy = inputs.colorImage[:,:,1]
-    Losscopy = inputs.colorImage[:,:,2]
+    markedImage = inputs.colorImage.copy()
+    WTcopy = markedImage[:,:,0]
+    LTcopy = markedImage[:,:,1]
+    Losscopy = markedImage[:,:,2]
 
     ### color corrresponding channels
     WTcopy[wtMasked == 255] = 255
@@ -507,7 +508,7 @@ def giveMarkedMyocyte(
     Losscopy[lossMasked == 255] = 255
 
     ### mark mask outline on myocyte
-    inputs.colorImage = util.markMaskOnMyocyte(
+    markedImage = util.markMaskOnMyocyte(
       inputs.colorImage,
       inputs.yamlDict['imageName']
     )
@@ -523,11 +524,11 @@ def giveMarkedMyocyte(
 
   if inputs.dic['returnPastedFilter']:
     ## Mark filter-sized unit cells on the image to represent hits
-    inputs.colorImage = util.markPastedFilters(inputs, lossMasked, ltMasked, wtMasked)
+    markedImage = util.markPastedFilters(inputs, lossMasked, ltMasked, wtMasked)
     
     ### apply mask again so as to avoid content > 1.0
-    inputs.colorImage = util.ReadResizeApplyMask(
-      inputs.colorImage,
+    markedImage = util.ReadResizeApplyMask(
+      markedImage,
       inputs.yamlDict['imageName'],
       ImgTwoSarcSize,
       filterTwoSarcSize=ImgTwoSarcSize
@@ -535,11 +536,11 @@ def giveMarkedMyocyte(
     # inputs.colorImage[dummy==255] = 255
 
     ### Now based on the marked hits, we can obtain an estimate of tubule content
-    estimatedContent = util.estimateTubuleContentFromColoredImage(inputs.colorImage)
+    estimatedContent = util.estimateTubuleContentFromColoredImage(markedImage)
   
     if inputs.dic['outputFileTag'] != False:
       ### mark mask outline on myocyte
-      cI_written = inputs.colorImage
+      cI_written = markedImage
 
       ### write outputs	  
       plt.figure()
@@ -562,12 +563,12 @@ def giveMarkedMyocyte(
     end = time.time()
     tElapsed = end - start
     print "Total Elapsed Time: {}s".format(tElapsed)
-    return inputs.colorImage, coloredAnglesMasked, angleCounts
+    return markedImage, coloredAnglesMasked, angleCounts
 
   end = time.time()
   tElapsed = end - start
   print "Total Elapsed Time: {}s".format(tElapsed)
-  return inputs.colorImage 
+  return markedImage 
 
 def give3DMarkedMyocyte(
       inputs,
