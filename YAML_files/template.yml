@@ -1,0 +1,112 @@
+# This is a template yml file that contains all of the parameters that one might want to change
+#   for their own classification.
+#   NOTE: 
+#         - Every parameter is optional except for the imageName parameter. 
+#         - Parameters that require you to input your own parameters into are shown as:
+#                                       <CAPITAL_LETTERS>
+#           and should be substituted for the parameter you would like to specify. For example,
+#           when changing this file to a usable yml file, one needs to change the imageName 
+#           parameter. So, if your image name is "image1.png", one would change <NAME_OF_IMAGE>
+#           to image1.png
+
+# This is the name of the image that you would like to classify.
+imageName: <NAME_OF_IMAGE>
+
+# This is the root of the name of the output files that are generated.
+outputFileTag: <FILE_TAG>
+
+# This is the parameter that specifies whether you would like to preprocess the image. It's 
+#   recommended to keep this on.
+preprocess: True
+
+# This parameter controls the types of filtering one would like to use in this case. The default 
+#   settings are all filtering types turned off, so make sure to specify the types you would like 
+#   to turn on. To turn these off, just switch "True" for "False"
+filteringType:
+    TT: True
+    LT: True
+    TA: True
+
+# This parameter contains the information for the resolution of the microscope used. 
+#   This is not necessary to include.
+scopeResolutions:
+    x: <NUMBER_OF_PIXELS_PER_MICRON>
+    y: <NUMBER_OF_PIXELS_PER_MICRON>
+
+# This parameter controls the rotations at which the filter will be analyzed to be present within 
+#   the image. The default rotations are shown below.
+rotations: [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25]
+
+# This option (either True or False) turns on/off the analysis and display of transverse tubule 
+#   striation angle.
+returnAngles: True
+
+# This option (either True or False) turns on/off the superimposing of filter-sized unit cells on the 
+#   hits of the original image. If this is turned off, only the original 'hits' will be superimposed 
+#   on the image. If this is turned on, for each hit, a filter-sized rectangle will be placed on the
+#   image to mark the filter on the image. Turning this option on is much more intuitive.
+#   The default is to have this parameter on.
+returnPastedFilter: True
+
+# This parameter designates the filter size in relation to the myocytes/tissue we wish to analyze
+#   Unless you are experimenting with non-default filters, this SHOULD BE LEFT ALONE.
+filterTwoSarcomereSize: 25 # pixels
+
+# The following two inputs are for the transverse tubule filter and punishment filter names. 
+#   Unless you would like to try your own filter, these should be left alone!
+ttFilterName: ./myoimages/newSimpleWTFilter.png
+ttPunishFilterName: ./myoimages/newSimpleWTPunishmentFilter.png
+
+# The following two inputs are for the longitudinal tubule and tubule absence filter names, respectively.
+#   Unless you would like to try your own filter, these should be left alone!
+ltFilterName: ./myoimages/LongitudinalFilter.png
+taFilterName: ./myoimages/LossFilter.png
+
+# The following dictionary of parameters is for specifying non-default parameters for the filtering
+#   routines. These have been heavily optimized, so default parameters should work with a wide
+#   range of data out of the box. However, we have included the option to change these to adapt 
+#   this routine to more diverse data sets.
+paramDicts:
+    TT:
+        # This controls the mode of filtering. Default is "punishmentFilter" meaning that two filters 
+        #   are used. One detects signal, and the punishment filter detects signal that we do not wish
+        #   to detect. This increases specificity of the filter.
+        filterMode: punishmentFilter
+        
+        # Gamma scales the weight of the punishment filter
+        gamma: 3
+        
+        # snrThresh controls the threhsold of detection. A lower threshold means higher hit detection
+        #   but lower specificity.
+        snrThresh: 0.35
+
+    LT:
+        # This controls the mode of filtering. The defulat for longitudinal filtering is the 
+        #   "regionalDeviation" mode. This mode measures the standard deviation of the filter
+        #   in addition to the integrated signal. 
+        filterMode: regionalDeviation
+    
+        # snrThresh controls the threshold of detection. A lower threshold means higher hit detection
+        #   but lower specificity
+        snrThresh: 0.6
+    
+        # stdDevThresh controls the threshold for the standard deviation of the filter. A lower 
+        #   threshold dictates that the filter responses must have a lower standard deviation.
+        stdDevThresh: 0.2
+    TA:
+        # This controls the mode of filtering. See the longitudinal filtering mode explanation 
+        #   for regionalDeviation explanation. 
+        filterMode: regionalDeviation
+    
+        # This option flips the snr threshold. This means that the hits must be BELOW the snr threshold
+        #   now instead of above the threshold. This is important for detecting a lack of signal.
+        inverseSNR: True
+    
+        # snrThresh controls the threshold for detection. NOTE that for tubule absence, the mechanism
+        #   is flipped, meaning that a lower threshold means a more stringent hit detection. 
+        snrThresh: 0.04
+        
+        # stdDevThresh contols the threshold for the standard deviation of the filter. A lower 
+        #   threshold dictates that the filter responses must have a lower standard deviation.
+        stdDevThresh: 0.1
+
