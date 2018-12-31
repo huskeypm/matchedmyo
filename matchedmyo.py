@@ -17,6 +17,7 @@ import painter
 import matchedFilter as mF
 import argparse
 import yaml
+import preprocessing as pp
 
 
 ###################################################################################################
@@ -36,6 +37,7 @@ class Inputs:
   '''
   def __init__(self,
                imageName = None,
+               colorImage = None,
                yamlFileName = None,
                mfOrig=None,
                scopeResolutions=None,
@@ -90,6 +92,8 @@ class Inputs:
     dic['returnAngles'] = False
     dic['returnPastedFilter'] = True
     dic['outputFileTag'] = False
+    dic['preprocess'] = False
+    dic['filterTwoSarcomereSize'] = 25
     
     ### Filtering flags to turn on or off
     dic['filterTypes'] = {
@@ -181,15 +185,26 @@ class Inputs:
     self.imgOrig = util.ReadImg(self.yamlDict['imageName'], renorm=True)
     self.dic['dimensions'] = len(self.imgOrig.shape)
 
+    ### Make a 'color' image with 3 channels in the final index to represent the color channels
+    ###   We also want to dampen the brightness a bit for display purposes, so we multiply by an
+    ###   alpha value
+    alpha = 0.85
+    colorImageMax = 255
+    self.colorImage = np.dstack((self.imgOrig, self.imgOrig, self.imgOrig)).astype(np.float32)
+    self.colorImage *= alpha * colorImageMax
+    self.colorImage = self.colorImage.astype(np.uint8)
+
     ### Form the correct default parameter dictionaries from this dimensionality measurement
     self.updateDefaultDict()
     self.updateParamDicts()
 
+    ### Check to see if we need to preprocess the image at all
+    if self.dic['preprocess']:
+      self.imgOrig = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'])
+
   def setupYamlInputs(self):
     '''This function sets up inputs if a yaml file name is specified'''
     self.load_yaml()
-    # self.setupDefaultDict()
-    # self.setupDefaultParamDicts()
     self.updateInputs()
 
 
@@ -331,7 +346,7 @@ def analyzeTT_Angles(testImageName,
   '''
 
   ### Read in original colored image
-  cImg = util.ReadImg(testImageName,cvtColor=False)
+  #cImg = util.ReadImg(testImageName,cvtColor=False)
 
   ### perform smoothing on the original image
   dim = 5
@@ -360,7 +375,7 @@ def analyzeTT_Angles(testImageName,
   ### pull out actual hits from smoothed results
   smoothedHits[WTstackedHits == 0] = -1
 
-  coloredAngles = painter.colorAngles(cImg,smoothedHits,inputs.dic['iters'])
+  coloredAngles = painter.colorAngles(inputs.colorImage,smoothedHits,inputs.dic['iters'])
 
   coloredAnglesMasked = util.ReadResizeApplyMask(coloredAngles,testImageName,
                                             ImgTwoSarcSize,
@@ -441,13 +456,6 @@ def giveMarkedMyocyte(
   else:
     LossstackedHits = np.zeros_like(inputs.imgOrig)
  
-  ### Perform Post-Processing
-  ## Read in colored image for marking hits
-  cI = util.ReadImg(inputs.yamlDict['imageName'],cvtColor=False).astype(np.float64)
-  # killing the brightness a bit so looking at results isn't like staring at the sun
-  cI *= 0.85
-  cI = np.round(cI).astype(np.uint8)
-
   ## Marking superthreshold hits for loss filter
   LossstackedHits[LossstackedHits != 0] = 255
   LossstackedHits = np.asarray(LossstackedHits, dtype='uint8')
@@ -489,9 +497,9 @@ def giveMarkedMyocyte(
 
   if not inputs.dic['returnPastedFilter']:
     ### create holders for marking channels
-    WTcopy = cI[:,:,0]
-    LTcopy = cI[:,:,1]
-    Losscopy = cI[:,:,2]
+    WTcopy = inputs.colorImage[:,:,0]
+    LTcopy = inputs.colorImage[:,:,1]
+    Losscopy = inputs.colorImage[:,:,2]
 
     ### color corrresponding channels
     WTcopy[wtMasked == 255] = 255
@@ -499,14 +507,14 @@ def giveMarkedMyocyte(
     Losscopy[lossMasked == 255] = 255
 
     ### mark mask outline on myocyte
-    cI = util.markMaskOnMyocyte(
-      cI,
+    inputs.colorImage = util.markMaskOnMyocyte(
+      inputs.colorImage,
       inputs.yamlDict['imageName']
     )
     if inputs.dic['outputFileTag'] != False:
       ### mark mask outline on myocyte
       #cI_written = util.markMaskOnMyocyte(cI,testImage)
-      cI_written = cI
+      cI_written = inputs.colorImage
 
       ### write output image
       plt.figure()
@@ -514,25 +522,24 @@ def giveMarkedMyocyte(
       plt.gcf().savefig(inputs.dic['outputFileTag']+"_output"+fileExtension,dpi=300)
 
   if inputs.dic['returnPastedFilter']:
-    ### We create a dummy image to hold the marked hits
-    dummy = np.zeros_like(cI)
-    dummy = util.markPastedFilters(lossMasked, ltMasked, wtMasked, dummy)
+    ## Mark filter-sized unit cells on the image to represent hits
+    inputs.colorImage = util.markPastedFilters(inputs, lossMasked, ltMasked, wtMasked)
     
     ### apply mask again so as to avoid content > 1.0
-    dummy = util.ReadResizeApplyMask(
-      dummy,
+    inputs.colorImage = util.ReadResizeApplyMask(
+      inputs.colorImage,
       inputs.yamlDict['imageName'],
       ImgTwoSarcSize,
       filterTwoSarcSize=ImgTwoSarcSize
     )
-    cI[dummy==255] = 255
+    # inputs.colorImage[dummy==255] = 255
 
     ### Now based on the marked hits, we can obtain an estimate of tubule content
-    estimatedContent = util.estimateTubuleContentFromColoredImage(cI)
+    estimatedContent = util.estimateTubuleContentFromColoredImage(inputs.colorImage)
   
     if inputs.dic['outputFileTag'] != False:
       ### mark mask outline on myocyte
-      cI_written = cI
+      cI_written = inputs.colorImage
 
       ### write outputs	  
       plt.figure()
@@ -555,12 +562,12 @@ def giveMarkedMyocyte(
     end = time.time()
     tElapsed = end - start
     print "Total Elapsed Time: {}s".format(tElapsed)
-    return cI, coloredAnglesMasked, angleCounts
+    return inputs.colorImage, coloredAnglesMasked, angleCounts
 
   end = time.time()
   tElapsed = end - start
   print "Total Elapsed Time: {}s".format(tElapsed)
-  return cI 
+  return inputs.colorImage 
 
 def give3DMarkedMyocyte(
       inputs,
@@ -653,12 +660,13 @@ def give3DMarkedMyocyte(
   cImg /= np.max(cImg)
   cImg *= 255 * alpha
   cImg = cImg.astype(np.uint8)
+  inputs.colorImage = cImg
   if returnPastedFilter:
     ## Use routine to mark unit cell sized cuboids around detections
-    cImg = util.markPastedFilters(TAstackedHits,
+    inputs.colorImage = util.markPastedFilters(inputs,
+                             TAstackedHits,
                              LTstackedHits,
                              TTstackedHits,
-                             cImg,
                              ttName = inputs.dic['ttFilterName'],
                              ltName = inputs.dic['ltFilterName'],
                              taName = inputs.dic['taFilterName'])
@@ -668,7 +676,7 @@ def give3DMarkedMyocyte(
 
     ### Now based on the marked hits, we can obtain an estimate of tubule content
     estimatedContent = util.estimateTubuleContentFromColoredImage(
-      cImg,
+      inputs.colorImage,
       totalCellSpace=cellVolume,
       taFilterName = inputs.dic['taFilterName'],
       ltFilterName = inputs.dic['ltFilterName'],
@@ -677,15 +685,15 @@ def give3DMarkedMyocyte(
 
   else:
     ## Just mark exactly where detection is instead of pasting unit cells on detections
-    cImg[:,:,:,2][TAstackedHits > 0] = 255
-    cImg[:,:,:,1][LTstackedHits > 0] = 255
-    cImg[:,:,:,0][TTstackedHits > 0] = 255
+    inputs.colorImage[:,:,:,2][TAstackedHits > 0] = 255
+    inputs.colorImage[:,:,:,1][LTstackedHits > 0] = 255
+    inputs.colorImage[:,:,:,0][TTstackedHits > 0] = 255
 
     ### Determine percentages of volume represented by each filter
     cellVolume = np.float(np.product(inputs.imgOrig.shape))
-    taContent = np.float(np.sum(cImg[:,:,:,2] == 255)) / cellVolume
-    ltContent = np.float(np.sum(cImg[:,:,:,1] == 255)) / cellVolume
-    ttContent = np.float(np.sum(cImg[:,:,:,0] == 255)) / cellVolume
+    taContent = np.float(np.sum(inputs.colorImage[:,:,:,2] == 255)) / cellVolume
+    ltContent = np.float(np.sum(inputs.colorImage[:,:,:,1] == 255)) / cellVolume
+    ttContent = np.float(np.sum(inputs.colorImage[:,:,:,0] == 255)) / cellVolume
 
     print "TA Content per Cell Volume:", taContent
     print "LT Content per Cell Volume:", ltContent
@@ -701,7 +709,7 @@ def give3DMarkedMyocyte(
   end = time.time()
   print "Time for algorithm to run:",end-start,"seconds"
   
-  return cImg
+  return inputs.colorImage
 
 # def giveTissueAnalysis(grayTissue,
 #                        iters = [-50,0], #TODO: FIX THIS TO ACTUAL RANGE

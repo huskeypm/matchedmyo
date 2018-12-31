@@ -1420,7 +1420,10 @@ def measureOccupiedVolumeFraction(inputArray):
   return volFrac
 
 def markPastedFilters(
-      taMasked, ltMasked, wtMasked, cI,
+      inputs,
+      taMasked,
+      ltMasked, 
+      wtMasked, 
       taName="./myoimages/LossFilter.png",
       ltName="./myoimages/LongitudinalFilter.png",
       ttName="./myoimages/newSimpleWTFilter.png"
@@ -1453,57 +1456,58 @@ def markPastedFilters(
   )
 
   ### load in filters to get filter dimensions
-  if taName:
+  if inputs.dic['filterTypes']['TA']:
+    print taName
     taFilt = LoadFilter(taName)
-  if ltName:
+  if inputs.dic['filterTypes']['LT']:
     ltFilt = LoadFilter(ltName)
-  if ttName:
+  if inputs.dic['filterTypes']['TT']:
     ttFilt = LoadFilter(ttName)
 
   ### get filter dimensions
-  if taName:
+  if inputs.dic['filterTypes']['TA']:
     TADimensions = measureFilterDimensions(taFilt)
-  if ltName:
+  if inputs.dic['filterTypes']['LT']:
     LTDimensions = measureFilterDimensions(ltFilt)
-  if ttName:
+  if inputs.dic['filterTypes']['TT']:
     TTDimensions = measureFilterDimensions(ttFilt)
 
   ### we want to mark WT last since that should be the most stringent
   # Opting to mark TA, then Long, then WT
-  if taName:
+  if inputs.dic['filterTypes']['TA']:
     labeledTA = painter.doLabel(TAholder,cellDimensions=TADimensions,thresh=0)
-    if len(np.shape(cI)) == 4:
+    if inputs.dic['dimensions'] == 3:
       print "Warning: Shifting TA hits down one index in the z domain to make consistent hit detection."
       dummy = np.zeros_like(labeledTA[:,:,0])
       labeledTA = np.dstack((dummy,labeledTA))[:,:,:-1]
   else:
     labeledTA = np.zeros_like(taMasked,dtype=int)
-  if ltName:
+  if inputs.dic['filterTypes']['LT']:
     labeledLT = painter.doLabel(LTholder,cellDimensions=LTDimensions,thresh=0)
-    if len(np.shape(cI)) == 4:
+    if inputs.dic['dimensions'] == 3:
       print "Warning: Shifting LT hits down one index in the z domain to make consistent hit detection."
       dummy = np.zeros_like(labeledLT[:,:,0])
       labeledLT = np.dstack((dummy,labeledLT))[:,:,:-1]
   else:
     labeledLT = np.zeros_like(ltMasked,dtype=int)
-  if ttName:
+  if inputs.dic['filterTypes']['TT']:
     labeledTT = painter.doLabel(TTholder,cellDimensions=TTDimensions,thresh=0)
   else:
     labeledTT = np.zeros_like(wtMasked,dtype=int)
 
   ### perform masking
-  if taName:
+  if inputs.dic['filterTypes']['TA']:
     TAmask = labeledTA.copy()
   else:
-    TAmask = TAholder.stackedHits > np.inf
-  if ltName:
+    TAmask = TAholder.stackedHits.astype(bool)
+  if inputs.dic['filterTypes']['LT']:
     LTmask = labeledLT.copy()
   else:
-    LTmask = LTholder.stackedHits > np.inf
-  if ttName:
+    LTmask = LTholder.stackedHits.astype(bool)
+  if inputs.dic['filterTypes']['TT']:
     TTmask = labeledTT.copy()
   else:
-    TTmask = TTholder.stackedHits > np.inf
+    TTmask = TTholder.stackedHits.astype(bool)
 
   TTmask[labeledTA] = False
   TTmask[labeledLT] = False
@@ -1513,11 +1517,11 @@ def markPastedFilters(
   ### Dampen brightness and mark hits
   alpha = 1.0
   hitValue = int(round(alpha * 255))
-  cI[...,2][TAmask] = hitValue
-  cI[...,1][LTmask] = hitValue
-  cI[...,0][TTmask] = hitValue
+  inputs.colorImage[...,2][TAmask] = hitValue
+  inputs.colorImage[...,1][LTmask] = hitValue
+  inputs.colorImage[...,0][TTmask] = hitValue
 
-  return cI
+  return inputs.colorImage
 
 # Prepare matrix of vectorized of FFT'd images
 def CalcX(
@@ -1654,52 +1658,6 @@ def load_yaml(fileName):
     data = None
   
   return data
-
-# def makeParamDicts(inputs):
-#   '''This function forms the parameter dictionaries for each filtering type, TT, LT, and TA and 
-#   inserts specified values for those parameters if they were specified in the yaml file.
-
-#   Inputs:
-#     inputs -> Inputs class defined in matchedmyo.py
-
-#   Outputs:
-#     storageDict -> dict. Dictionary containing parameter dictionaries with 'TT', 'LT', and 'TA' 
-#                      being the keys.
-#   '''
-#   ### Form dictionary that contains default parameters
-#   storageDict = dict()
-
-#   ## Check dimensionality of image to specify correct parameter dictionaries
-#   dim = len(np.shape(inputs.imgOrig))
-#   filterTypes = ['TT','LT','TA']
-#   if dim == 3:
-#     filterTypes = [filtType + '3D' for filtType in filterTypes]
-
-#   ### Assign default parameters
-#   storageDict['TT'] = optimizer.ParamDict(typeDict=filterTypes[0])
-#   storageDict['LT'] = optimizer.ParamDict(typeDict=filterTypes[1])
-#   storageDict['TA'] = optimizer.ParamDict(typeDict=filterTypes[2])
-
-#   ### Check to see if a yaml file is specified or read-in already
-#   if inputs.yamlFileName or inputs.yamlDict:
-#     ## If the file name is specified, we have to read in the dictionary from the yaml file
-#     if inputs.yamlFileName and not inputs.yamlDict:
-#       ## Read in the yaml file
-#       yamlDict = load_yaml(inputs.yamlFileName)
-
-#     ## Iterate through and assign non-default parameters to correct dictionaries
-#     for key, paramDict in inputs.yamlDict.iteritems():
-#       ## Check to see if the key is pointing to a parameter dictionary
-#       if not any(key == filt for filt in ['TT','LT','TA']):
-#         continue
-      
-#       ## Go through and assign all specified non-default parameters in the yaml file to the 
-#       ##   storageDict
-#       for parameterName, parameter in paramDict.iteritems():
-#         storageDict[key][parameterName] = parameter
-  
-#   return storageDict
-
 
 ###################################################################################################
 ###################################################################################################

@@ -1,6 +1,6 @@
-imageName: './myoimages/MI_M_45_processed.png'
+imageName: ./myoimages/MI_M_45_processed.png
 filterTypes: 
-  'TT': True
-  'LT': True
-  'TA': True
+  TT: True
+  LT: True
+  TA: True
 returnAngles: True
