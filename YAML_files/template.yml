@@ -22,7 +22,7 @@ preprocess: True
 # This parameter controls the types of filtering one would like to use in this case. The default 
 #   settings are all filtering types turned off, so make sure to specify the types you would like 
 #   to turn on. To turn these off, just switch "True" for "False"
-filteringType:
+filterTypes:
     TT: True
     LT: True
     TA: True
@@ -35,7 +35,7 @@ scopeResolutions:
 
 # This parameter controls the rotations at which the filter will be analyzed to be present within 
 #   the image. The default rotations are shown below.
-rotations: [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25]
+iters: [-25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 25]
 
 # This option (either True or False) turns on/off the analysis and display of transverse tubule 
 #   striation angle.
