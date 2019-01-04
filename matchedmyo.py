@@ -234,12 +234,10 @@ def TT_Filtering(inputs,
 
   ### Specify necessary inputs
   ## Read in filter
-  # ttFilter = util.LoadFilter(inputs.dic['ttFilterName'])
   ttFilter = util.LoadFilter(inputs.paramDicts['TT']['filterName'])
   inputs.mfOrig = ttFilter
 
   paramDict['covarianceMatrix'] = np.ones_like(inputs.imgOrig)
-  # paramDict['mfPunishment'] = util.LoadFilter(inputs.dic['ttPunishFilterName'])
   paramDict['mfPunishment'] = util.LoadFilter(inputs.paramDicts['TT']['punishFilterName'])
   print "phase out GPU"
   paramDict['useGPU'] = inputs.useGPU
@@ -274,7 +272,6 @@ def LT_Filtering(inputs,
   start = time.time()
 
   ### Specify necessary inputs
-  # inputs.mfOrig = util.LoadFilter(inputs.dic['ltFilterName'])
   inputs.mfOrig = util.LoadFilter(inputs.paramDicts['LT']['filterName'])
   print "Seriously, phase out GPU"
   paramDict['useGPU'] = inputs.useGPU
@@ -303,7 +300,6 @@ def TA_Filtering(inputs,
   start = time.time()
 
   ### Specify necessary inputs
-  # inputs.mfOrig = util.LoadFilter(inputs.dic['taFilterName'])
   inputs.mfOrig = util.LoadFilter(inputs.paramDicts['TA']['filterName'])
   print "PHASE OUT GPU"
   paramDict['useGPU'] = inputs.useGPU
@@ -521,7 +517,6 @@ def giveMarkedMyocyte(
 
     if inputs.dic['outputFileTag'] != False:
       ### mark mask outline on myocyte
-      #cI_written = util.markMaskOnMyocyte(cI,testImage)
       cI_written = markedImage
 
       ### write output image
@@ -675,11 +670,8 @@ def give3DMarkedMyocyte(
                              TAstackedHits,
                              LTstackedHits,
                              TTstackedHits,
-                             #ttName = inputs.dic['ttFilterName'],
                              ttName = inputs.paramDicts['TT']['filterName'],
-                             #ltName = inputs.dic['ltFilterName'],
                              ltName = inputs.paramDicts['LT']['filterName'],
-                             #taName = inputs.dic['taFilterName'],
                              taName = inputs.paramDicts['TA']['filterName']
                              )
 
@@ -690,11 +682,8 @@ def give3DMarkedMyocyte(
     estimatedContent = util.estimateTubuleContentFromColoredImage(
       inputs.colorImage,
       totalCellSpace=cellVolume,
-      #taFilterName = inputs.dic['taFilterName'],
       taFilterName=inputs.paramDicts['TA']['filterName'],
-      #ltFilterName = inputs.dic['ltFilterName'],
       ltFilterName=inputs.paramDicts['LT']['filterName'],
-      #ttFilterName = inputs.dic['ttFilterName']
       ttFilterName=inputs.paramDicts['TT']['filterName']
     )
 
