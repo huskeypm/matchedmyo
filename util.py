@@ -47,7 +47,7 @@ def myplot(img,fileName=None,clim=None):
   if clim!=None:
     plt.clim(clim)
 
-def ReadImg(fileName,cvtColor=True,renorm=False,bound=False):
+def ReadImg(fileName,cvtColor=True,renorm=False,bound=False, dataType = np.float32):
   ### Check to see what the file type is
   fileType = fileName[-4:]
 
@@ -82,6 +82,9 @@ def ReadImg(fileName,cvtColor=True,renorm=False,bound=False):
   ### Normalize the image to have maximum value of 1.
   if renorm:
     img = img / np.float(np.amax(img))
+
+  ### Conver the data type of the image to the one that is specified
+  img = img.astype(dataType)
   
   return img 
 
@@ -1422,9 +1425,9 @@ def measureOccupiedVolumeFraction(inputArray):
 
 def markPastedFilters(
       inputs,
-      taMasked,
-      ltMasked, 
-      wtMasked, 
+      taMasked=None,
+      ltMasked=None, 
+      wtMasked=None, 
       taName="./myoimages/LossFilter.png",
       ltName="./myoimages/LongitudinalFilter.png",
       ttName="./myoimages/newSimpleWTFilter.png"
@@ -1440,21 +1443,24 @@ def markPastedFilters(
   '''
   ### Exploiting architecture of painter function to mark hits for me
   ###   To do this, we need to mimic the class structure from bankDetect results
-  TAholder = bD.ClassificationResults(
-    correlated = None,
-    stackedHits = taMasked,
-    stackedAngles = None
-  )
-  LTholder = bD.ClassificationResults(
-    correlated = None,
-    stackedHits = ltMasked,
-    stackedAngles = None
-  )
-  TTholder = bD.ClassificationResults(
-    correlated = None,
-    stackedHits = wtMasked,
-    stackedAngles = None
-  )
+  if inputs.dic['filterTypes']['TA']:
+    TAholder = bD.ClassificationResults(
+      correlated = None,
+      stackedHits = taMasked,
+      stackedAngles = None
+    )
+  if inputs.dic['filterTypes']['LT']:
+    LTholder = bD.ClassificationResults(
+      correlated = None,
+      stackedHits = ltMasked,
+      stackedAngles = None
+    )
+  if inputs.dic['filterTypes']['TT']:
+    TTholder = bD.ClassificationResults(
+      correlated = None,
+      stackedHits = wtMasked,
+      stackedAngles = None
+    )
 
   ### load in filters to get filter dimensions
   if inputs.dic['filterTypes']['TA']:
@@ -1480,47 +1486,54 @@ def markPastedFilters(
       print "Warning: Shifting TA hits down one index in the z domain to make consistent hit detection."
       dummy = np.zeros_like(labeledTA[:,:,0])
       labeledTA = np.dstack((dummy,labeledTA))[:,:,:-1]
-  else:
-    labeledTA = np.zeros_like(taMasked,dtype=int)
+  # else:
+  #   labeledTA = np.zeros_like(taMasked,dtype=int)
   if inputs.dic['filterTypes']['LT']:
     labeledLT = painter.doLabel(LTholder,cellDimensions=LTDimensions,thresh=0)
     if inputs.dic['dimensions'] == 3:
       print "Warning: Shifting LT hits down one index in the z domain to make consistent hit detection."
       dummy = np.zeros_like(labeledLT[:,:,0])
       labeledLT = np.dstack((dummy,labeledLT))[:,:,:-1]
-  else:
-    labeledLT = np.zeros_like(ltMasked,dtype=int)
+  # else:
+  #   labeledLT = np.zeros_like(ltMasked,dtype=int)
   if inputs.dic['filterTypes']['TT']:
     labeledTT = painter.doLabel(TTholder,cellDimensions=TTDimensions,thresh=0)
-  else:
-    labeledTT = np.zeros_like(wtMasked,dtype=int)
+  # else:
+  #   labeledTT = np.zeros_like(wtMasked,dtype=int)
 
   ### perform masking
   if inputs.dic['filterTypes']['TA']:
     TAmask = labeledTA.copy()
-  else:
-    TAmask = TAholder.stackedHits.astype(bool)
+  # else:
+  #   TAmask = TAholder.stackedHits.astype(bool)
   if inputs.dic['filterTypes']['LT']:
     LTmask = labeledLT.copy()
-  else:
-    LTmask = LTholder.stackedHits.astype(bool)
+  # else:
+  #   LTmask = LTholder.stackedHits.astype(bool)
   if inputs.dic['filterTypes']['TT']:
     TTmask = labeledTT.copy()
-  else:
-    TTmask = TTholder.stackedHits.astype(bool)
+  # else:
+  #   TTmask = TTholder.stackedHits.astype(bool)
 
-  TTmask[labeledTA] = False
-  TTmask[labeledLT] = False
-  LTmask[labeledTA] = False
-  LTmask[TTmask] = False # prevents double marking of WT and LT
+  if inputs.dic['filterTypes']['TA'] and inputs.dic['filterTypes']['TT']:
+    TTmask[labeledTA] = False
+  if inputs.dic['filterTypes']['TT'] and inputs.dic['filterTypes']['LT']:
+    TTmask[labeledLT] = False
+  if inputs.dic['filterTypes']['LT'] and inputs.dic['filterTypes']['TA']:
+    LTmask[labeledTA] = False
+  if inputs.dic['filterTypes']['LT'] and inputs.dic['filterTypes']['TT']:
+    LTmask[TTmask] = False # prevents double marking of WT and LT
 
   ### Dampen brightness and mark hits
   markedImage = inputs.colorImage.copy()
   alpha = 1.0
   hitValue = int(round(alpha * 255))
-  markedImage[...,2][TAmask] = hitValue
-  markedImage[...,1][LTmask] = hitValue
-  markedImage[...,0][TTmask] = hitValue
+  if inputs.dic['filterTypes']['TA']:
+    markedImage[...,2][TAmask] = hitValue
+  if inputs.dic['filterTypes']['LT']:
+    markedImage[...,1][LTmask] = hitValue
+  if inputs.dic['filterTypes']['TT']:
+    markedImage[...,0][TTmask] = hitValue
 
   return markedImage
 
