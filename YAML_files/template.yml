@@ -12,8 +12,13 @@
 # This is the name of the image that you would like to classify.
 imageName: <NAME_OF_IMAGE>
 
-# This is the root of the name of the output files that are generated.
-outputFileTag: <FILE_TAG>
+# This is how output file parameters are specified
+outputParams:
+    fileRoot: <FILE_ROOT>
+    fileType: png
+    dpi: 300
+    saveHitsArray: False
+    csvFile: ./results/classification_results.csv
 
 # This is the parameter that specifies whether you would like to preprocess the image. It's 
 #   recommended to keep this on.
@@ -51,16 +56,6 @@ returnPastedFilter: True
 # This parameter designates the filter size in relation to the myocytes/tissue we wish to analyze
 #   Unless you are experimenting with non-default filters, this SHOULD BE LEFT ALONE.
 filterTwoSarcomereSize: 25 # pixels
-
-# The following two inputs are for the transverse tubule filter and punishment filter names. 
-#   Unless you would like to try your own filter, these should be left alone!
-# ttFilterName: ./myoimages/newSimpleWTFilter.png
-# ttPunishFilterName: ./myoimages/newSimpleWTPunishmentFilter.png
-
-# The following two inputs are for the longitudinal tubule and tubule absence filter names, respectively.
-#   Unless you would like to try your own filter, these should be left alone!
-# ltFilterName: ./myoimages/LongitudinalFilter.png
-# taFilterName: ./myoimages/LossFilter.png
 
 # The following dictionary of parameters is for specifying non-default parameters for the filtering
 #   routines. These have been heavily optimized, so default parameters should work with a wide

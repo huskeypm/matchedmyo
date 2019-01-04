@@ -91,9 +91,17 @@ class Inputs:
     dic['iters'] = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
     dic['returnAngles'] = False
     dic['returnPastedFilter'] = True
-    dic['outputFileTag'] = False
     dic['preprocess'] = False
     dic['filterTwoSarcomereSize'] = 25
+
+    ### Output parameter dictionary
+    dic['outputParams'] = {
+      'fileRoot': None,
+      'fileType': 'png',
+      'dpi': 300,
+      'saveHitsArray': False,
+      'csvFile': None
+    }
     
     ### Filtering flags to turn on or off
     dic['filterTypes'] = {
@@ -123,6 +131,12 @@ class Inputs:
       ##   since we have functions that update it already
       if key == 'paramDicts':
         continue
+
+      ## Check to see if the key is pointing to the outputParams dictionary specified in the YAML file
+      if key == "outputParams":
+        ## iterate through the dictionary specified in the yaml file and store non-default values
+        for outputKey, outputValue in value.iteritems():
+          self.dic['outputParams'][outputKey] = outputValue
       
       ## Here we check if the key is present within the default dictionary. If it is, we can then
       ##   see if a non-default value is specified for it.
@@ -417,7 +431,7 @@ def giveMarkedMyocyte(
       inputs,
       ImgTwoSarcSize=None,
       useGPU=False,
-      fileExtension=".pdf",
+      # fileExtension=".pdf",
       ):
   '''
   This function is the main workhorse for the detection of features in 2D myocytes.
@@ -436,7 +450,8 @@ def giveMarkedMyocyte(
     )
     WTstackedHits = WTresults.stackedHits
   else:
-    WTstackedHits = np.zeros_like(inputs.imgOrig)
+    #WTstackedHits = np.zeros_like(inputs.imgOrig)
+    WTstackedHits = None
 
   ## Longitudinal Tubule Filtering
   if inputs.dic['filterTypes']['LT']:
@@ -446,7 +461,8 @@ def giveMarkedMyocyte(
     )
     LTstackedHits = LTresults.stackedHits
   else:
-    LTstackedHits = np.zeros_like(inputs.imgOrig)
+    # LTstackedHits = np.zeros_like(inputs.imgOrig)
+    LTstackedHits = None
 
   ## Tubule Absence Filtering
   if inputs.dic['filterTypes']['TA']:
@@ -456,46 +472,74 @@ def giveMarkedMyocyte(
     )
     LossstackedHits = Lossresults.stackedHits
   else:
-    LossstackedHits = np.zeros_like(inputs.imgOrig)
+    # LossstackedHits = np.zeros_like(inputs.imgOrig)
+    LossstackedHits = None
  
   ## Marking superthreshold hits for loss filter
-  LossstackedHits[LossstackedHits != 0] = 255
-  LossstackedHits = np.asarray(LossstackedHits, dtype='uint8')
+  if inputs.dic['filterTypes']['TA']:
+    LossstackedHits[LossstackedHits != 0] = 255
+    LossstackedHits = np.asarray(LossstackedHits, dtype='uint8')
 
-  ## applying a loss mask to attenuate false positives from WT and Longitudinal filter
-  WTstackedHits[LossstackedHits == 255] = 0
-  LTstackedHits[LossstackedHits == 255] = 0
+    ## applying a loss mask to attenuate false positives from WT and Longitudinal filter
+    if inputs.dic['filterTypes']['TT']:
+      WTstackedHits[LossstackedHits == 255] = 0
+    if inputs.dic['filterTypes']['LT']:
+      LTstackedHits[LossstackedHits == 255] = 0
 
   ## marking superthreshold hits for longitudinal filter
-  LTstackedHits[LTstackedHits != 0] = 255
-  LTstackedHits = np.asarray(LTstackedHits, dtype='uint8')
+  if inputs.dic['filterTypes']['LT']:
+    LTstackedHits[LTstackedHits != 0] = 255
+    LTstackedHits = np.asarray(LTstackedHits, dtype='uint8')
 
-  ## masking WT response with LT mask so there is no overlap in the markings
-  WTstackedHits[LTstackedHits == 255] = 0
+    ## masking WT response with LT mask so there is no overlap in the markings
+    if inputs.dic['filterTypes']['TT']:
+      WTstackedHits[LTstackedHits == 255] = 0
 
   ## marking superthreshold hits for WT filter
-  WTstackedHits[WTstackedHits != 0] = 255
-  WTstackedHits = np.asarray(WTstackedHits, dtype='uint8')
+  if inputs.dic['filterTypes']['TT']:
+    WTstackedHits[WTstackedHits != 0] = 255
+    WTstackedHits = np.asarray(WTstackedHits, dtype='uint8')
 
   ## apply preprocessed masks
-  wtMasked = util.ReadResizeApplyMask(
-    WTstackedHits,
-    inputs.yamlDict['imageName'],
-    ImgTwoSarcSize,
-    filterTwoSarcSize=ImgTwoSarcSize
-  )
-  ltMasked = util.ReadResizeApplyMask(
-    LTstackedHits,
-    inputs.yamlDict['imageName'],
-    ImgTwoSarcSize,
-    filterTwoSarcSize=ImgTwoSarcSize
-  )
-  lossMasked = util.ReadResizeApplyMask(
-    LossstackedHits,
-    inputs.yamlDict['imageName'],
-    ImgTwoSarcSize,
-    filterTwoSarcSize=ImgTwoSarcSize
-  )
+  if inputs.dic['filterTypes']['TT']:
+    wtMasked = util.ReadResizeApplyMask(
+      WTstackedHits,
+      inputs.yamlDict['imageName'],
+      ImgTwoSarcSize,
+      filterTwoSarcSize=ImgTwoSarcSize
+    )
+  else:
+    wtMasked = None
+  if inputs.dic['filterTypes']['LT']:
+    ltMasked = util.ReadResizeApplyMask(
+      LTstackedHits,
+      inputs.yamlDict['imageName'],
+      ImgTwoSarcSize,
+      filterTwoSarcSize=ImgTwoSarcSize
+    )
+  else:
+    ltMasked = None
+  if inputs.dic['filterTypes']['TA']:
+    lossMasked = util.ReadResizeApplyMask(
+      LossstackedHits,
+      inputs.yamlDict['imageName'],
+      ImgTwoSarcSize,
+      filterTwoSarcSize=ImgTwoSarcSize
+    )
+  else:
+    lossMasked = None
+
+  ## Save the hits as full-resolution arrays for future use 
+  if inputs.dic['outputParams']['saveHitsArray']:
+    outDict = inputs.dic['outputParams']
+    if inputs.dic['filterTypes']['TA']:
+      np.save(outDict['fileRoot']+'_TA_hits', lossMasked)
+    
+    if inputs.dic['filterTypes']['LT']:
+      np.save(outDict['fileRoot']+'_LT_hits', ltMasked)
+
+    if inputs.dic['filterTypes']['TT']:
+      np.save(outDict['fileRoot']+'_TT_hits', wtMasked)
 
   if not inputs.dic['returnPastedFilter']:
     ### create holders for marking channels
@@ -505,9 +549,12 @@ def giveMarkedMyocyte(
     Losscopy = markedImage[:,:,2]
 
     ### color corrresponding channels
-    WTcopy[wtMasked > 0] = 255
-    LTcopy[ltMasked > 0] = 255
-    Losscopy[lossMasked > 0] = 255
+    if inputs.dic['filterTypes']['TT']:
+      WTcopy[wtMasked > 0] = 255
+    if inputs.dic['filterTypes']['LT']:
+      LTcopy[ltMasked > 0] = 255
+    if inputs.dic['filterTypes']['TA']:
+      Losscopy[lossMasked > 0] = 255
 
     ### mark mask outline on myocyte
     markedImage = util.markMaskOnMyocyte(
@@ -515,14 +562,15 @@ def giveMarkedMyocyte(
       inputs.yamlDict['imageName']
     )
 
-    if inputs.dic['outputFileTag'] != False:
+    if isinstance(inputs.dic['outputParams']['fileRoot'], str):
       ### mark mask outline on myocyte
       cI_written = markedImage
 
       ### write output image
       plt.figure()
       plt.imshow(util.switchBRChannels(cI_written))
-      plt.gcf().savefig(inputs.dic['outputFileTag']+"_output"+fileExtension,dpi=300)
+      outDict = inputs.dic['outputParams']
+      plt.gcf().savefig(outDict['fileRoot']+"_output."+outDict['fileType'],dpi=outDict['dpi'])
 
   if inputs.dic['returnPastedFilter']:
     ## Mark filter-sized unit cells on the image to represent hits
@@ -540,14 +588,15 @@ def giveMarkedMyocyte(
     ### Now based on the marked hits, we can obtain an estimate of tubule content
     estimatedContent = util.estimateTubuleContentFromColoredImage(markedImage)
   
-    if inputs.dic['outputFileTag'] != False:
+    if isinstance(inputs.dic['outputParams']['fileRoot'], str):
       ### mark mask outline on myocyte
       cI_written = markedImage
 
       ### write outputs	  
       plt.figure()
       plt.imshow(util.switchBRChannels(cI_written))
-      plt.gcf().savefig(inputs.dic['outputFileTag']+"_output"+fileExtension,dpi=300)
+      outDict = inputs.dic['outputParams']
+      plt.gcf().savefig(outDict['fileRoot']+"_output."+outDict['fileType'],dpi=outDict['dpi'])
 
   if inputs.dic['returnAngles']:
     angleCounts, coloredAnglesMasked = analyzeTT_Angles(
@@ -557,10 +606,11 @@ def giveMarkedMyocyte(
       WTstackedHits=WTstackedHits
     )
 
-    if inputs.dic['outputFileTag'] != False:
+    if isinstance(inputs.dic['outputParams']['fileRoot'], str):
       plt.figure()
       plt.imshow(util.switchBRChannels(coloredAnglesMasked))
-      plt.gcf().savefig(inputs.dic['outputFileTag']+"_angles_output"+fileExtension,dpi=300)
+      outDict = inputs.dic['outputParams']
+      plt.gcf().savefig(outDict['fileRoot']+"_angles_output."+outDict['fileType'],dpi=outDict['dpi'])
     
     end = time.time()
     tElapsed = end - start
@@ -707,8 +757,8 @@ def give3DMarkedMyocyte(
     print "WARNING: Striation angle analysis is not yet available in 3D"
   
   ### Save detection image
-  if inputs.dic['outputFileTag'] != False:
-    util.Save3DImg(cImg,inputs.dic['outputFileTag']+'.tif',switchChannels=True)
+  if isinstance(inputs.dic['outputParams']['fileRoot'], str):
+    util.Save3DImg(cImg,inputs.dic['outputParams']['fileRoot']+'.'+inputs.dic['outputParams']['fileType'],switchChannels=True)
 
   end = time.time()
   print "Time for algorithm to run:",end-start,"seconds"
@@ -858,11 +908,6 @@ def validate3D(args):
   ### Specify the yaml file. NOTE: This will be done via command line for main classification routines
   yamlFile = './YAML_files/validate3D.yml'
 
-  ### Setup input parameters
-  inputs = Inputs(
-    yamlFileName = yamlFile
-  )
-
   ### Define parameters for the simulation of the cell
   ## Probability of finding a longitudinal tubule unit cell
   ltProb = 0.3
@@ -871,7 +916,7 @@ def validate3D(args):
   ## Amplitude of the Guassian White Noise
   noiseAmplitude = 0.
   ## Define scope resolutions for generating the filters and the cell. This is in x, y, and z resolutions
-  # scopeResolutions = [10,10,5] #[vx / um]
+  scopeResolutions = [10,10,5] #[vx / um]
   ## x, y, and z Dimensions of the simulated cell [microns]
   cellDimensions = [10, 10, 20]
   ## Define test file name
@@ -886,11 +931,16 @@ def validate3D(args):
   util.generateSimulated3DCell(LT_probability=ltProb,
                                TA_probability=taProb,
                                noiseAmplitude=noiseAmplitude,
-                               scopeResolutions=inputs.dic['scopeResolutions'],
+                               scopeResolutions=scopeResolutions,
                                cellDimensions=cellDimensions,
                                fileName=testName,
                                seed=1001,
                                )
+
+  ### Setup input parameters for classification
+  inputs = Inputs(
+    yamlFileName = yamlFile
+  )
 
   ### Analyze the 3D cell
   markedImage = give3DMarkedMyocyte(#testImage=testName,
