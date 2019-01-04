@@ -144,7 +144,9 @@ def ParamDict(typeDict=''):
   paramDict={
     'snrThresh':1.,
     'penaltyscale': 1.,
-    'useFilterInv':False,   
+    'useFilterInv':False,  
+    'filterName': '',
+    'punishFilterName': '', 
     'sigma_n': 1. ,
     'filterMode': "simple",
     'doCLAHE':  False,   
@@ -159,29 +161,37 @@ def ParamDict(typeDict=''):
     paramDict['doCLAHE'] = True
   elif 'TT' in typeDict:
     paramDict['filterMode'] = 'punishmentFilter'
+    paramDict['filterName'] = './myoimages/newSimpleWTFilter.png'
+    paramDict['punishFilterName'] = './myoimages/newSimpleWTPunishmentFilter.png'
     # optimized as of June 5, 2018
     paramDict['gamma'] = 3.
     paramDict['snrThresh'] = 0.35
     if '3D' in typeDict:
       # optimized as of December 4, 2018
+      paramDict['filterName'] = './myoimages/TT_3D.tif'
+      paramDict['punishFilterName'] = './myoimages/TT_Punishment_3D.tif'
       paramDict['snrThresh'] = 0.8
   elif 'LT' in typeDict:
     paramDict['filterMode'] = 'regionalDeviation'
+    paramDict['filterName'] = './myoimages/LongitudinalFilter.png'
     # optimized as of June 5, 2018 
     paramDict['snrThresh'] = 0.6 
     paramDict['stdDevThresh'] = 0.2
     if '3D' in typeDict:
       # optimized as of December 4, 2018
+      paramDict['filterName'] = './myoimages/LT_3D.tif'
       paramDict['snrThresh'] = 0.9
       paramDict['stdDevThresh'] = 1.
   elif 'TA' in typeDict:
     # optimized as of June 5, 2018
     paramDict['filterMode'] = 'regionalDeviation'
+    paramDict['filterName'] = './myoimages/LossFilter.png'
     paramDict['inverseSNR'] = True
     paramDict['snrThresh'] = 0.04 
     paramDict['stdDevThresh'] = 0.1
     if '3D' in typeDict:
       # optimized as of December 4, 2018
+      paramDict['filterName'] = './myoimages/TA_3D.tif'
       paramDict['stdDevThresh'] = 0.5
 
   return paramDict
