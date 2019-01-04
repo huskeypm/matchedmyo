@@ -103,10 +103,10 @@ class Inputs:
     }
 
     ### Specify filter names
-    dic['ttFilterName'] = './myoimages/newSimpleWTFilter.png'
-    dic['ttPunishFilterName'] = './myoimages/newSimpleWTPunishmentFilter.png'
-    dic['ltFilterName'] = './myoimages/LongitudinalFilter.png'
-    dic['taFilterName'] = './myoimages/LossFilter.png'
+    # dic['ttFilterName'] = './myoimages/newSimpleWTFilter.png'
+    # dic['ttPunishFilterName'] = './myoimages/newSimpleWTPunishmentFilter.png'
+    # dic['ltFilterName'] = './myoimages/LongitudinalFilter.png'
+    # dic['taFilterName'] = './myoimages/LossFilter.png'
 
     ### Store in the class
     self.dic = dic
@@ -234,11 +234,13 @@ def TT_Filtering(inputs,
 
   ### Specify necessary inputs
   ## Read in filter
-  ttFilter = util.LoadFilter(inputs.dic['ttFilterName'])
+  # ttFilter = util.LoadFilter(inputs.dic['ttFilterName'])
+  ttFilter = util.LoadFilter(inputs.paramDicts['TT']['filterName'])
   inputs.mfOrig = ttFilter
 
   paramDict['covarianceMatrix'] = np.ones_like(inputs.imgOrig)
-  paramDict['mfPunishment'] = util.LoadFilter(inputs.dic['ttPunishFilterName'])
+  # paramDict['mfPunishment'] = util.LoadFilter(inputs.dic['ttPunishFilterName'])
+  paramDict['mfPunishment'] = util.LoadFilter(inputs.paramDicts['TT']['punishFilterName'])
   print "phase out GPU"
   paramDict['useGPU'] = inputs.useGPU
 
@@ -272,7 +274,8 @@ def LT_Filtering(inputs,
   start = time.time()
 
   ### Specify necessary inputs
-  inputs.mfOrig = util.LoadFilter(inputs.dic['ltFilterName'])
+  # inputs.mfOrig = util.LoadFilter(inputs.dic['ltFilterName'])
+  inputs.mfOrig = util.LoadFilter(inputs.paramDicts['LT']['filterName'])
   print "Seriously, phase out GPU"
   paramDict['useGPU'] = inputs.useGPU
 
@@ -300,7 +303,8 @@ def TA_Filtering(inputs,
   start = time.time()
 
   ### Specify necessary inputs
-  inputs.mfOrig = util.LoadFilter(inputs.dic['taFilterName'])
+  # inputs.mfOrig = util.LoadFilter(inputs.dic['taFilterName'])
+  inputs.mfOrig = util.LoadFilter(inputs.paramDicts['TA']['filterName'])
   print "PHASE OUT GPU"
   paramDict['useGPU'] = inputs.useGPU
   
@@ -671,9 +675,13 @@ def give3DMarkedMyocyte(
                              TAstackedHits,
                              LTstackedHits,
                              TTstackedHits,
-                             ttName = inputs.dic['ttFilterName'],
-                             ltName = inputs.dic['ltFilterName'],
-                             taName = inputs.dic['taFilterName'])
+                             #ttName = inputs.dic['ttFilterName'],
+                             ttName = inputs.paramDicts['TT']['filterName'],
+                             #ltName = inputs.dic['ltFilterName'],
+                             ltName = inputs.paramDicts['LT']['filterName'],
+                             #taName = inputs.dic['taFilterName'],
+                             taName = inputs.paramDicts['TA']['filterName']
+                             )
 
     ### 'Measure' cell volume just by getting measure of containing array
     cellVolume = np.float(np.product(inputs.imgOrig.shape))
@@ -682,9 +690,12 @@ def give3DMarkedMyocyte(
     estimatedContent = util.estimateTubuleContentFromColoredImage(
       inputs.colorImage,
       totalCellSpace=cellVolume,
-      taFilterName = inputs.dic['taFilterName'],
-      ltFilterName = inputs.dic['ltFilterName'],
-      ttFilterName = inputs.dic['ttFilterName']
+      #taFilterName = inputs.dic['taFilterName'],
+      taFilterName=inputs.paramDicts['TA']['filterName'],
+      #ltFilterName = inputs.dic['ltFilterName'],
+      ltFilterName=inputs.paramDicts['LT']['filterName'],
+      #ttFilterName = inputs.dic['ttFilterName']
+      ttFilterName=inputs.paramDicts['TT']['filterName']
     )
 
   else:

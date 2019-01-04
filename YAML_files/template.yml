@@ -54,13 +54,13 @@ filterTwoSarcomereSize: 25 # pixels
 
 # The following two inputs are for the transverse tubule filter and punishment filter names. 
 #   Unless you would like to try your own filter, these should be left alone!
-ttFilterName: ./myoimages/newSimpleWTFilter.png
-ttPunishFilterName: ./myoimages/newSimpleWTPunishmentFilter.png
+# ttFilterName: ./myoimages/newSimpleWTFilter.png
+# ttPunishFilterName: ./myoimages/newSimpleWTPunishmentFilter.png
 
 # The following two inputs are for the longitudinal tubule and tubule absence filter names, respectively.
 #   Unless you would like to try your own filter, these should be left alone!
-ltFilterName: ./myoimages/LongitudinalFilter.png
-taFilterName: ./myoimages/LossFilter.png
+# ltFilterName: ./myoimages/LongitudinalFilter.png
+# taFilterName: ./myoimages/LossFilter.png
 
 # The following dictionary of parameters is for specifying non-default parameters for the filtering
 #   routines. These have been heavily optimized, so default parameters should work with a wide
@@ -72,6 +72,12 @@ paramDicts:
         #   are used. One detects signal, and the punishment filter detects signal that we do not wish
         #   to detect. This increases specificity of the filter.
         filterMode: punishmentFilter
+
+        # This is the name of the filter used for this morphological classification
+        filterName: ./myoimages/newSimpleWTFilter.png
+
+        # This is the name of the punishment filter used for TT classification
+        punishFilterName: ./myoimages/newSimpleWTPunishmentFilter.png
         
         # Gamma scales the weight of the punishment filter
         gamma: 3
@@ -85,6 +91,9 @@ paramDicts:
         #   "regionalDeviation" mode. This mode measures the standard deviation of the filter
         #   in addition to the integrated signal. 
         filterMode: regionalDeviation
+
+        # This is the name of the filter used for this morphological classification
+        filterName: ./myoimages/LongitudinalFilter.png
     
         # snrThresh controls the threshold of detection. A lower threshold means higher hit detection
         #   but lower specificity
@@ -97,6 +106,9 @@ paramDicts:
         # This controls the mode of filtering. See the longitudinal filtering mode explanation 
         #   for regionalDeviation explanation. 
         filterMode: regionalDeviation
+
+        # This is the name of the filter used for this morphological classification
+        filterName: ./myoimages/LossFilter.png
     
         # This option flips the snr threshold. This means that the hits must be BELOW the snr threshold
         #   now instead of above the threshold. This is important for detecting a lack of signal.
