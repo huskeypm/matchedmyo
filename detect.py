@@ -378,6 +378,8 @@ def do2DGPUFiltering():
   '''
   Prototyping right now
   '''
+  raise RuntimeError("GPU usage is deprecated.")
+
   import twoDtense as tdt
   import tissue
 

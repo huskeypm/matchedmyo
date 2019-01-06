@@ -6,8 +6,11 @@ cardiomyocyte/tissue images.
 This is THE script that all sophisticated, general user-level routines will be routed through.
 '''
 
+import os
 import time
 import sys
+import datetime
+import csv
 import util
 import numpy as np
 import optimizer
@@ -41,7 +44,6 @@ class Inputs:
                yamlFileName = None,
                mfOrig=None,
                scopeResolutions=None,
-               useGPU=False,
                efficientRotationStorage=True,
                paramDicts = None,
                yamlDict = None,
@@ -65,7 +67,6 @@ class Inputs:
     self.imageName = imageName
     self.yamlFileName = yamlFileName
     self.mfOrig = mfOrig
-    self.useGPU = useGPU
     self.efficientRotationStorage = efficientRotationStorage
     self.paramDicts = paramDicts
 
@@ -100,7 +101,7 @@ class Inputs:
       'fileType': 'png',
       'dpi': 300,
       'saveHitsArray': False,
-      'csvFile': None
+      'csvFile': './results/classification_results.csv'
     }
     
     ### Filtering flags to turn on or off
@@ -109,12 +110,6 @@ class Inputs:
       'LT':False,
       'TA':False
     }
-
-    ### Specify filter names
-    # dic['ttFilterName'] = './myoimages/newSimpleWTFilter.png'
-    # dic['ttPunishFilterName'] = './myoimages/newSimpleWTPunishmentFilter.png'
-    # dic['ltFilterName'] = './myoimages/LongitudinalFilter.png'
-    # dic['taFilterName'] = './myoimages/LossFilter.png'
 
     ### Store in the class
     self.dic = dic
@@ -224,6 +219,72 @@ class Inputs:
     self.load_yaml()
     self.updateInputs()
 
+class ClassificationResults:
+  '''This class holds all of the results that we will need to store.'''
+  def __init__(self,
+               markedImage=None,
+               markedAngles=None,
+               ttContent=None,
+               ltContent=None,
+               taContent=None):
+    '''
+    Inputs:
+      markedImage -> Numpy array. The image with TT, LT, and TA hits superimposed on the original image.
+      markedAngles -> Numpy array. The image with TT striation angle color-coded on the original image.
+    '''
+    self.markedImage = markedImage
+    self.markedAngles = markedAngles
+    self.ttContent = ttContent
+    self.ltContent = ltContent
+    self.taContent = taContent
+  
+  def writeToCSV(self, inputs):
+    '''This function writes the results to a CSV file whose name is specified in the Inputs class 
+    (Inputs.outputParams['csvFile'])'''
+
+    ### Check if the output csv file already exists
+    fileExists = os.path.isfile(inputs.dic['outputParams']['csvFile'])
+
+    ### If the file does not already exist, we need to create headers for it
+    if not fileExists:
+      with open(inputs.dic['outputParams']['csvFile'], 'wb') as csvFile:
+        ## Create instance of writer object
+        dummyWriter = csv.writer(csvFile)
+      
+        ## If the csv file did not already exists, we need to create headers for the output file
+        header = [
+          'Date of Classification',
+          'Time of Classification',
+          'Image Name',
+          'TT Content',
+          'LT Content',
+          'TA Content',
+          'Output Image Location and Root'
+        ]
+        dummyWriter.writerow(header)
+
+    with open(inputs.dic['outputParams']['csvFile'], 'ab') as csvFile:
+      ## Create instance of writer object
+      dummyWriter = csv.writer(csvFile)
+      
+      ## Get Date and Time
+      now = datetime.datetime.now()
+
+      ## Write the outputs of this classification to the csv file
+      output = [
+        now.strftime('%Y-%m-%d'),
+        now.strftime('%H:%M:%S'),
+        inputs.imageName,
+        self.ttContent,
+        self.ltContent,
+        self.taContent,
+        inputs.dic['outputParams']['fileRoot']        
+      ]
+
+      ## Write outputs to csv file
+      dummyWriter.writerow(output)
+
+
 
 ###################################################################################################
 ###################################################################################################
@@ -253,8 +314,6 @@ def TT_Filtering(inputs,
 
   paramDict['covarianceMatrix'] = np.ones_like(inputs.imgOrig)
   paramDict['mfPunishment'] = util.LoadFilter(inputs.paramDicts['TT']['punishFilterName'])
-  print "phase out GPU"
-  paramDict['useGPU'] = inputs.useGPU
 
   ## Check to see if parameters are manually specified
   if ttThresh != None:
@@ -287,8 +346,6 @@ def LT_Filtering(inputs,
 
   ### Specify necessary inputs
   inputs.mfOrig = util.LoadFilter(inputs.paramDicts['LT']['filterName'])
-  print "Seriously, phase out GPU"
-  paramDict['useGPU'] = inputs.useGPU
 
   ### Perform filtering
   LTresults = bD.DetectFilter(
@@ -315,8 +372,6 @@ def TA_Filtering(inputs,
 
   ### Specify necessary inputs
   inputs.mfOrig = util.LoadFilter(inputs.paramDicts['TA']['filterName'])
-  print "PHASE OUT GPU"
-  paramDict['useGPU'] = inputs.useGPU
   
   ## Check to see if iters (filter rotations are specified) if they aren't we'll just use 0 and 45
   ##   degrees since the loss filter is symmetric
@@ -430,8 +485,6 @@ def analyzeTT_Angles(testImageName,
 def giveMarkedMyocyte(
       inputs,
       ImgTwoSarcSize=None,
-      useGPU=False,
-      # fileExtension=".pdf",
       ):
   '''
   This function is the main workhorse for the detection of features in 2D myocytes.
@@ -440,6 +493,8 @@ def giveMarkedMyocyte(
   '''
  
   start = time.time()
+  ### Create storage object for results
+  myResults = ClassificationResults()
 
   ### Perform Filtering Routines
   ## Transverse Tubule Filtering
@@ -557,14 +612,14 @@ def giveMarkedMyocyte(
       Losscopy[lossMasked > 0] = 255
 
     ### mark mask outline on myocyte
-    markedImage = util.markMaskOnMyocyte(
+    myResults.markedImage = util.markMaskOnMyocyte(
       markedImage,
       inputs.yamlDict['imageName']
     )
 
     if isinstance(inputs.dic['outputParams']['fileRoot'], str):
       ### mark mask outline on myocyte
-      cI_written = markedImage
+      cI_written = myResults.markedImage
 
       ### write output image
       plt.figure()
@@ -574,11 +629,11 @@ def giveMarkedMyocyte(
 
   if inputs.dic['returnPastedFilter']:
     ## Mark filter-sized unit cells on the image to represent hits
-    markedImage = util.markPastedFilters(inputs, lossMasked, ltMasked, wtMasked)
+    myResults.markedImage = util.markPastedFilters(inputs, lossMasked, ltMasked, wtMasked)
     
     ### apply mask again so as to avoid content > 1.0
-    markedImage = util.ReadResizeApplyMask(
-      markedImage,
+    myResults.markedImage = util.ReadResizeApplyMask(
+      myResults.markedImage,
       inputs.yamlDict['imageName'],
       ImgTwoSarcSize,
       filterTwoSarcSize=ImgTwoSarcSize
@@ -586,11 +641,11 @@ def giveMarkedMyocyte(
     # inputs.colorImage[dummy==255] = 255
 
     ### Now based on the marked hits, we can obtain an estimate of tubule content
-    estimatedContent = util.estimateTubuleContentFromColoredImage(markedImage)
+    estimatedContent = util.estimateTubuleContentFromColoredImage(myResults.markedImage)
   
     if isinstance(inputs.dic['outputParams']['fileRoot'], str):
       ### mark mask outline on myocyte
-      cI_written = markedImage
+      cI_written = myResults.markedImage
 
       ### write outputs	  
       plt.figure()
@@ -599,7 +654,7 @@ def giveMarkedMyocyte(
       plt.gcf().savefig(outDict['fileRoot']+"_output."+outDict['fileType'],dpi=outDict['dpi'])
 
   if inputs.dic['returnAngles']:
-    angleCounts, coloredAnglesMasked = analyzeTT_Angles(
+    angleCounts, myResults.markedAngles = analyzeTT_Angles(
       testImageName=inputs.yamlDict['imageName'],
       inputs=inputs,
       ImgTwoSarcSize=ImgTwoSarcSize,
@@ -608,19 +663,22 @@ def giveMarkedMyocyte(
 
     if isinstance(inputs.dic['outputParams']['fileRoot'], str):
       plt.figure()
-      plt.imshow(util.switchBRChannels(coloredAnglesMasked))
+      plt.imshow(util.switchBRChannels(myResults.markedAngles))
       outDict = inputs.dic['outputParams']
       plt.gcf().savefig(outDict['fileRoot']+"_angles_output."+outDict['fileType'],dpi=outDict['dpi'])
     
     end = time.time()
     tElapsed = end - start
     print "Total Elapsed Time: {}s".format(tElapsed)
-    return markedImage, coloredAnglesMasked, angleCounts
+    return myResults.markedImage, myResults.markedAngles, angleCounts
+
+  ### Write results of the classification
+  myResults.writeToCSV(inputs=inputs)
 
   end = time.time()
   tElapsed = end - start
   print "Total Elapsed Time: {}s".format(tElapsed)
-  return markedImage 
+  return myResults.markedImage 
 
 def give3DMarkedMyocyte(
       inputs,
@@ -651,6 +709,9 @@ def give3DMarkedMyocyte(
     TBD
   '''
   start = time.time()
+
+  ### Insantiate storage object for results
+  myResults = ClassificationResults()
 
   ### Form flattened iteration matrix containing all possible rotation combinations
   flattenedIters = []
@@ -716,7 +777,7 @@ def give3DMarkedMyocyte(
   inputs.colorImage = cImg
   if returnPastedFilter:
     ## Use routine to mark unit cell sized cuboids around detections
-    inputs.colorImage = util.markPastedFilters(inputs,
+    myResults.markedImage = util.markPastedFilters(inputs,
                              TAstackedHits,
                              LTstackedHits,
                              TTstackedHits,
@@ -730,7 +791,7 @@ def give3DMarkedMyocyte(
 
     ### Now based on the marked hits, we can obtain an estimate of tubule content
     estimatedContent = util.estimateTubuleContentFromColoredImage(
-      inputs.colorImage,
+      myResults.markedImage,
       totalCellSpace=cellVolume,
       taFilterName=inputs.paramDicts['TA']['filterName'],
       ltFilterName=inputs.paramDicts['LT']['filterName'],
@@ -739,105 +800,36 @@ def give3DMarkedMyocyte(
 
   else:
     ## Just mark exactly where detection is instead of pasting unit cells on detections
-    inputs.colorImage[:,:,:,2][TAstackedHits > 0] = 255
-    inputs.colorImage[:,:,:,1][LTstackedHits > 0] = 255
-    inputs.colorImage[:,:,:,0][TTstackedHits > 0] = 255
+    myResults.markedImage = inputs.colorImage.copy()
+
+    myResults.markedImage[:,:,:,2][TAstackedHits > 0] = 255
+    myResults.markedImage[:,:,:,1][LTstackedHits > 0] = 255
+    myResults.markedImage[:,:,:,0][TTstackedHits > 0] = 255
 
     ### Determine percentages of volume represented by each filter
     cellVolume = np.float(np.product(inputs.imgOrig.shape))
-    taContent = np.float(np.sum(inputs.colorImage[:,:,:,2] == 255)) / cellVolume
-    ltContent = np.float(np.sum(inputs.colorImage[:,:,:,1] == 255)) / cellVolume
-    ttContent = np.float(np.sum(inputs.colorImage[:,:,:,0] == 255)) / cellVolume
+    myResults.taContent = np.float(np.sum(myResults.markedImage[:,:,:,2] == 255)) / cellVolume
+    myResults.ltContent = np.float(np.sum(myResults.markedImage[:,:,:,1] == 255)) / cellVolume
+    myResults.ttContent = np.float(np.sum(myResults.markedImage[:,:,:,0] == 255)) / cellVolume
 
-    print "TA Content per Cell Volume:", taContent
-    print "LT Content per Cell Volume:", ltContent
-    print "TT Content per Cell Volume:", ttContent
+    print "TA Content per Cell Volume:", myResults.taContent
+    print "LT Content per Cell Volume:", myResults.ltContent
+    print "TT Content per Cell Volume:", myResults.ttContent
 
   if returnAngles:
     print "WARNING: Striation angle analysis is not yet available in 3D"
   
   ### Save detection image
   if isinstance(inputs.dic['outputParams']['fileRoot'], str):
-    util.Save3DImg(cImg,inputs.dic['outputParams']['fileRoot']+'.'+inputs.dic['outputParams']['fileType'],switchChannels=True)
+    util.Save3DImg(myResults.markedImage,inputs.dic['outputParams']['fileRoot']+'.'+inputs.dic['outputParams']['fileType'],switchChannels=True)
+
+  ### Write results of the classification
+  myResults.writeToCSV(inputs=inputs)
 
   end = time.time()
   print "Time for algorithm to run:",end-start,"seconds"
   
-  return inputs.colorImage
-
-# def giveTissueAnalysis(grayTissue,
-#                        iters = [-50,0], #TODO: FIX THIS TO ACTUAL RANGE
-#                        ttFilterName="./myoimages/newSimpleWTFilter.png",
-#                        ttPunishFilterName="./myoimages/newSimpleWTPunishmentFilter.png"):
-#   '''This function is for the analysis and classification of subcellular morphology in confocal images
-#   of tissue sections containing many myocytes. This presents a different set of challengs than the 
-#   single myocyte analysis and for that reason, the longitudinal tubule response degrades significantly.
-#   Thus, we only include the analysis of transverse tubule filter hits and rotation angles as well as 
-#   tubule absence filter hits.
-
-#   Inputs:
-#     TODO
-#   '''
-#   ### BEGIN CODE TAKEN FROM BRANCH OF GPU DETECT
-#   '''
-#   This function will take the previously preprocessed tissue and run the WT 
-#   filter across the entire image. From this, we will apply a large smoothing
-#   function across the entire detection image. This should hopefully provide
-#   a nice gradient that shows TT-density loss as proximity to the infarct
-#   increases
-
-#   NOTE: This function is meant to be called repeatedly by a bash script.
-#           Some library utilized herein is leaky and eats memory for 
-#           breakfast.
-
-#   Inputs:
-#     iteration - rotation at which to perform the detection
-
-#   Outputs:
-#     None
-
-#   Written Files:
-#     "tissueDetections_<iteration>.pkl"
-#   '''
-#   ### Load in tissue
-#   grayTissue = LoadTissue()
-
-#   # ### Load in tissue
-#   # params = tis.params
-#   # grayTissue = tis.Setup().astype(np.float32)
-#   # grayTissue /= np.max(grayTissue)
-  
-#   print "Size of single tissue image in Gigabytes:",sys.getsizeof(grayTissue) / 1e9
-
-#   # ttFilterName = "./myoimages/newSimpleWTFilter.png"
-#   # ttPunishFilterName = "./myoimages/newSimpleWTPunishmentFilter.png"
-
-#   inputs = empty()
-#   inputs.imgOrig = grayTissue
-#   # inputs.useGPU = False
-
-#   # returnAngles = False
-#   # returnAngles = True
-
-#   startTime = time.time()
-#   # ### This is mombo memory intensive
-#   # thisIteration = [iteration]
-#   tissueResults = TT_Filtering(inputs,iters,ttFilterName,ttPunishFilterName,None,None,False)
-#   # #print "before masking"
-#   # resultsImage = tissueResults.stackedHits > 0 
-#   # #print "after masking"
-
-
-#   # ### save tissue detection results
-#   # #print "before dumping"
-#   # name = "tissueDetections_"+str(iteration)
-#   # ## consider replacing with numpy save function since it is much quicker
-#   # #pkl.dump(resultsImage,open(name,'w'))
-#   # np.save(name,resultsImage)
-#   # #print "after dumping"
-#   endTime = time.time()
-
-#   print "Time for algorithm to run:",endTime-startTime
+  return myResults.markedImage
 
 ###################################################################################################
 ###################################################################################################

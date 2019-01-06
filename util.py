@@ -15,13 +15,6 @@ import bankDetect as bD
 import yaml
 import optimizer
 
-### Temporarily raising error with tensorflow.
-###   We should be getting rid of this soon
-try:
-  import tensorflow as tf
-except:
-  print "Tensorflow was not found on this computer. Routines with GPU implementation will not work."
- 
 ### Create an empty instance of a class
 class empty:
   pass
@@ -184,19 +177,6 @@ def measureFilterDimensions(grayFilter,returnFilterPaddingLocations=False,verbos
     return newDimLengths, paddingLocs
   else:
     return newDimLengths
-
-def viewer(tensor):
-  '''
-  Quick and dirty function for viewing a tensor used with tensorflow
-  '''
-  def dummy(tensor2):
-    return tensor2
-
-  with tf.Session() as sess:
-    result = sess.run(dummy(tensor))
-    print np.shape(result)
-    print result
-    return result
 
 def markMaskOnMyocyte(img,imgName):
   '''
@@ -939,6 +919,7 @@ def rotateTFFilter2D(img,rotation):
   '''
   #rotated = tf.cast(img,dtype=tf.float64)
   #rotated = tf.cast(img,dtype=tf.float32)
+  raise RuntimeError("This is deprecated.")
   rotated = tf.to_float(img)
   rotated = tf.contrib.image.rotate(rotated,rotation,interpolation="BILINEAR")
   rotated = tf.cast(rotated,dtype=tf.complex64)

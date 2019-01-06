@@ -9,7 +9,6 @@ import cv2
 import painter 
 import numpy as np 
 import matplotlib.pylab as plt 
-import twoDtense as tdt
 
 
 ###################################################################################################
@@ -67,16 +66,17 @@ def DetectFilter(
 
   # do correlations across all iter
   if paramDict['useGPU']:
-    result,timeElapsed = tdt.doTFloop(
-            inputs,
-            paramDict,
-            ziters=iters
-            )
-    # since routine gives correlated > 0 for snr > snrThresh then all nonzero correlated pixels are hits
-    if paramDict['inverseSNR']:
-      result.stackedHits[result.stackedHits > paramDict['snrThresh']] = 0.
-    else:
-      result.stackedHits[result.stackedHits < paramDict['snrThresh']] = 0.
+    raise RuntimeError("GPU use is DEPRECATED. Turn this flag off to run classification.")
+    # result,timeElapsed = tdt.doTFloop(
+    #         inputs,
+    #         paramDict,
+    #         ziters=iters
+    #         )
+    # # since routine gives correlated > 0 for snr > snrThresh then all nonzero correlated pixels are hits
+    # if paramDict['inverseSNR']:
+    #   result.stackedHits[result.stackedHits > paramDict['snrThresh']] = 0.
+    # else:
+    #   result.stackedHits[result.stackedHits < paramDict['snrThresh']] = 0.
 
   else:
     correlated = painter.correlateThresher(
