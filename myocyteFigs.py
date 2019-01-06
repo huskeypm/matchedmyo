@@ -17,7 +17,6 @@ import matchedFilter as mF
 import optimizer
 import painter
 import preprocessing as pp
-import twoDtense as tdt
 import tissue
 import util
 import matchedmyo as mm
