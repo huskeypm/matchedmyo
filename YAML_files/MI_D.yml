@@ -1,0 +1,6 @@
+imageName: /net/share/dfco222/data/TT/LouchData/processedWithIntelligentThresholding/MI_D_76_processed.png
+outputParams:
+    fileRoot: ./results/MI_D
+    fileType: pdf
+    dpi: 1200
+preprocess: False
