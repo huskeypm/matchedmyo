@@ -87,12 +87,16 @@ class Inputs:
     
     ### Globabl parameters
     dic['imageName'] = ''
-    dic['scopeResolutions'] = []
-    dic['efficientRotationStore'] = True
+    dic['scopeResolutions'] = {
+      'x': None,
+      'y': None,
+      'z': None
+    }
+    dic['efficientRotationStorage'] = True
     dic['iters'] = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
     dic['returnAngles'] = False
     dic['returnPastedFilter'] = True
-    dic['preprocess'] = False
+    dic['preprocess'] = True
     dic['filterTwoSarcomereSize'] = 25
 
     ### Output parameter dictionary
@@ -144,10 +148,29 @@ class Inputs:
         ## if the key is not already specified in the default dictionary, then we continue on
         pass
     
-  def load_yaml(self):
-    '''Function to read and store the yaml dictionary'''
-    self.yamlDict = util.load_yaml(self.yamlFileName)
+    ### Check to see if '.csv' is present in the output csv file
+    if self.dic['outputParams']['csvFile'][-4:] != '.csv':
+      self.dic['outputParams']['csvFile'] = self.dic['outputParams']['csvFile'] + '.csv'
 
+    ### Convert the scope resolutions into a list
+    if isinstance(self.dic['scopeResolutions'], dict):
+      self.dic['scopeResolutions'] = [
+        self.dic['scopeResolutions']['x'],
+        self.dic['scopeResolutions']['y'],
+        self.dic['scopeResolutions']['z']
+      ]
+
+    ### Flatten out iters if it is still a dictionary. This is necessary for 3D classification where
+    ###   there are three axes of rotation
+    if isinstance(self.dic['iters'], dict):
+      flattenedIters = []
+      for i in self.dic['iters']['x']:
+        for j in self.dic['iters']['y']:
+          for k in self.dic['iters']['z']:
+            flattenedIters.append( [i,j,k] )
+      self.dic['iters'] = flattenedIters
+      
+    
   def setupDefaultParamDicts(self):
     '''This function forms the default parameter dictionaries for each filtering type, TT, LT, and 
     TA.'''
@@ -214,10 +237,79 @@ class Inputs:
     if self.dic['preprocess']:
       self.imgOrig = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'])
 
+  def load_yaml(self):
+    '''Function to read and store the yaml dictionary'''
+    self.yamlDict = util.load_yaml(self.yamlFileName)
+
+  def check_yaml_for_errors(self):
+    '''This function checks that the user-specified parameters read in through load_yaml() are valid'''
+
+    ### Check that the scope resolutions are specified correctly
+    for value in self.dic['scopeResolutions']:
+      if not isinstance(value, (float, int, type(None))):
+        raise RuntimeError("Scope resolutions are not specified correctly. Ensure that the "
+                           +"resolutions are integers, floats, or are left blank.")
+
+    ### Check efficientRotationStorage
+    if not isinstance(self.dic['efficientRotationStorage'], bool):
+      raise RuntimeError("The efficientRotationStorage parameter is not a boolean type "
+                         +"(True or False). Ensure that this is correct in the YAML file.")
+
+    ### Check the rotations
+    if not isinstance(self.dic['iters'], list):
+      raise RuntimeError('Double check that iters is specified correctly in the YAML file')
+    for value in self.dic['iters']:
+      ## Check if the entries are lists (3D) or floats/ints (2D)
+      if not isinstance(value, (float, int, list)):
+          raise RuntimeError('Double check that the values specified for the rotations (iters) are '
+                             +'integers or floats.')
+
+    if not isinstance(self.dic['returnAngles'], bool):
+      raise RuntimeError('Double check that returnAngles is either True or False in the YAML file.')
+
+    if not isinstance(self.dic['returnPastedFilter'], bool):
+      raise RuntimeError('Double check that returnPastedFilter is either True or False in the YAML file.')
+
+    if not isinstance(self.dic['filterTwoSarcomereSize'], int):
+      raise RuntimeError('Double check that filterTwoSarcomereSize is an integer.')
+
+    ### Check output parameters
+    if not isinstance(self.dic['outputParams']['fileRoot'], (type(None), str)):
+      raise RuntimeError('Ensure that the fileRoot parameter in outputParams is either a string '
+                         +'or left blank.')
+    if not self.dic['outputParams']['fileType'] in ['png','tif','pdf']:
+      raise RuntimeError('Double check that fileType in outputParams is either "png," "tif," or "pdf."')
+    if not isinstance(self.dic['outputParams']['dpi'], int):
+      raise RuntimeError('Ensure that dpi in outputParams is an integer.')
+    if not isinstance(self.dic['outputParams']['saveHitsArray'], bool):
+      raise RuntimeError('Ensure that saveHitsArray in outputParams is either True or False')
+    if not isinstance(self.dic['outputParams']['csvFile'], str):
+      raise RuntimeError('Ensure that csvFile in outputParams is a string.')
+
+    ### Check that filter types is either true or false for all entries
+    for key, value in self.dic['filterTypes'].iteritems():
+      if not isinstance(value, bool):
+        raise RuntimeError('Check that {} in filterTypes is either True or False'.format(key))
+
+    if self.dic['returnAngles']:
+      if not self.dic['filterTypes']['TT']:
+        raise RuntimeError('TT filtering must be turned on if returnAngles is specified as True')
+    
   def setupYamlInputs(self):
     '''This function sets up inputs if a yaml file name is specified'''
+    ### Check that the YAML file exists
+    if not os.path.isfile(self.yamlFileName):
+      raise RuntimeError("Double check that the yaml file that was specified is correct. Currently, "
+                         +"the YAML file that was specified does not exist.")
+
     self.load_yaml()
+    
+    ### Double check that the image exists
+    if not os.path.isfile(self.yamlDict['imageName']):
+      raise RuntimeError('The specified image does not exist. Double-check that imageName is correct.')
+    
     self.updateInputs()
+    self.check_yaml_for_errors()
 
 class ClassificationResults:
   '''This class holds all of the results that we will need to store.'''
@@ -683,9 +775,6 @@ def giveMarkedMyocyte(
 def give3DMarkedMyocyte(
       inputs,
       ImgTwoSarcSize=None,
-      xiters=[-10,0,10],
-      yiters=[-10,0,10],
-      ziters=[-10,0,10],
       returnAngles=False,
       returnPastedFilter=True,
       ):
@@ -712,16 +801,6 @@ def give3DMarkedMyocyte(
 
   ### Insantiate storage object for results
   myResults = ClassificationResults()
-
-  ### Form flattened iteration matrix containing all possible rotation combinations
-  flattenedIters = []
-  for i in xiters:
-    for j in yiters:
-      for k in ziters:
-        flattenedIters.append( [i,j,k] )
-
-  ### Store the flattened iteration matrix in the inputs structure
-  inputs.dic['iters'] = flattenedIters
 
   ### Transverse Tubule Filtering
   if inputs.dic['filterTypes']['TT']:
@@ -935,18 +1014,9 @@ def validate3D(args):
   )
 
   ### Analyze the 3D cell
-  markedImage = give3DMarkedMyocyte(#testImage=testName,
-                                    # scopeResolutions = scopeResolutions,
-                                    #ttFilterName = ttName,
-                                    #ttPunishFilterName = ttPunishName,
-                                    #ltFilterName = ltName,
-                                    #taFilterName = taName,
-                                    inputs = inputs,
-                                    xiters = [0],
-                                    yiters = [0],
-                                    ziters = [0],
-                                    # tag = '3DValidationData_analysis'
-                                    )
+  markedImage = give3DMarkedMyocyte(
+    inputs = inputs
+  )
 
   print "\nThe following content values are for validation purposes only.\n"
 

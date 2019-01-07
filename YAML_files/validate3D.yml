@@ -1,10 +1,18 @@
 imageName: './myoimages/3DValidationData.tif'
 outputFileTag: '3DValidationData_analysis'
+preprocess: False
 filterTypes: 
     'TT': True
     'LT': True
     'TA': True
-scopeResolutions: [10,10,5] #voxels per micron
+scopeResolutions: 
+    x: 10
+    y: 10
+    z: 5 #voxels per micron
+iters:
+    x: [0]
+    y: [0]
+    z: [0]
 ttFilterName: './myoimages/TT_3D.tif'
 ttPunishFilterName: './myoimages/TT_Punishment_3D.tif'
 ltFilterName: './myoimages/LT_3D.tif'

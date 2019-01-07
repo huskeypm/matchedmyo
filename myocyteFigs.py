@@ -57,12 +57,15 @@ def WT_results():
   rawImg = util.ReadImg(testImage,cvtColor=False)
 
   iters = [-25,-20, -15, -10, -5, 0, 5, 10, 15, 20,25]
-  coloredImg, coloredAngles, angleCounts = mm.giveMarkedMyocyte(testImage=testImage,
-                        returnAngles=True,
-                        iters=iters,
-                        tag='fig3',
-                        writeImage = True
-                        )
+
+  ### Read in parameters from YAML file
+  inputs = mm.Inputs(
+    yamlFileName='./YAML_files/WT.yml'
+  )
+  
+  coloredImg, coloredAngles, angleCounts = mm.giveMarkedMyocyte(
+    inputs = inputs
+  )
   correctColoredAngles = util.switchBRChannels(coloredAngles)
   correctColoredImg = util.switchBRChannels(coloredImg)
 
@@ -85,17 +88,17 @@ def WT_results():
   ax.set_ylabel('Normalized Content')
   ax.legend(marks)
   ax.set_xticks([])
-  plt.gcf().savefig('fig3_BarChart.pdf',dpi=300)
+  plt.gcf().savefig('./results/fig3_BarChart.pdf',dpi=1200)
   plt.close()
 
   ### save files individually and arrange using inkscape
   plt.figure()
   plt.imshow(util.switchBRChannels(util.markMaskOnMyocyte(rawImg,testImage)))
-  plt.gcf().savefig("fig3_Raw.pdf",dpi=300)
+  plt.gcf().savefig("./results/fig3_Raw.pdf",dpi=1200)
 
   plt.figure()
   plt.imshow(correctColoredAngles)
-  plt.gcf().savefig("fig3_ColoredAngles.pdf",dpi=300)
+  plt.gcf().savefig("./results/fig3_ColoredAngles.pdf",dpi=1200)
 
   ### save histogram of angles
   du.giveAngleHistogram(angleCounts,iters,"fig3")
@@ -108,7 +111,13 @@ def HF_results():
   filterTwoSarcSize = 25
   imgName = root + "HF_1_processed.png"
   rawImg = util.ReadImg(imgName)
-  markedImg = mm.giveMarkedMyocyte(testImage=imgName,tag='fig4',writeImage=True)
+
+  ### Read in parameters from yaml file
+  inputs = mm.Inputs(
+    yamlFileName='./YAML_files/HF.yml'
+  )
+
+  markedImg = mm.giveMarkedMyocyte(inputs=inputs)
 
   ### make bar chart for content
   wtContent, ltContent, lossContent = util.assessContent(markedImg,imgName)
@@ -129,20 +138,20 @@ def HF_results():
   ax.set_ylabel('Normalized Content')
   ax.legend(marks)
   ax.set_xticks([])
-  plt.gcf().savefig('fig4_BarChart.pdf',dpi=300)
+  plt.gcf().savefig('./results/fig4_BarChart.pdf',dpi=300)
   plt.close()
  
   switchedImg = util.switchBRChannels(markedImg)
 
   plt.figure()
   plt.imshow(util.switchBRChannels(util.markMaskOnMyocyte(rawImg,imgName)))
-  plt.gcf().savefig("fig4_Raw.pdf",dpi=300)
+  plt.gcf().savefig("./results/fig4_Raw.pdf",dpi=300)
 
 def MI_results(): 
   '''
   MI Results
   '''
-  filterTwoSarcSize = 25
+  # filterTwoSarcSize = 25
 
   ### Distal, Medial, Proximal
   DImageName = root+"MI_D_76_processed.png"
@@ -157,10 +166,21 @@ def MI_results():
   PImage = util.ReadImg(PImageName)
   images = [DImage, MImage, PImage]
 
+  ### Define inputs for each image
+  inputs_D = mm.Inputs(
+    yamlFileName = './YAML_files/MI_D.yml'
+  )
+  inputs_M = mm.Inputs(
+    yamlFileName = './YAML_files/MI_M.yml'
+  )
+  inputs_P = mm.Inputs(
+    yamlFileName = './YAML_files/MI_P.yml'
+  )
+
   # BE SURE TO UPDATE TESTMF WITH OPTIMIZED PARAMS
-  Dimg = mm.giveMarkedMyocyte(testImage=DImageName,tag='fig5_D',writeImage=True)
-  Mimg = mm.giveMarkedMyocyte(testImage=MImageName,tag='fig5_M',writeImage=True)
-  Pimg = mm.giveMarkedMyocyte(testImage=PImageName,tag='fig5_P',writeImage=True)
+  Dimg = mm.giveMarkedMyocyte(inputs=inputs_D)
+  Mimg = mm.giveMarkedMyocyte(inputs=inputs_M)
+  Pimg = mm.giveMarkedMyocyte(inputs=inputs_P)
 
   results = [Dimg, Mimg, Pimg]
   keys = ['Distal', 'Medial', 'Proximal']
@@ -195,20 +215,20 @@ def MI_results():
   ax.set_xticks(indices + width* 3/2)
   ax.set_xticklabels(keys)
   ax.legend(marks)
-  plt.gcf().savefig('fig5_BarChart.pdf',dpi=300)
+  plt.gcf().savefig('./results/fig5_BarChart.pdf',dpi=300)
   plt.close()
 
   plt.figure()
   plt.imshow(util.switchBRChannels(util.markMaskOnMyocyte(DImage,DImageName)))
-  plt.gcf().savefig("fig5_Raw_D.pdf",dpi=300)
+  plt.gcf().savefig("./results/fig5_Raw_D.pdf",dpi=300)
 
   plt.figure()
   plt.imshow(util.switchBRChannels(util.markMaskOnMyocyte(MImage,MImageName)))
-  plt.gcf().savefig("fig5_Raw_M.pdf",dpi=300)
+  plt.gcf().savefig("./results/fig5_Raw_M.pdf",dpi=300)
 
   plt.figure()
   plt.imshow(util.switchBRChannels(util.markMaskOnMyocyte(PImage,PImageName)))
-  plt.gcf().savefig("fig5_Raw_P.pdf",dpi=300)
+  plt.gcf().savefig("./results/fig5_Raw_P.pdf",dpi=300)
 
 def tissueComparison(fullAnalysis=True):
   '''
@@ -539,12 +559,14 @@ def saveWorkflowFig():
 
   imgName = "./myoimages/MI_D_73_processed.png" 
   iters = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
+
+  inputs = mm.Inputs(
+    yamlFileName='./YAML_files/workflow.yml'
+  )
   
-  colorImg,colorAngles,angleCounts = mm.giveMarkedMyocyte(testImage=imgName,
-                                                       tag="WorkflowFig",
-                                                       iters=iters,
-                                                       returnAngles=True,
-                                                       writeImage=True)
+  colorImg,colorAngles,angleCounts = mm.giveMarkedMyocyte(
+    inputs=inputs
+  )
 
   ### save the correlation planes
   lossFilter = util.LoadFilter("./myoimages/LossFilter.png")
@@ -876,12 +898,22 @@ def analyzeAllMyo(root="/net/share/dfco222/data/TT/LouchData/processedWithIntell
       continue
     print name
     iters=[-25,-20,-15,-10,-5,0,5,10,15,20,25]
+
+    ### Form inputs
+    inputs = mm.Inputs(
+      imageName=name
+    )
+    inputs.dic['outputParams'] = {
+      'fileRoot':name[:-4],
+      'fileType':'pdf',
+      'dpi':1200
+    }
+
     ### iterate through names and mark the images
-    markedMyocyte,_,angleCounts = mm.giveMarkedMyocyte(testImage=root+name,
-                                                    tag=name[:-4],
-                                                    iters=iters,
-                                                    writeImage=True,
-                                                    returnAngles=True)
+    markedMyocyte,_,angleCounts = mm.giveMarkedMyocyte(
+      inputs = inputs
+    )
+
     ### save raw image with ROI marked
     cImg = util.ReadImg(root+name)
     cImg = util.markMaskOnMyocyte(cImg,root+name)
@@ -929,28 +961,6 @@ def analyzeAllMyo(root="/net/share/dfco222/data/TT/LouchData/processedWithIntell
   du.giveBarChartfromDict(HF,'HF')
   du.giveMIBarChart(MI_D,MI_M,MI_P)
   du.giveAvgStdofDicts(Sham,HF,MI_D,MI_M,MI_P)
-
-def analyzeSingleMyo(name,twoSarcSize):
-   realName = name#+"_processed.png"
-   iters = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
-   markedMyocyte,_,angleCounts = mm.giveMarkedMyocyte(testImage=realName,
-                                     ImgTwoSarcSize=twoSarcSize,
-                                     tag=name,
-                                     writeImage=True,
-                                     returnAngles=True)
-   ### assess content
-   wtC, ltC, lossC = util.assessContent(markedMyocyte,imgName=realName)
-   #content = np.asarray([wtC, ltC, lossC],dtype=float)
-   #content /= np.max(content)
-
-   ### hacky way to get percent of hits within range of 5 degrees from minor axis
-   idxs = [4,5,6]
-   totalHits = len(angleCounts)
-   angleCountsNP = np.asarray(angleCounts)
-   hitsInRange =   np.count_nonzero(np.equal(angleCounts, iters[idxs[0]])) \
-                 + np.count_nonzero(np.equal(angleCounts, iters[idxs[1]])) \
-                 + np.count_nonzero(np.equal(angleCounts, iters[idxs[2]]))
-   print "Percentage of WT hits within 5 degrees of minor axis:", float(hitsInRange)/float(totalHits) * 100.
 
 def Myocyte():
   '''This function defines the dataset for the myocyte optimization routines
@@ -1413,12 +1423,6 @@ if __name__ == "__main__":
       analyzeAllMyo()
       quit()
 
-    if(arg=="-analyzeSingleMyo"):
-      name = sys.argv[i+1]
-      twoSarcSize = float(sys.argv[i+2])
-      analyzeSingleMyo(name,twoSarcSize)
-      quit()
-
     if(arg=="-testTissue"):
       name = "testingNotchFilter.png"
       mm.giveMarkedMyocyte(testImage=name,
@@ -1427,11 +1431,6 @@ if __name__ == "__main__":
                         returnAngles=False,
                         writeImage=True,
                         useGPU=True)
-      quit()
-
-    if(arg=="-analyzeDirectory"):
-      root = sys.argv[i+1]
-      analyzeAllMyo(root=root)
       quit()
 
     ### Additional Arguments

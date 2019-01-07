@@ -1,0 +1,6 @@
+imageName: ./myoimages/MI_D_73_processed.png
+outputParams:
+    fileRoot: ./results/workflow
+    fileType: pdf
+    dpi: 1200
+preprocess: False

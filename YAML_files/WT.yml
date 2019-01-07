@@ -1,0 +1,6 @@
+imageName: /net/share/dfco222/data/TT/LouchData/processedMaskedNucleus/Sham_M_65_nucleus_processed.png
+preprocess: False
+outputParams:
+  fileRoot: ./results/WT
+  fileType: pdf
+  dpi: 1200
