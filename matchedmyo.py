@@ -7,6 +7,7 @@ This is THE script that all sophisticated, general user-level routines will be r
 '''
 
 import os
+import subprocess
 import time
 import sys
 import datetime
@@ -170,7 +171,6 @@ class Inputs:
             flattenedIters.append( [i,j,k] )
       self.dic['iters'] = flattenedIters
       
-    
   def setupDefaultParamDicts(self):
     '''This function forms the default parameter dictionaries for each filtering type, TT, LT, and 
     TA.'''
@@ -390,8 +390,6 @@ class ClassificationResults:
 
 def TT_Filtering(inputs,
                  paramDict,
-                 ttThresh=None,
-                 ttGamma=None,
                  ):
   '''
   Takes inputs class that contains original image and performs WT filtering on the image
@@ -406,12 +404,6 @@ def TT_Filtering(inputs,
 
   paramDict['covarianceMatrix'] = np.ones_like(inputs.imgOrig)
   paramDict['mfPunishment'] = util.LoadFilter(inputs.paramDicts['TT']['punishFilterName'])
-
-  ## Check to see if parameters are manually specified
-  if ttThresh != None:
-    paramDict['snrThresh'] = ttThresh
-  if ttGamma != None:
-    paramDict['gamma'] = ttGamma
 
   ### Perform filtering
   WTresults = bD.DetectFilter(
@@ -928,6 +920,9 @@ def fullValidation(args):
   validate(args)
   validate3D(args)
 
+  print "All validation tests have PASSED! MatchedMyo is installed properly on this machine."
+  print "Happy classifying!"
+
 def validate(args,
              display=False
              ):
@@ -936,6 +931,9 @@ def validate(args,
   Inputs:
     display -> Bool. If True, display the marked image
   '''
+  ### Capture all print statements
+  sys.stdout = open('garbage.txt', 'w')
+
   ### Specify the yaml file NOTE: This will be done via command line for main classification routines
   yamlFile = './YAML_files/validate.yml'
 
@@ -959,16 +957,20 @@ def validate(args,
   ### Calculate TT, LT, and TA content  
   ttContent, ltContent, taContent = util.assessContent(markedImg)
 
+  sys.stdout.close()
+  sys.stdout = sys.__stdout__
+  subprocess.call(['rm', 'garbage.txt'])
+
   assert(abs(ttContent - 103050) < 1), "TT validation failed."
   assert(abs(ltContent -  68068) < 1), "LT validation failed."
   assert(abs(taContent - 156039) < 1), "TA validation failed."
 
   ### Calculate the number of hits at rotation equal to 5 degrees
   numHits = np.count_nonzero(np.asarray(angleCounts) == 5)
-  print "Number of Hits at Rotation = 5 Degrees:", numHits
+  # print "Number of Hits at Rotation = 5 Degrees:", numHits
   assert(abs(numHits - 1621) < 1), "Rotation validation failed"
 
-  print "\nPASSED!\n"
+  print "\nValidate Function has PASSED!\n"
 
 def validate3D(args):
   '''This function serves as a validation routine for the 3D functionality of this repo.
@@ -976,6 +978,9 @@ def validate3D(args):
   Inputs:
     None
   '''
+  ### Capture all print statements
+  sys.stdout = open('garbage.txt', 'w')
+
   ### Specify the yaml file. NOTE: This will be done via command line for main classification routines
   yamlFile = './YAML_files/validate3D.yml'
 
@@ -1023,12 +1028,16 @@ def validate3D(args):
   ### Assess the amount of TT, LT, and TA content there is in the image 
   ttContent, ltContent, taContent = util.assessContent(markedImage)
 
+  sys.stdout.close()
+  sys.stdout = sys.__stdout__
+  subprocess.call(['rm', 'garbage.txt'])
+
   ### Check to see that they are in close agreement with previous values
   ###   NOTE: We have to have a lot of wiggle room since we're generating a new cell for each validation
   assert(abs(ttContent - 301215) < 1), "TT validation failed."
   assert(abs(ltContent -  53293) < 1), "LT validation failed."
   assert(abs(taContent - 409003) < 1), "TA validation failed."
-  print "\nPASSED!\n"
+  print "\n3D Validation has PASSED!\n"
 
 ###################################################################################################
 ###################################################################################################
