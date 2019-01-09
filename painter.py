@@ -87,13 +87,14 @@ def correlateThresher(
       ## We also need to create a storage array for the rotation which the maximum SNR occurred.
       if len(np.shape(img)) == 3:
         ## This means that the image is 3D and we must store the rotation arrays in 3 different arrays
+        ##   We use 361 because no one in their right mind would want to rotate a filter >= 360 degrees
         correlated['rotSNRArray'] = {}
-        correlated['rotSNRArray']['x'] = np.zeros_like(img, dtype=np.int8) - 1
-        correlated['rotSNRArray']['y'] = np.zeros_like(img, dtype=np.int8) - 1
-        correlated['rotSNRArray']['z'] = np.zeros_like(img, dtype=np.int8) - 1
+        correlated['rotSNRArray']['x'] = np.ones_like(img, dtype=np.int16) * 361
+        correlated['rotSNRArray']['y'] = np.ones_like(img, dtype=np.int16) * 361
+        correlated['rotSNRArray']['z'] = np.ones_like(img, dtype=np.int16) * 361
       else:
         ## Otherwise we only need one array to store the single rotation
-        correlated['rotSNRArray'] = np.zeros_like(img,dtype=np.int8) - 1
+        correlated['rotSNRArray'] = np.ones_like(img,dtype=np.int16) * 361
     else:
       ## Store all 'hits' at each angle 
       correlated = []
@@ -245,6 +246,7 @@ def StackHits(correlated,  # an array of 'correlation planes'
       if returnAngles:
         ## Now we fix the stackedAngles format
         stackedAngles = correlated['rotSNRArray']
+        # stackedAngles[stackedHits == 0] = 361 # 361 indicates no hit at that pixel/voxel
         return stackedHits, stackedAngles
       else:
         return stackedHits
@@ -308,19 +310,7 @@ def colorAngles(rawOrig, stackedAngles,iters,leftChannel='red',rightChannel='blu
 
   dims = np.shape(stackedAngles)
 
-  if len(np.shape(rawOrig)) > 2:
-    coloredImg = rawOrig.copy()
-    #plt.figure()
-    #plt.imshow(coloredImg)
-    #plt.show()
-    #quit()
-  else:
-    # we need to make an RGB version of the image
-    coloredImg = np.zeros((dims[0],dims[1],3),dtype='uint8')
-    scale = 0.75
-    coloredImg[:,:,0] = scale * rawOrig
-    coloredImg[:,:,1] = scale * rawOrig
-    coloredImg[:,:,2] = scale * rawOrig
+  coloredImg = rawOrig.copy()
 
   leftmostIdx = 0 # mark as left channel
   rightmostIdx = len(iters) # mark as right channel
@@ -331,9 +321,10 @@ def colorAngles(rawOrig, stackedAngles,iters,leftChannel='red',rightChannel='blu
   for i in range(dims[0]):
     for j in range(dims[1]):
       rotArg = stackedAngles[i,j]
-      if rotArg != -1:
-        coloredImg[i,j,channelDict[leftChannel]] = int(255 - rotArg*spacing)
-        coloredImg[i,j,channelDict[rightChannel]] = int(rotArg*spacing)
+      if rotArg != -1 and rotArg != 361: # the two values that indicate no hit at this location
+        rotIndex = np.argmax([rotArg == it for it in iters])
+        coloredImg[i,j,channelDict[leftChannel]] = int(255 - rotIndex*spacing)
+        coloredImg[i,j,channelDict[rightChannel]] = int(rotIndex*spacing)
   return coloredImg
 
 # Basically just finds a 'unit cell' sized area around each detection 

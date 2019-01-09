@@ -4,3 +4,4 @@ outputParams:
   fileRoot: ./results/WT
   fileType: pdf
   dpi: 1200
+returnAngles: True

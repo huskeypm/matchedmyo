@@ -76,16 +76,21 @@ class Inputs:
     self.paramDicts = paramDicts
     self.preprocess = preprocess
 
+    ## Update default dictionaries according to yaml file
+    if yamlFileName:
+      self.load_yaml()
+      try:
+        self.classificationType = self.yamlDict['classificationType']
+      except:
+        pass
+    else:
+      self.yamlDict = None
+
     ## Setup default dictionaries for classification
     self.setupDefaultDict()
     self.setupDefaultParamDicts()
 
-    ## Update default dictionaries according to yaml file
-    if yamlFileName:
-      self.load_yaml()
-    else:
-      self.yamlDict = None
-
+    ## Update based on YAML file
     self.updateDefaultDict()
     self.setupImages()
     self.updateInputs()
@@ -195,7 +200,12 @@ class Inputs:
         if key == "outputParams":
           ## iterate through the dictionary specified in the yaml file and store non-default values
           for outputKey, outputValue in value.iteritems():
-            self.dic['outputParams'][outputKey] = outputValue
+            if outputKey in self.dic['outputParams'].keys():
+              self.dic['outputParams'][outputKey] = outputValue
+            else:
+              msg = str(outputKey)+" is not a parameter you can specify in the outputParams dictionary. Check your spelling"
+              raise RuntimeError(msg)
+          continue
         
         ## Here we check if the key is present within the default dictionary. If it is, we can then
         ##   see if a non-default value is specified for it.
@@ -347,8 +357,9 @@ class Inputs:
         raise RuntimeError('Check that {} in filterTypes is either True or False'.format(key))
 
     if self.dic['returnAngles']:
-      if not self.dic['filterTypes']['TT']:
-        raise RuntimeError('TT filtering must be turned on if returnAngles is specified as True')
+      if self.dic['classificationType'] == 'myocyte':
+        if not self.dic['filterTypes']['TT']:
+          raise RuntimeError('TT filtering must be turned on if returnAngles is specified as True')
     
   def setupYamlInputs(self):
     '''This function sets up inputs if a yaml file name is specified'''
@@ -586,7 +597,7 @@ def analyzeTT_Angles(testImageName,
   smoothedHits = smoothedWTresults.stackedAngles
 
   ### pull out actual hits from smoothed results
-  smoothedHits[WTstackedHits == 0] = -1
+  smoothedHits[WTstackedHits == 0] = 361
 
   coloredAngles = painter.colorAngles(inputs.colorImage,smoothedHits,inputs.dic['iters'])
 
@@ -782,7 +793,8 @@ def giveMarkedMyocyte(
     # inputs.colorImage[dummy==255] = 255
 
     ### Now based on the marked hits, we can obtain an estimate of tubule content
-    estimatedContent = util.estimateTubuleContentFromColoredImage(myResults.markedImage)
+    ### TODO: Make this an optional parameter specified in the YAML file
+    # estimatedContent = util.estimateTubuleContentFromColoredImage(myResults.markedImage)
   
     if isinstance(inputs.dic['outputParams']['fileRoot'], str):
       ### mark mask outline on myocyte
@@ -808,10 +820,6 @@ def giveMarkedMyocyte(
       outDict = inputs.dic['outputParams']
       plt.gcf().savefig(outDict['fileRoot']+"_angles_output."+outDict['fileType'],dpi=outDict['dpi'])
     
-    end = time.time()
-    tElapsed = end - start
-    print "Total Elapsed Time: {}s".format(tElapsed)
-
   ### Write results of the classification
   myResults.writeToCSV(inputs=inputs)
 
@@ -957,6 +965,109 @@ def give3DMarkedMyocyte(
   print "Time for algorithm to run:",end-start,"seconds"
   
   return myResults
+
+def arbitraryFiltering(inputs):
+  '''This function is for matched-filtering of arbitrary combinations of user-supplied images
+  and filters with non-default parameter dictionaries.
+  
+  Inputs:
+    inputs -> See Inputs Class
+    
+  Outputs:
+    myResults -> See ClassificationResults class
+  '''
+  start = time.time()
+
+  myResults = ClassificationResults(
+    markedImage = inputs.colorImage.copy()
+  )
+
+  ### Loop over filtering types and perform classification for that filter type if turned on by YAML file
+  for filterKey, filterToggle in inputs.dic['filterTypes'].iteritems():
+    if filterToggle:
+      print "Performing {} classification".format(filterKey)
+      ## Load in filter
+      inputs.mfOrig = util.LoadFilter(inputs.paramDicts[filterKey]['filterName'])
+      ## Load punishment filter and covariance matrix if applicable
+      if inputs.paramDicts[filterKey]['filterMode'] == 'punishmentFilter':
+        inputs.paramDicts[filterKey]['punishmentFilter'] = util.LoadFilter(
+          inputs.paramDicts[filterKey]['punishFilterName']
+        )
+        inputs.paramDicts[filterKey]['covarianceMatrix'] = np.ones_like(inputs.imgOrig)
+
+      ## Perform filtering
+      filterResults = bD.DetectFilter(
+        inputs = inputs,
+        paramDict = inputs.paramDicts[filterKey],
+        iters = inputs.dic['iters'],
+        returnAngles = inputs.dic['returnAngles']
+      )
+
+      ## Get the channel index of the filter
+      channelIndex = int(filterKey[-1]) - 1
+
+      ## Save the hits as full-resolution arrays for future use 
+      if inputs.dic['outputParams']['saveHitsArray']:
+        outDict = inputs.dic['outputParams']
+        np.save(outDict['fileRoot']+'_'+filterKey+'_hits', filterResults.stackedHits)
+
+      ## Mark hits on the colored image
+      if inputs.dic['returnPastedFilter']:
+        ## Read in filter dimensions
+        filtDims = util.measureFilterDimensions(inputs.mfOrig)
+
+        ## Perform dilation of hits based on filter dimensions
+        filterResults.stackedHits = painter.doLabel(
+          filterResults,
+          cellDimensions=filtDims,
+          thresh=0
+        )
+      myResults.markedImage[..., channelIndex][filterResults.stackedHits != 0] = 255
+
+      ## Measure amount of hits in image relative to image size
+      hitRatio = float(np.count_nonzero(filterResults.stackedHits)) / float(np.prod(inputs.imgOrig.shape))
+      print filterKey+' detection to non-detection ratio: '+str(hitRatio)[:7]
+      # storage{filterKey} = hitRatio
+
+      ## Save angles of detection if indicated
+      if inputs.dic['returnAngles']:
+        ## NOTE: not saving in myResults since we'd overwrite during each iteration of loop
+        coloredAngles = painter.colorAngles(inputs.colorImage.copy(),filterResults.stackedAngles,inputs.dic['iters'])
+
+        ## Count num hits at each rotation
+        angleCounts = {}
+        hitSum = 0 # DELETE
+        for it in inputs.dic['iters']:
+          angleCounts[it] = np.count_nonzero(filterResults.stackedAngles == it)
+          hitSum += angleCounts[it] # DELETE
+          print filterKey+' hits at {} rotation: {}'.format(it, angleCounts[it])
+
+        if isinstance(inputs.dic['outputParams']['fileRoot'],str):
+          plt.figure()
+          plt.imshow(util.switchBRChannels(coloredAngles))
+          outDict = inputs.dic['outputParams']
+          plt.gcf().savefig(outDict['fileRoot']+'_'+filterKey+'_angles_output.'+outDict['fileType'],dpi=outDict['dpi'])
+
+  ## Save image if indicated in inputs
+  if isinstance(inputs.dic['outputParams']['fileRoot'], str):
+    plt.figure()
+    plt.imshow(util.switchBRChannels(myResults.markedImage))
+    outDict = inputs.dic['outputParams']
+    plt.gcf().savefig(outDict['fileRoot']+"_output."+outDict['fileType'],dpi=outDict['dpi'])
+
+  print np.count_nonzero(filterResults.stackedHits) # DELETE
+  print np.count_nonzero(filterResults.stackedAngles != 361) # DELETE
+  print hitSum # DELETE
+
+  ### Write results of the classification
+  myResults.writeToCSV(inputs=inputs)
+
+
+  end = time.time()
+  tElapsed = end - start
+  print "Total Elapsed Time: {}s".format(tElapsed)
+  return myResults
+
 
 ###################################################################################################
 ###################################################################################################
@@ -1115,12 +1226,15 @@ def run(args):
 
   ### Determine if classification is 2D or 3D and run the correct routine for it
   dim = len(np.shape(inputs.imgOrig))
-  if dim == 2:
-    giveMarkedMyocyte(inputs = inputs)
-  elif dim == 3:
-    give3DMarkedMyocyte(inputs = inputs)
-  else:
-    raise RuntimeError("The dimensions of the image specified in {} is not supported.".format(args.yamlFile))
+  if inputs.dic['classificationType'] == 'myocyte':
+    if dim == 2:
+      giveMarkedMyocyte(inputs = inputs)
+    elif dim == 3:
+      give3DMarkedMyocyte(inputs = inputs)
+    else:
+      raise RuntimeError("The dimensions of the image specified in {} is not supported.".format(args.yamlFile))
+  elif inputs.dic['classificationType'] == 'arbitrary':
+    arbitraryFiltering(inputs = inputs)
 
 def main(args):
   '''The routine through which all command line functionality is routed.
