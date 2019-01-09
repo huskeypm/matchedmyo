@@ -40,6 +40,7 @@ class Inputs:
   characterization so it's convenient to have a way to pass parameters around.
   '''
   def __init__(self,
+               classificationType = 'myocyte',
                imageName = None,
                colorImage = None,
                yamlFileName = None,
@@ -66,6 +67,7 @@ class Inputs:
     '''
 
     ### Store global class-level parameters
+    self.classificationType = classificationType
     self.imageName = imageName
     self.yamlFileName = yamlFileName
     self.mfOrig = mfOrig
@@ -113,6 +115,7 @@ class Inputs:
     dic = dict()
     
     ### Globabl parameters
+    dic['classificationType'] = self.classificationType
     if isinstance(self.imageName, str):
       dic['imageName'] = self.imageName
     else:
@@ -133,7 +136,14 @@ class Inputs:
     dic['iters'] = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
     dic['returnAngles'] = False
     dic['returnPastedFilter'] = True
-    dic['preprocess'] = self.preprocess
+
+    if self.classificationType == 'arbitrary':
+      ## We don't have a preprocessing routine defined for the arbitrary filtering case
+      dic['preprocess'] = False
+    elif self.classificationType == 'myocyte':
+      ## But we do have a preprocessing routine defined for the myocyte cases
+      dic['preprocess'] = self.preprocess
+    
     dic['filterTwoSarcomereSize'] = 25
 
     ### Output parameter dictionary
@@ -144,13 +154,25 @@ class Inputs:
       'saveHitsArray': False,
       'csvFile': './results/classification_results.csv'
     }
+
+    if self.classificationType != 'myocyte':
+      ## Write to a different csv file
+      dic['outputParams']['csvFile'] = './results/classification_results_arbitrary.csv'
     
     ### Filtering flags to turn on or off
-    dic['filterTypes'] = {
-      'TT':True,
-      'LT':True,
-      'TA':True
-    }
+    if self.classificationType == 'myocyte':
+      dic['filterTypes'] = {
+        'TT':True,
+        'LT':True,
+        'TA':True
+      }
+    elif self.classificationType == 'arbitrary':
+      ## Setting default only filtering 1 turned on since we have to manually define parameter dictionaries
+      dic['filterTypes'] = {
+        'filter1':True,
+        'filter2':False,
+        'filter3':False
+      }
 
     ### Store in the class
     self.dic = dic
@@ -214,13 +236,20 @@ class Inputs:
     ### Form dictionary that contains default parameters
     storageDict = dict()
 
-    ## Check dimensionality of image to specify correct parameter dictionaries
-    filterTypes = ['TT','LT','TA']
+    if self.classificationType == 'myocyte':
+      filterTypes = ['TT','LT','TA']
 
-    ### Assign default parameters
-    storageDict['TT'] = optimizer.ParamDict(typeDict=filterTypes[0])
-    storageDict['LT'] = optimizer.ParamDict(typeDict=filterTypes[1])
-    storageDict['TA'] = optimizer.ParamDict(typeDict=filterTypes[2])
+      ### Assign default parameters
+      storageDict['TT'] = optimizer.ParamDict(typeDict=filterTypes[0])
+      storageDict['LT'] = optimizer.ParamDict(typeDict=filterTypes[1])
+      storageDict['TA'] = optimizer.ParamDict(typeDict=filterTypes[2])
+    elif self.classificationType == 'arbitrary':
+      filterTypes = ['', '', '']
+
+      ### Assign default parameters
+      storageDict['filter1'] = optimizer.ParamDict(typeDict=filterTypes[0])
+      storageDict['filter2'] = optimizer.ParamDict(typeDict=filterTypes[1])
+      storageDict['filter3'] = optimizer.ParamDict(typeDict=filterTypes[2])
 
     self.paramDicts = storageDict
 
@@ -266,6 +295,9 @@ class Inputs:
 
   def check_yaml_for_errors(self):
     '''This function checks that the user-specified parameters read in through load_yaml() are valid'''
+    ### Check if the classification types are valid
+    if not any([self.classificationType == name for name in ['myocyte','arbitrary']]):
+      raise RuntimeError('The classificationType specified is not valid. Double check this.')
 
     ### Check that the scope resolutions are specified correctly
     for value in self.dic['scopeResolutions']:
@@ -973,7 +1005,7 @@ def validate(args,
 
   if display:
     plt.figure()
-    plt.imshow(myResults.markedImg)
+    plt.imshow(myResults.markedImage)
     plt.show()
 
   print "\nThe following content values are for validation purposes only.\n"
