@@ -68,6 +68,7 @@ class Inputs:
     self.imageName = imageName
     self.yamlFileName = yamlFileName
     self.mfOrig = mfOrig
+    self.scopeResolutions = scopeResolutions
     self.efficientRotationStorage = efficientRotationStorage
     self.paramDicts = paramDicts
 
@@ -77,9 +78,33 @@ class Inputs:
 
     ## Update default dictionaries according to yaml file
     if yamlFileName:
-      self.setupYamlInputs()
+      self.load_yaml()
+      # self.setupYamlInputs()
     else:
       self.yamlDict = None
+
+    self.setupImages()
+
+    self.updateInputs()
+
+    if self.yamlDict:
+      self.check_yaml_for_errors()
+
+  def setupImages(self):
+    '''This function sets up the gray scale image for classification and the color image for marking
+    hits.'''
+    ### Read in the original image and determine number of dimensions from this
+    self.imgOrig = util.ReadImg(self.yamlDict['imageName'], renorm=True)
+    self.dic['dimensions'] = len(self.imgOrig.shape)
+
+    ### Make a 'color' image with 3 channels in the final index to represent the color channels
+    ###   We also want to dampen the brightness a bit for display purposes, so we multiply by an
+    ###   alpha value
+    alpha = 0.85
+    colorImageMax = 255
+    self.colorImage = np.dstack((self.imgOrig, self.imgOrig, self.imgOrig)).astype(np.float32)
+    self.colorImage *= alpha * colorImageMax
+    self.colorImage = self.colorImage.astype(np.uint8)
 
   def setupDefaultDict(self):
     '''This method sets up a dictionary to hold default classification inputs. This will then be 
@@ -87,12 +112,22 @@ class Inputs:
     dic = dict()
     
     ### Globabl parameters
-    dic['imageName'] = ''
-    dic['scopeResolutions'] = {
-      'x': None,
-      'y': None,
-      'z': None
-    }
+    if isinstance(self.imageName, str):
+      dic['imageName'] = self.imageName
+    else:
+      dic['imageName'] = ''
+    if self.scopeResolutions == None:
+      dic['scopeResolutions'] = {
+        'x': None,
+        'y': None,
+        'z': None
+      }
+    else:
+      dic['scopeResolutions'] = {
+        'x': self.scopeResolutions[0],
+        'y': self.scopeResolutions[1],
+        'z': self.scopeResolutions[2]
+      }
     dic['efficientRotationStorage'] = True
     dic['iters'] = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
     dic['returnAngles'] = False
@@ -111,9 +146,9 @@ class Inputs:
     
     ### Filtering flags to turn on or off
     dic['filterTypes'] = {
-      'TT':False,
-      'LT':False,
-      'TA':False
+      'TT':True,
+      'LT':True,
+      'TA':True
     }
 
     ### Store in the class
@@ -126,28 +161,29 @@ class Inputs:
     ### Iterate through all keys specified in yaml and figure out if they have a default value.
     ###   If they do, then we assign the non-default value specified in the yaml file in the 
     ###   dictionary we already formed.
-    for key, value in self.yamlDict.iteritems():
-      ## Check to see if the key is pointing to the parameter dictionary. If it is, skip this
-      ##   since we have functions that update it already
-      if key == 'paramDicts':
-        continue
+    if isinstance(self.yamlDict, dict):
+      for key, value in self.yamlDict.iteritems():
+        ## Check to see if the key is pointing to the parameter dictionary. If it is, skip this
+        ##   since we have functions that update it already
+        if key == 'paramDicts':
+          continue
 
-      ## Check to see if the key is pointing to the outputParams dictionary specified in the YAML file
-      if key == "outputParams":
-        ## iterate through the dictionary specified in the yaml file and store non-default values
-        for outputKey, outputValue in value.iteritems():
-          self.dic['outputParams'][outputKey] = outputValue
-      
-      ## Here we check if the key is present within the default dictionary. If it is, we can then
-      ##   see if a non-default value is specified for it.
-      try:
-        ## checking to see if a default value is specified
-        if self.dic[key] != None:
-          ## if it is, we store the non-default value(s)
-          self.dic[key] = value
-      except:
-        ## if the key is not already specified in the default dictionary, then we continue on
-        pass
+        ## Check to see if the key is pointing to the outputParams dictionary specified in the YAML file
+        if key == "outputParams":
+          ## iterate through the dictionary specified in the yaml file and store non-default values
+          for outputKey, outputValue in value.iteritems():
+            self.dic['outputParams'][outputKey] = outputValue
+        
+        ## Here we check if the key is present within the default dictionary. If it is, we can then
+        ##   see if a non-default value is specified for it.
+        try:
+          ## checking to see if a default value is specified
+          if self.dic[key] != None:
+            ## if it is, we store the non-default value(s)
+            self.dic[key] = value
+        except:
+          ## if the key is not already specified in the default dictionary, then we continue on
+          pass
     
     ### Check to see if '.csv' is present in the output csv file
     if self.dic['outputParams']['csvFile'][-4:] != '.csv':
@@ -215,20 +251,6 @@ class Inputs:
     
     Also updates parameteres based on parameters that are specified in the yaml dictionary 
     that is stored within this class.'''
-
-    ### Read in the original image and determine number of dimensions from this
-    self.imgOrig = util.ReadImg(self.yamlDict['imageName'], renorm=True)
-    self.dic['dimensions'] = len(self.imgOrig.shape)
-
-    ### Make a 'color' image with 3 channels in the final index to represent the color channels
-    ###   We also want to dampen the brightness a bit for display purposes, so we multiply by an
-    ###   alpha value
-    alpha = 0.85
-    colorImageMax = 255
-    self.colorImage = np.dstack((self.imgOrig, self.imgOrig, self.imgOrig)).astype(np.float32)
-    self.colorImage *= alpha * colorImageMax
-    self.colorImage = self.colorImage.astype(np.uint8)
-
     ### Form the correct default parameter dictionaries from this dimensionality measurement
     self.updateDefaultDict()
     self.updateParamDicts()
@@ -318,7 +340,8 @@ class ClassificationResults:
                markedAngles=None,
                ttContent=None,
                ltContent=None,
-               taContent=None):
+               taContent=None,
+               angleCounts=None):
     '''
     Inputs:
       markedImage -> Numpy array. The image with TT, LT, and TA hits superimposed on the original image.
@@ -329,6 +352,7 @@ class ClassificationResults:
     self.ttContent = ttContent
     self.ltContent = ltContent
     self.taContent = taContent
+    self.angleCounts = angleCounts
   
   def writeToCSV(self, inputs):
     '''This function writes the results to a CSV file whose name is specified in the Inputs class 
@@ -738,7 +762,7 @@ def giveMarkedMyocyte(
       plt.gcf().savefig(outDict['fileRoot']+"_output."+outDict['fileType'],dpi=outDict['dpi'])
 
   if inputs.dic['returnAngles']:
-    angleCounts, myResults.markedAngles = analyzeTT_Angles(
+    myResults.angleCounts, myResults.markedAngles = analyzeTT_Angles(
       testImageName=inputs.yamlDict['imageName'],
       inputs=inputs,
       ImgTwoSarcSize=ImgTwoSarcSize,
@@ -754,7 +778,6 @@ def giveMarkedMyocyte(
     end = time.time()
     tElapsed = end - start
     print "Total Elapsed Time: {}s".format(tElapsed)
-    return myResults.markedImage, myResults.markedAngles, angleCounts
 
   ### Write results of the classification
   myResults.writeToCSV(inputs=inputs)
@@ -762,7 +785,7 @@ def giveMarkedMyocyte(
   end = time.time()
   tElapsed = end - start
   print "Total Elapsed Time: {}s".format(tElapsed)
-  return myResults.markedImage 
+  return myResults
 
 def give3DMarkedMyocyte(
       inputs,
@@ -900,7 +923,7 @@ def give3DMarkedMyocyte(
   end = time.time()
   print "Time for algorithm to run:",end-start,"seconds"
   
-  return myResults.markedImage
+  return myResults
 
 ###################################################################################################
 ###################################################################################################
@@ -943,19 +966,19 @@ def validate(args,
   )
 
   ### Run algorithm to pull out content and rotation info
-  markedImg, _, angleCounts = giveMarkedMyocyte(
+  myResults = giveMarkedMyocyte(
     inputs=inputs
   )
 
   if display:
     plt.figure()
-    plt.imshow(markedImg)
+    plt.imshow(myResults.markedImg)
     plt.show()
 
   print "\nThe following content values are for validation purposes only.\n"
 
   ### Calculate TT, LT, and TA content  
-  ttContent, ltContent, taContent = util.assessContent(markedImg)
+  ttContent, ltContent, taContent = util.assessContent(myResults.markedImage)
 
   sys.stdout.close()
   sys.stdout = sys.__stdout__
@@ -966,7 +989,7 @@ def validate(args,
   assert(abs(taContent - 156039) < 1), "TA validation failed."
 
   ### Calculate the number of hits at rotation equal to 5 degrees
-  numHits = np.count_nonzero(np.asarray(angleCounts) == 5)
+  numHits = np.count_nonzero(np.asarray(myResults.angleCounts) == 5)
   # print "Number of Hits at Rotation = 5 Degrees:", numHits
   assert(abs(numHits - 1621) < 1), "Rotation validation failed"
 
@@ -1019,14 +1042,14 @@ def validate3D(args):
   )
 
   ### Analyze the 3D cell
-  markedImage = give3DMarkedMyocyte(
+  myResults = give3DMarkedMyocyte(
     inputs = inputs
   )
 
   print "\nThe following content values are for validation purposes only.\n"
 
   ### Assess the amount of TT, LT, and TA content there is in the image 
-  ttContent, ltContent, taContent = util.assessContent(markedImage)
+  ttContent, ltContent, taContent = util.assessContent(myResults.markedImage)
 
   sys.stdout.close()
   sys.stdout = sys.__stdout__
