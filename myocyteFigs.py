@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 import pandas as pd
+import cPickle as pkl
 
 import bankDetect as bD
 import detect
@@ -622,15 +623,14 @@ def saveWorkflowFig():
   ### Make a histogram for the angles
   du.giveAngleHistogram(angleCounts,iters,"WorkflowFig")
 
-def test3DSimulatedData(LT_probability = [0.1], 
-                        TA_probability = [0.1],
-                        noiseAmplitude = 0.):
+def test3DSimulatedData(LT_probability = [0., .15, .3], 
+                        TA_probability = [0., .15, .3],
+                        noiseAmplitude = 0.,
+                        numReplicates = 1):
   '''This function tests out the implementation of the 3D data simulation and detection routines.
   This is carried out by generating the simulated data based on user specified ratios of LT, TT,
   and TA unit cells. We then analyze this using the 3D filtering routines. Then compare the results
   compared to what we would expect based on the specified probability distributions.
-
-  TODO: Make the probabilities much larger so we can test a large dataset and get a range of predictions.
 
   Inputs:
     LT_probability -> List of floats. Probability of inserting a LT unit cell into the simulated data.
@@ -638,6 +638,7 @@ def test3DSimulatedData(LT_probability = [0.1],
                         NOTE: The probability of finding a TT unit cell is
                           1 - LT_probability - TA_probability
     noiseAmplitude -> float. Amplitude of the multiplicative Gaussian white noise in the simulated data
+    numReplicates -> int. Number of cells generated for each combination of probabilities
 
   Outputs:
     None
@@ -654,29 +655,62 @@ def test3DSimulatedData(LT_probability = [0.1],
   ltName = './myoimages/LT_3D.tif'
   taName = './myoimages/TA_3D.tif'
 
-  ### Loop through and generate all of the necessary simulated cells
+  ### Loop through and generate all of the necessary simulated cells and classification results
+  storage = {}
   for LTp in LT_probability:
     for TAp in TA_probability:
-      ## Define test file name
-      testName = "./myoimages/3DTestData_{}LT_{}TA.tif".format(
-        str(LTp).replace('.',''),
-        str(TAp).replace('.','')
-      )
+      ## Create storage entry in dictionary
+      probs = str(LTp)+'_'+str(TAp)
+      storage[probs] = {
+        'TA': [], 
+        'LT': [],
+        'TT': []
+      }
+      for num in range(numReplicates):
+        ## Define test file name
+        testName = "./myoimages/3DTestData_{}LT_{}TA.tif".format(
+          str(LTp).replace('.',''),
+          str(TAp).replace('.','')
+        )
 
-      ## Simulate the small 3D cell
-      util.generateSimulated3DCell(LT_probability=LTp,
-                                   TA_probability=TAp,
-                                   noiseAmplitude=noiseAmplitude,
-                                   scopeResolutions=scopeResolutions,
-                                   cellDimensions=cellDimensions,
-                                   fileName=testName,
-                                   seed=1001,
-                                   )
+        ## Simulate the small 3D cell
+        util.generateSimulated3DCell(LT_probability=LTp,
+                                     TA_probability=TAp,
+                                     noiseAmplitude=noiseAmplitude,
+                                     scopeResolutions=scopeResolutions,
+                                     cellDimensions=cellDimensions,
+                                     fileName=testName
+                                     )
+        
+        ## Form inputs
+        inputs = mm.Inputs(
+          imageName = testName,
+          scopeResolutions = scopeResolutions
+        )
+        inputs.dic['iters'] = [[0,0,0]]
+        inputs.dic['preprocess'] = False
+        inputs.dic['dimensions'] = 3
+        # Update parameter dicitonaries to now contain 3D parameters, not 2D
+        inputs.updateParamDicts()
 
-  ### Loop through and Analyze the simulated data
+        ## Classify the simulated cell
+        myResults = mm.give3DMarkedMyocyte(
+          inputs = inputs
+        )
 
-  ### TODO: Finish this
-  
+        storage[probs]['TA'].append(myResults.taContent)
+        storage[probs]['LT'].append(myResults.ltContent)
+        storage[probs]['TT'].append(myResults.ttContent)
+
+  with open('./results/test3DSimulatedData.pkl', 'wb') as fil:
+    pkl.dump(storage, fil)
+
+  for probs, contentDict in storage.iteritems():
+    print probs+':'
+    print '\tTA Content'+str(np.mean(contentDict['TA']))+' +- '+str(np.std(contentDict['TA']))
+    print '\tLT Content'+str(np.mean(contentDict['LT']))+' +- '+str(np.std(contentDict['LT']))
+    print '\tTT Content'+str(np.mean(contentDict['TT']))+' +- '+str(np.std(contentDict['TT']))
+
 
 ###################################################################################################
 ###################################################################################################
@@ -1364,6 +1398,10 @@ if __name__ == "__main__":
 
     if(arg=="-yaml"):
       YAML_example()
+      quit()
+
+    if(arg=='-test3DSimulatedData'):
+      test3DSimulatedData()
       quit()
 
     # generates all figs
