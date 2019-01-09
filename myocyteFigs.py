@@ -626,7 +626,7 @@ def saveWorkflowFig():
 def test3DSimulatedData(LT_probability = [0., .15, .3], 
                         TA_probability = [0., .15, .3],
                         noiseAmplitude = 0.,
-                        numReplicates = 1):
+                        numReplicates = 20):
   '''This function tests out the implementation of the 3D data simulation and detection routines.
   This is carried out by generating the simulated data based on user specified ratios of LT, TT,
   and TA unit cells. We then analyze this using the 3D filtering routines. Then compare the results
@@ -685,7 +685,8 @@ def test3DSimulatedData(LT_probability = [0., .15, .3],
         ## Form inputs
         inputs = mm.Inputs(
           imageName = testName,
-          scopeResolutions = scopeResolutions
+          scopeResolutions = scopeResolutions,
+          preprocess=False
         )
         inputs.dic['iters'] = [[0,0,0]]
         inputs.dic['preprocess'] = False
@@ -698,18 +699,20 @@ def test3DSimulatedData(LT_probability = [0., .15, .3],
           inputs = inputs
         )
 
-        storage[probs]['TA'].append(myResults.taContent)
-        storage[probs]['LT'].append(myResults.ltContent)
-        storage[probs]['TT'].append(myResults.ttContent)
+        cellVolume = float(np.prod(inputs.imgOrig.shape))
+
+        storage[probs]['TA'].append(float(np.count_nonzero(myResults.markedImage[..., 2] == 255)) / cellVolume)
+        storage[probs]['LT'].append(float(np.count_nonzero(myResults.markedImage[..., 1] == 255)) / cellVolume)
+        storage[probs]['TT'].append(float(np.count_nonzero(myResults.markedImage[..., 0] == 255)) / cellVolume)
 
   with open('./results/test3DSimulatedData.pkl', 'wb') as fil:
     pkl.dump(storage, fil)
 
   for probs, contentDict in storage.iteritems():
     print probs+':'
-    print '\tTA Content'+str(np.mean(contentDict['TA']))+' +- '+str(np.std(contentDict['TA']))
-    print '\tLT Content'+str(np.mean(contentDict['LT']))+' +- '+str(np.std(contentDict['LT']))
-    print '\tTT Content'+str(np.mean(contentDict['TT']))+' +- '+str(np.std(contentDict['TT']))
+    print '\tTA Content '+str(np.mean(contentDict['TA']))[:5]+' +- '+str(np.std(contentDict['TA']))[:5]
+    print '\tLT Content '+str(np.mean(contentDict['LT']))[:5]+' +- '+str(np.std(contentDict['LT']))[:5]
+    print '\tTT Content '+str(np.mean(contentDict['TT']))[:5]+' +- '+str(np.std(contentDict['TT']))[:5]
 
 
 ###################################################################################################

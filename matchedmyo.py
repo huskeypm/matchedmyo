@@ -48,6 +48,7 @@ class Inputs:
                efficientRotationStorage=True,
                paramDicts = None,
                yamlDict = None,
+               preprocess = True
                ):
     '''
     Inputs:
@@ -71,6 +72,7 @@ class Inputs:
     self.scopeResolutions = scopeResolutions
     self.efficientRotationStorage = efficientRotationStorage
     self.paramDicts = paramDicts
+    self.preprocess = preprocess
 
     ## Setup default dictionaries for classification
     self.setupDefaultDict()
@@ -79,12 +81,11 @@ class Inputs:
     ## Update default dictionaries according to yaml file
     if yamlFileName:
       self.load_yaml()
-      # self.setupYamlInputs()
     else:
       self.yamlDict = None
 
+    self.updateDefaultDict()
     self.setupImages()
-
     self.updateInputs()
 
     if self.yamlDict:
@@ -94,7 +95,7 @@ class Inputs:
     '''This function sets up the gray scale image for classification and the color image for marking
     hits.'''
     ### Read in the original image and determine number of dimensions from this
-    self.imgOrig = util.ReadImg(self.yamlDict['imageName'], renorm=True)
+    self.imgOrig = util.ReadImg(self.dic['imageName'], renorm=True)
     self.dic['dimensions'] = len(self.imgOrig.shape)
 
     ### Make a 'color' image with 3 channels in the final index to represent the color channels
@@ -132,7 +133,7 @@ class Inputs:
     dic['iters'] = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
     dic['returnAngles'] = False
     dic['returnPastedFilter'] = True
-    dic['preprocess'] = True
+    dic['preprocess'] = self.preprocess
     dic['filterTwoSarcomereSize'] = 25
 
     ### Output parameter dictionary
@@ -252,7 +253,7 @@ class Inputs:
     Also updates parameteres based on parameters that are specified in the yaml dictionary 
     that is stored within this class.'''
     ### Form the correct default parameter dictionaries from this dimensionality measurement
-    self.updateDefaultDict()
+    # self.updateDefaultDict()
     self.updateParamDicts()
 
     ### Check to see if we need to preprocess the image at all
