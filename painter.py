@@ -246,7 +246,7 @@ def StackHits(correlated,  # an array of 'correlation planes'
       if returnAngles:
         ## Now we fix the stackedAngles format
         stackedAngles = correlated['rotSNRArray']
-        # stackedAngles[stackedHits == 0] = 361 # 361 indicates no hit at that pixel/voxel
+        stackedAngles[stackedHits == 0] = 361 # 361 indicates no hit at that pixel/voxel
         return stackedHits, stackedAngles
       else:
         return stackedHits
