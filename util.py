@@ -976,9 +976,9 @@ def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize=25,filterTwoSarcSize=25):
   maskName = imgName[:-4]; fileType = imgName[-4:]
   fileName = maskName+'_mask'+fileType
   mask = cv2.imread(fileName)                       
-  try:
+  if mask != None:
     maskGray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-  except:
+  else:
     print "No mask named '"+fileName +"' was found. Circumventing masking."
     return img
   if ImgTwoSarcSize != None:
