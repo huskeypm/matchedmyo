@@ -360,6 +360,20 @@ class Inputs:
       if self.dic['classificationType'] == 'myocyte':
         if not self.dic['filterTypes']['TT']:
           raise RuntimeError('TT filtering must be turned on if returnAngles is specified as True')
+
+    ### Check that filter modes are specified correctly
+    for filtType, pDict in self.paramDicts.iteritems():
+      print filtType, pDict #DELETE
+      try:
+        filtMode = pDict['filterMode']
+      except:
+        filtMode = False
+      if filtMode != False:
+        if filtMode not in ['simple', 'punishmentFilter', 'regionalDeviation'] and self.dic['filterTypes'][filtType]:
+          raise RuntimeError('Check that filterMode for {} in your paramDicts'.format(filtType) 
+                             +' is either "simple,"'
+                             +'"punishmentFilter," or "regionalDeviation."')
+
     
   def setupYamlInputs(self):
     '''This function sets up inputs if a yaml file name is specified'''
@@ -988,6 +1002,11 @@ def arbitraryFiltering(inputs):
       print "Performing {} classification".format(filterKey)
       ## Load in filter
       inputs.mfOrig = util.LoadFilter(inputs.paramDicts[filterKey]['filterName'])
+      if inputs.paramDicts[filterKey]['filterMode'] == 'punishmentFilter':
+        # We have to load in the punishment filter too
+        inputs.paramDicts[filterKey]['mfPunishment'] = util.LoadFilter(
+          inputs.paramDicts[filterKey]['punishFilterName']
+        )
       ## Load punishment filter and covariance matrix if applicable
       if inputs.paramDicts[filterKey]['filterMode'] == 'punishmentFilter':
         inputs.paramDicts[filterKey]['punishmentFilter'] = util.LoadFilter(
@@ -1036,10 +1055,8 @@ def arbitraryFiltering(inputs):
 
         ## Count num hits at each rotation
         angleCounts = {}
-        hitSum = 0 # DELETE
         for it in inputs.dic['iters']:
           angleCounts[it] = np.count_nonzero(filterResults.stackedAngles == it)
-          hitSum += angleCounts[it] # DELETE
           print filterKey+' hits at {} rotation: {}'.format(it, angleCounts[it])
 
         if isinstance(inputs.dic['outputParams']['fileRoot'],str):
@@ -1054,10 +1071,6 @@ def arbitraryFiltering(inputs):
     plt.imshow(util.switchBRChannels(myResults.markedImage))
     outDict = inputs.dic['outputParams']
     plt.gcf().savefig(outDict['fileRoot']+"_output."+outDict['fileType'],dpi=outDict['dpi'])
-
-  print np.count_nonzero(filterResults.stackedHits) # DELETE
-  print np.count_nonzero(filterResults.stackedAngles != 361) # DELETE
-  print hitSum # DELETE
 
   ### Write results of the classification
   myResults.writeToCSV(inputs=inputs)
