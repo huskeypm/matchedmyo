@@ -363,7 +363,6 @@ class Inputs:
 
     ### Check that filter modes are specified correctly
     for filtType, pDict in self.paramDicts.iteritems():
-      print filtType, pDict #DELETE
       try:
         filtMode = pDict['filterMode']
       except:
@@ -610,14 +609,13 @@ def analyzeTT_Angles(testImageName,
   smoothedWTresults = bD.DetectFilter(rotInputs,params,inputs.dic['iters'],returnAngles=True)
   smoothedHits = smoothedWTresults.stackedAngles
 
+  ### Apply mask to the WTstackedHits so we don't have to apply it later and chop off part of the image
+  WTstackedHits = util.ReadResizeApplyMask(WTstackedHits,testImageName,ImgTwoSarcSize,filterTwoSarcSize=ImgTwoSarcSize)
+
   ### pull out actual hits from smoothed results
   smoothedHits[WTstackedHits == 0] = 361
 
-  coloredAngles = painter.colorAngles(inputs.colorImage,smoothedHits,inputs.dic['iters'])
-
-  coloredAnglesMasked = util.ReadResizeApplyMask(coloredAngles,testImageName,
-                                            ImgTwoSarcSize,
-                                            filterTwoSarcSize=ImgTwoSarcSize)
+  coloredAnglesMasked = painter.colorAngles(inputs.colorImage,smoothedHits,inputs.dic['iters'])
 
   ### Check to see if we've used the new efficient way of storing information in the algorithm.
   ###   If we have, we already have the rotational information stored
@@ -794,17 +792,22 @@ def giveMarkedMyocyte(
       plt.gcf().savefig(outDict['fileRoot']+"_output."+outDict['fileType'],dpi=outDict['dpi'])
 
   if inputs.dic['returnPastedFilter']:
-    ## Mark filter-sized unit cells on the image to represent hits
+    ## Mark filter-sized unit cells on blank image to represent hits
     myResults.markedImage = util.markPastedFilters(inputs, lossMasked, ltMasked, wtMasked)
     
-    ### apply mask again so as to avoid content > 1.0
+    ### apply mask to marked image to avoid content > 1.0
     myResults.markedImage = util.ReadResizeApplyMask(
       myResults.markedImage,
       inputs.yamlDict['imageName'],
       ImgTwoSarcSize,
       filterTwoSarcSize=ImgTwoSarcSize
     )
-    # inputs.colorImage[dummy==255] = 255
+
+    ## Superimpose hits onto image
+    colorImgDummy = inputs.colorImage.copy()
+    for i in range(3):
+      colorImgDummy[...,i][myResults.markedImage[...,i] == 255] = 255
+    myResults.markedImage = colorImgDummy
 
     ### Now based on the marked hits, we can obtain an estimate of tubule content
     ### TODO: Make this an optional parameter specified in the YAML file

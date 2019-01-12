@@ -1,7 +1,7 @@
 imageName: /net/share/dfco222/data/TT/LouchData/processedWithIntelligentThresholding/HF_1_processed.png
 outputParams:
     fileRoot: ./results/HF
-    fileType: pdf
+    fileType: png
     dpi: 1200
 preprocess: False
-returnAngles: False
+returnAngles: True
