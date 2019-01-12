@@ -976,7 +976,7 @@ def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize=25,filterTwoSarcSize=25):
   maskName = imgName[:-4]; fileType = imgName[-4:]
   fileName = maskName+'_mask'+fileType
   mask = cv2.imread(fileName)                       
-  if mask != None:
+  if isinstance(mask, np.ndarray):
     maskGray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
   else:
     print "No mask named '"+fileName +"' was found. Circumventing masking."
@@ -1506,7 +1506,8 @@ def markPastedFilters(
     LTmask[TTmask] = False # prevents double marking of WT and LT
 
   ### Dampen brightness and mark hits
-  markedImage = inputs.colorImage.copy()
+  # markedImage = inputs.colorImage.copy()
+  markedImage = np.zeros_like(inputs.colorImage)
   alpha = 1.0
   hitValue = int(round(alpha * 255))
   if inputs.dic['filterTypes']['TA']:
