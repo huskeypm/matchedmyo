@@ -971,15 +971,16 @@ def makeMask(threshold = 245,
 
     return newmasker
 
-def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize=25,filterTwoSarcSize=25):
+def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize=25,filterTwoSarcSize=25,maskName=None):
   # function to apply the image mask before outputting results
-  maskName = imgName[:-4]; fileType = imgName[-4:]
-  fileName = maskName+'_mask'+fileType
-  mask = cv2.imread(fileName)                       
+  if maskName == None:
+    maskName = imgName[:-4]; fileType = imgName[-4:]
+    maskName = maskName+'_mask'+fileType
+  mask = cv2.imread(maskName)                       
   if isinstance(mask, np.ndarray):
     maskGray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
   else:
-    print "No mask named '"+fileName +"' was found. Circumventing masking."
+    print "No mask named '"+maskName +"' was found. Circumventing masking."
     return img
   if ImgTwoSarcSize != None:
     scale = float(filterTwoSarcSize) / float(ImgTwoSarcSize)
