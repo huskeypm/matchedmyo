@@ -1242,6 +1242,27 @@ def autoDepadArray(img, verbose=False):
   
   return newImg
 
+def lightlyPreprocess(img,filterTwoSarcomereSize):
+  '''Function to lightly preprocess a given myocyte'''
+  ### Lightly preprocess the image
+  imgDims = np.shape(img)
+
+  # grab subsection for resizing image. Extents are just guesses so they could be improved
+  cY, cX = int(round(float(imgDims[0]/2.))), int(round(float(imgDims[1]/2.)))
+  xExtent = 50
+  yExtent = 25
+  top = cY-yExtent; bottom = cY+yExtent; left = cX-xExtent; right = cX+xExtent
+  indexes = np.asarray([top,bottom,left,right])
+  subsection = np.asarray(img[top:bottom,left:right],dtype=np.float64)
+  subsection /= np.max(subsection)
+  img, scale, newIndexes = pp.resizeGivenSubsection(img,subsection,filterTwoSarcomereSize,indexes)
+
+  # intelligently threshold image using gaussian thresholding
+  img = pp.normalizeToStriations(img, newIndexes, filterTwoSarcomereSize)
+  img = np.asarray(img,dtype=np.float64)
+  img /= np.max(img)
+  return img
+
 ###################################################################################################
 ###################################################################################################
 ###################################################################################################
