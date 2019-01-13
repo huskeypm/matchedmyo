@@ -127,6 +127,7 @@ class Inputs:
       dic['imageName'] = self.imageName
     else:
       dic['imageName'] = ''
+    dic['maskName'] = self.maskName
     if self.scopeResolutions == None:
       dic['scopeResolutions'] = {
         'x': None,
@@ -612,7 +613,7 @@ def analyzeTT_Angles(testImageName,
   smoothedHits = smoothedWTresults.stackedAngles
 
   ### Apply mask to the WTstackedHits so we don't have to apply it later and chop off part of the image
-  WTstackedHits = util.ReadResizeApplyMask(WTstackedHits,testImageName,ImgTwoSarcSize,filterTwoSarcSize=ImgTwoSarcSize)
+  WTstackedHits = util.ReadResizeApplyMask(WTstackedHits,testImageName,ImgTwoSarcSize,filterTwoSarcSize=ImgTwoSarcSize,maskName=inputs.dic['maskName'])
 
   ### pull out actual hits from smoothed results
   smoothedHits[WTstackedHits == 0] = 361
@@ -727,7 +728,8 @@ def giveMarkedMyocyte(
       WTstackedHits,
       inputs.yamlDict['imageName'],
       ImgTwoSarcSize,
-      filterTwoSarcSize=ImgTwoSarcSize
+      filterTwoSarcSize=ImgTwoSarcSize,
+      maskName=inputs.dic['maskName']
     )
   else:
     wtMasked = None
@@ -736,7 +738,8 @@ def giveMarkedMyocyte(
       LTstackedHits,
       inputs.yamlDict['imageName'],
       ImgTwoSarcSize,
-      filterTwoSarcSize=ImgTwoSarcSize
+      filterTwoSarcSize=ImgTwoSarcSize,
+      maskName=inputs.dic['maskName']
     )
   else:
     ltMasked = None
@@ -745,7 +748,8 @@ def giveMarkedMyocyte(
       LossstackedHits,
       inputs.yamlDict['imageName'],
       ImgTwoSarcSize,
-      filterTwoSarcSize=ImgTwoSarcSize
+      filterTwoSarcSize=ImgTwoSarcSize,
+      maskName=inputs.dic['maskName']
     )
   else:
     lossMasked = None
@@ -802,7 +806,8 @@ def giveMarkedMyocyte(
       myResults.markedImage,
       inputs.yamlDict['imageName'],
       ImgTwoSarcSize,
-      filterTwoSarcSize=ImgTwoSarcSize
+      filterTwoSarcSize=ImgTwoSarcSize,
+      maskName=inputs.dic['maskName']
     )
 
     ## Superimpose hits onto image
