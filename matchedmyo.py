@@ -42,6 +42,7 @@ class Inputs:
   def __init__(self,
                classificationType = 'myocyte',
                imageName = None,
+               maskName = None,
                colorImage = None,
                yamlFileName = None,
                mfOrig=None,
@@ -69,6 +70,7 @@ class Inputs:
     ### Store global class-level parameters
     self.classificationType = classificationType
     self.imageName = imageName
+    self.maskName = maskName
     self.yamlFileName = yamlFileName
     self.mfOrig = mfOrig
     self.scopeResolutions = scopeResolutions
@@ -1251,6 +1253,9 @@ def run(args):
       raise RuntimeError("The dimensions of the image specified in {} is not supported.".format(args.yamlFile))
   elif inputs.dic['classificationType'] == 'arbitrary':
     arbitraryFiltering(inputs = inputs)
+  else:
+    raise RuntimeError("Classification Type (specified as classificationType: <type> in YAML file)"
+                       +"not understood. Check to see that spelling is correct.")
 
 def main(args):
   '''The routine through which all command line functionality is routed.
