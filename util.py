@@ -21,6 +21,7 @@ class empty:
   pass
 
 root = "myoimages/"
+thisFileRoot = '/'.join(os.path.realpath(__file__).split('/')[:-1])
 
 ###################################################################################################
 ###################################################################################################
@@ -975,13 +976,17 @@ def makeMask(threshold = 245,
 def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize=25,filterTwoSarcSize=25,maskName=None):
   # function to apply the image mask before outputting results
   if maskName == None:
-    maskName = imgName[:-4]; fileType = imgName[-4:]
-    maskName = maskName+'_mask'+fileType
+    if isinstance(imgName, str):
+      maskName = imgName[:-4]; fileType = imgName[-4:]
+      maskName = maskName+'_mask'+fileType
   mask = cv2.imread(maskName)                       
   if isinstance(mask, np.ndarray):
     maskGray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
   else:
-    print "No mask named '"+maskName +"' was found. Circumventing masking."
+    if maskName == None:
+      print "No mask was found. Circumventing masking."
+    else:
+      print "No mask named '"+maskName +"' was found. Circumventing masking."
     return img
   if ImgTwoSarcSize != None:
     scale = float(filterTwoSarcSize) / float(ImgTwoSarcSize)
@@ -1248,6 +1253,11 @@ def lightlyPreprocess(img,filterTwoSarcomereSize,colorImg=None):
   ### Lightly preprocess the image
   imgDims = np.shape(img)
 
+  ### Check data type of image. If it's not uint8, then we should rescale
+  if img.dtype != np.uint8:
+    img = img.astype(np.float32) / np.max(img) * 255.
+    img = img.astype(np.uint8)
+
   # grab subsection for resizing image. Extents are just guesses so they could be improved
   cY, cX = int(round(float(imgDims[0]/2.))), int(round(float(imgDims[1]/2.)))
   xExtent = 50
@@ -1260,7 +1270,7 @@ def lightlyPreprocess(img,filterTwoSarcomereSize,colorImg=None):
 
   # If colorImg is supplied, then we resize that too
   if isinstance(colorImg,np.ndarray):
-    colorImg = cv2.resize(colorImg, None, dx=scale, dy=scale,interpolation=cv2.INTER_CUBIC)
+    colorImg = cv2.resize(colorImg, None, fx=scale, fy=scale,interpolation=cv2.INTER_CUBIC)
 
   # intelligently threshold image using gaussian thresholding
   img = pp.normalizeToStriations(img, newIndexes, filterTwoSarcomereSize)
@@ -1440,9 +1450,9 @@ def markPastedFilters(
       taMasked=None,
       ltMasked=None, 
       wtMasked=None, 
-      taName="./myoimages/LossFilter.png",
-      ltName="./myoimages/LongitudinalFilter.png",
-      ttName="./myoimages/newSimpleWTFilter.png"
+      taName=thisFileRoot+"/myoimages/LossFilter.png",
+      ltName=thisFileRoot+"/myoimages/LongitudinalFilter.png",
+      ttName=thisFileRoot+"/myoimages/newSimpleWTFilter.png"
       ):
   '''
   Given masked stacked hits for the 3 filters and a doctored colored image, 
