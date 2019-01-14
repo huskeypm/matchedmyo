@@ -86,7 +86,7 @@ class Inputs:
       except:
         pass
     else:
-      self.yamlDict = None
+      self.yamlDict = {}
 
     ## Setup default dictionaries for classification
     self.setupDefaultDict()
@@ -227,11 +227,15 @@ class Inputs:
 
     ### Convert the scope resolutions into a list
     if isinstance(self.dic['scopeResolutions'], dict):
-      self.dic['scopeResolutions'] = [
+      scopeRes = [
         self.dic['scopeResolutions']['x'],
-        self.dic['scopeResolutions']['y'],
-        self.dic['scopeResolutions']['z']
+        self.dic['scopeResolutions']['y']
       ]
+      try:
+        scopeRes.append(self.dic['scopeResolutions']['z'])
+      except:
+        pass
+      self.dic['scopeResolutions'] = scopeRes
 
     ### Flatten out iters if it is still a dictionary. This is necessary for 3D classification where
     ###   there are three axes of rotation
@@ -658,7 +662,6 @@ def giveMarkedMyocyte(
     See give3DMarkedMyocyte() for better documentation.
     TODO: Better document this
   '''
- 
   start = time.time()
   ### Create storage object for results
   myResults = ClassificationResults()
