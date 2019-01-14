@@ -32,17 +32,24 @@ def normalizeToStriations(img, subsectionIdxs,filterSize):
   print "Normalizing myocyte to striations"
   
   ### Load in filter that will be used to smooth the subsection
-  WTfilterName = "./myoimages/singleTTFilter.png"
-  WTfilter = util.ReadImg(WTfilterName,renorm=True)
+  thisPath = os.path.realpath(__file__).split('/')[:-1]
+  thisPath = '/'.join(thisPath)
+  WTfilterName = thisPath+'/myoimages/singleTTFilter.png'
+  #WTfilter = util.ReadImg(WTfilterName,renorm=True)
   # divide by the sum so that we are averaging across the filter
-  WTfilter /= np.sum(WTfilter)
+  #WTfilter /= np.sum(WTfilter)
+  WTfilter = util.LoadFilter(WTfilterName)
 
   ### Perform smoothing on subsection
-  smoothed = np.asarray(mF.matchedFilter(img,WTfilter,demean=False),dtype=np.uint8)
+  smoothed = np.asarray(mF.matchedFilter(img,WTfilter,demean=False))
 
   ### Grab subsection of the smoothed image
   smoothedSubsection = smoothed.copy()[subsectionIdxs[0]:subsectionIdxs[1],
                                        subsectionIdxs[2]:subsectionIdxs[3]]
+
+  ### Now we have to normalize to 255 for cv2 algorithm to work
+  smoothedSubsection = smoothedSubsection * 255. / np.max(smoothedSubsection)
+  smoothedSubsection = smoothedSubsection.astype(np.uint8)
   #plt.figure()
   #plt.imshow(smoothedSubsection)
   #plt.colorbar()

@@ -11,6 +11,7 @@ import subprocess
 import time
 import sys
 import datetime
+import copy
 import csv
 import util
 import numpy as np
@@ -23,6 +24,7 @@ import argparse
 import yaml
 import preprocessing as pp
 
+root = '/'.join(os.path.realpath(__file__).split('/')[:-1])
 
 ###################################################################################################
 ###################################################################################################
@@ -222,7 +224,8 @@ class Inputs:
           pass
     
     ### Check to see if '.csv' is present in the output csv file
-    if self.dic['outputParams']['csvFile'][-4:] != '.csv':
+    if (isinstance(self.dic['outputParams']['csvFile'],str) 
+        and self.dic['outputParams']['csvFile'][-4:] != '.csv'):
       self.dic['outputParams']['csvFile'] = self.dic['outputParams']['csvFile'] + '.csv'
 
     ### Convert the scope resolutions into a list
@@ -569,7 +572,7 @@ def analyzeTT_Angles(testImageName,
                      inputs,
                      ImgTwoSarcSize,
                      WTstackedHits,
-                     ttFilterName = "./myoimages/newSimpleWTFilter.png"
+                     ttFilterName = root+"/myoimages/newSimpleWTFilter.png"
                      ):
   '''This function analyzes the tubule striation angle for the transverse tubule filter.
   The routine does this by smoothing the original image with a small smoothing filter, constructing
@@ -602,10 +605,11 @@ def analyzeTT_Angles(testImageName,
   ttFilter = util.LoadFilter(ttFilterName)
   longFilter = np.concatenate((ttFilter,ttFilter,ttFilter))
     
-  rotInputs = Inputs(
-    imageName = inputs.imageName,
-    yamlFileName = inputs.yamlFileName,
-    mfOrig = longFilter)
+  #rotInputs = Inputs(
+  #  imageName = inputs.imageName,
+  #  yamlFileName = inputs.yamlFileName,
+  #  mfOrig = longFilter)
+  rotInputs = copy.deepcopy(inputs)
   rotInputs.imgOrig = smoothed
 
   params = optimizer.ParamDict(typeDict='WT')
@@ -848,7 +852,8 @@ def giveMarkedMyocyte(
       plt.gcf().savefig(outDict['fileRoot']+"_angles_output."+outDict['fileType'],dpi=outDict['dpi'])
     
   ### Write results of the classification
-  myResults.writeToCSV(inputs=inputs)
+  if isinstance(inputs.dic['outputParams']['csvFile'],str):
+    myResults.writeToCSV(inputs=inputs)
 
   end = time.time()
   tElapsed = end - start
