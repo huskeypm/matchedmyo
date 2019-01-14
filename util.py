@@ -1259,7 +1259,7 @@ def lightlyPreprocess(img,filterTwoSarcomereSize,colorImg=None):
   img, scale, newIndexes = pp.resizeGivenSubsection(img,subsection,filterTwoSarcomereSize,indexes)
 
   # If colorImg is supplied, then we resize that too
-  if colorImg != None:
+  if isinstance(colorImg,np.ndarray):
     colorImg = cv2.resize(colorImg, None, dx=scale, dy=scale,interpolation=cv2.INTER_CUBIC)
 
   # intelligently threshold image using gaussian thresholding
