@@ -35,10 +35,11 @@ def normalizeToStriations(img, subsectionIdxs,filterSize):
   thisPath = os.path.realpath(__file__).split('/')[:-1]
   thisPath = '/'.join(thisPath)
   WTfilterName = thisPath+'/myoimages/singleTTFilter.png'
-  #WTfilter = util.ReadImg(WTfilterName,renorm=True)
-  # divide by the sum so that we are averaging across the filter
-  #WTfilter /= np.sum(WTfilter)
   WTfilter = util.LoadFilter(WTfilterName)
+
+  if img.dtype != np.uint8:
+    img = img.astype(np.float32) / float(np.max(img)) * 255.
+    img = img.astype(np.uint8)
 
   ### Perform smoothing on subsection
   smoothed = np.asarray(mF.matchedFilter(img,WTfilter,demean=False))
@@ -48,8 +49,9 @@ def normalizeToStriations(img, subsectionIdxs,filterSize):
                                        subsectionIdxs[2]:subsectionIdxs[3]]
 
   ### Now we have to normalize to 255 for cv2 algorithm to work
-  smoothedSubsection = smoothedSubsection * 255. / np.max(smoothedSubsection)
-  smoothedSubsection = smoothedSubsection.astype(np.uint8)
+  if img.dtype != np.uint8:
+    smoothedSubsection = smoothedSubsection * 255. / np.max(smoothedSubsection)
+    smoothedSubsection = smoothedSubsection.astype(np.uint8)
   #plt.figure()
   #plt.imshow(smoothedSubsection)
   #plt.colorbar()
@@ -413,10 +415,20 @@ def resizeGivenSubsection(img,subsection,filterTwoSarcomereSize,indexes):
 def applyCLAHE(img,filterTwoSarcomereSize):
   print "Applying CLAHE to Myocyte"
 
+  if img.dtype != np.uint8:
+    # convert to uint8 data type to use with clahe algorithm
+    fixed = True
+    oldImgMax = np.max(img)
+    img = img * 255. / float(np.max(img))
+    img = img.astype(np.uint8)
+
   kernel = (filterTwoSarcomereSize, filterTwoSarcomereSize)
   clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=kernel)
 
   clahedImage = clahe.apply(img)
+
+  if fixed:
+    img = img.astype(np.float32) / float(np.max(img)) * oldImgMax
 
   return clahedImage
 ###############################################################################
@@ -425,7 +437,7 @@ def applyCLAHE(img,filterTwoSarcomereSize):
 ###
 ###############################################################################
 
-def preprocess(fileName,filterTwoSarcomereSize):
+def preprocess(fileName,filterTwoSarcomereSize,writeImage=False):
   img = util.ReadImg(fileName)
 
   img,degreesOffCenter = reorient(img)
@@ -440,9 +452,12 @@ def preprocess(fileName,filterTwoSarcomereSize):
     1
 
   # write file
-  name,fileType = fileName[:-4],fileName[-4:]
-  newName = name+"_processed"+fileType
-  cv2.imwrite(newName,img)
+  if writeImage:
+    name,fileType = fileName[:-4],fileName[-4:]
+    newName = name+"_processed"+fileType
+    cv2.imwrite(newName,img)
+
+  img = img.astype(np.float32) / float(np.max(img))
 
   return img
 

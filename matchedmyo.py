@@ -307,7 +307,13 @@ class Inputs:
 
     ### Check to see if we need to preprocess the image at all
     if self.dic['preprocess']:
+      self.imgOrig = util.ReadImg(self.imageName)
       self.imgOrig = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'])
+      ## remake the color image
+      eightBitImage = self.imgOrig.astype(np.float32).copy()
+      eightBitImage = eightBitImage / np.max(eightBitImage) * 255. * 0.8 # 0.8 is to kill the brightness
+      eightBitImage = eightBitImage.astype(np.uint8)
+      self.colorImage = np.dstack((eightBitImage,eightBitImage,eightBitImage))
 
   def load_yaml(self):
     '''Function to read and store the yaml dictionary'''
@@ -605,11 +611,8 @@ def analyzeTT_Angles(testImageName,
   ttFilter = util.LoadFilter(ttFilterName)
   longFilter = np.concatenate((ttFilter,ttFilter,ttFilter))
     
-  #rotInputs = Inputs(
-  #  imageName = inputs.imageName,
-  #  yamlFileName = inputs.yamlFileName,
-  #  mfOrig = longFilter)
   rotInputs = copy.deepcopy(inputs)
+  rotInputs.mfOrig = longFilter
   rotInputs.imgOrig = smoothed
 
   params = optimizer.ParamDict(typeDict='WT')
@@ -733,7 +736,7 @@ def giveMarkedMyocyte(
   if inputs.dic['filterTypes']['TT']:
     wtMasked = util.ReadResizeApplyMask(
       WTstackedHits,
-      inputs.yamlDict['imageName'],
+      inputs.imageName,
       ImgTwoSarcSize,
       filterTwoSarcSize=ImgTwoSarcSize,
       maskName=inputs.dic['maskName']
@@ -743,7 +746,7 @@ def giveMarkedMyocyte(
   if inputs.dic['filterTypes']['LT']:
     ltMasked = util.ReadResizeApplyMask(
       LTstackedHits,
-      inputs.yamlDict['imageName'],
+      inputs.imageName,
       ImgTwoSarcSize,
       filterTwoSarcSize=ImgTwoSarcSize,
       maskName=inputs.dic['maskName']
@@ -753,7 +756,7 @@ def giveMarkedMyocyte(
   if inputs.dic['filterTypes']['TA']:
     lossMasked = util.ReadResizeApplyMask(
       LossstackedHits,
-      inputs.yamlDict['imageName'],
+      inputs.imageName,
       ImgTwoSarcSize,
       filterTwoSarcSize=ImgTwoSarcSize,
       maskName=inputs.dic['maskName']
@@ -811,7 +814,7 @@ def giveMarkedMyocyte(
     ### apply mask to marked image to avoid content > 1.0
     myResults.markedImage = util.ReadResizeApplyMask(
       myResults.markedImage,
-      inputs.yamlDict['imageName'],
+      inputs.imageName,
       ImgTwoSarcSize,
       filterTwoSarcSize=ImgTwoSarcSize,
       maskName=inputs.dic['maskName']
