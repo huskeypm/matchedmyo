@@ -945,7 +945,7 @@ def give3DMarkedMyocyte(
   cImg *= 255 * alpha
   cImg = cImg.astype(np.uint8)
   inputs.colorImage = cImg
-  if returnPastedFilter:
+  if inputs.dic['returnPastedFilter']:
     ## Use routine to mark unit cell sized cuboids around detections
     myResults.markedImage = util.markPastedFilters(inputs,
                              TAstackedHits,
