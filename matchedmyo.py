@@ -13,6 +13,7 @@ import sys
 import datetime
 import copy
 import csv
+import cv2
 import util
 import numpy as np
 import optimizer
@@ -44,7 +45,7 @@ class Inputs:
   def __init__(self,
                classificationType = 'myocyte',
                imageName = None,
-               maskName = None,
+               maskName = False,
                colorImage = None,
                yamlFileName = None,
                mfOrig=None,
@@ -101,7 +102,7 @@ class Inputs:
 
     if self.yamlDict:
       self.check_yaml_for_errors()
-
+    
   def setupImages(self):
     '''This function sets up the gray scale image for classification and the color image for marking
     hits.'''
@@ -117,6 +118,13 @@ class Inputs:
     self.colorImage = np.dstack((self.imgOrig, self.imgOrig, self.imgOrig)).astype(np.float32)
     self.colorImage *= alpha * colorImageMax
     self.colorImage = self.colorImage.astype(np.uint8)
+
+    if isinstance(self.dic['maskName'], str):
+      self.maskImg = util.ReadImg(self.dic['maskName'],renorm=True)
+      self.maskImg[self.maskImg < np.max(self.maskImg)] = 0
+      self.maskImg = self.maskImg.astype(np.uint8)
+    else:
+      self.maskImg = None
 
   def setupDefaultDict(self):
     '''This method sets up a dictionary to hold default classification inputs. This will then be 
@@ -389,7 +397,6 @@ class Inputs:
                              +' is either "simple,"'
                              +'"punishmentFilter," or "regionalDeviation."')
 
-    
   def setupYamlInputs(self):
     '''This function sets up inputs if a yaml file name is specified'''
     ### Check that the YAML file exists
@@ -405,6 +412,48 @@ class Inputs:
     
     self.updateInputs()
     self.check_yaml_for_errors()
+
+  def autoPreprocess(self):
+    '''Function to automate preprocessing for rapid prototyping of the MatchedMyo software. This
+    is meant for rough estimations of final classification and is not meant to replace the manual
+    preprocessing done for figure-quality images.'''
+    ### Lightly preprocess the image
+    imgShape = self.imgOrig.shape
+
+    ### Check data type of image. If it's not uint8, then we should rescale
+    if self.imgOrig.dtype != np.uint8:
+      self.imgOrig = self.imgOrig.astype(np.float32) / np.max(self.imgOrig) * 255.
+      self.imgOrig = self.imgOrig.astype(np.uint8)
+
+    # grab subsection for resizing image. Extents are just guesses so they could be improved
+    cY, cX = int(round(float(imgShape[0]/2.))), int(round(float(imgShape[1]/2.)))
+    xExtent = 50
+    yExtent = 25
+    top = cY-yExtent; bottom = cY+yExtent; left = cX-xExtent; right = cX+xExtent
+    indexes = np.asarray([top,bottom,left,right])
+    subsection = np.asarray(self.imgOrig[top:bottom,left:right],dtype=np.float64)
+    subsection /= np.max(subsection)
+    self.imgOrig, scale, newIndexes = pp.resizeGivenSubsection(
+      self.imgOrig,
+      subsection,
+      self.dic['filterTwoSarcomereSize'],
+      indexes
+    )
+
+    # If colorImg is supplied, then we resize that too
+    if isinstance(self.colorImage,np.ndarray):
+      self.colorImage = cv2.resize(self.colorImage, None, fx=scale, fy=scale,interpolation=cv2.INTER_CUBIC)
+
+    if isinstance(self.maskImg,np.ndarray):
+      self.maskImg = cv2.resize(self.maskImg, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+
+    # intelligently threshold image using gaussian thresholding
+    self.imgOrig = pp.normalizeToStriations(
+      self.imgOrig, 
+      newIndexes, 
+      self.dic['filterTwoSarcomereSize']
+    )
+    self.imgOrig = self.imgOrig.astype(np.float32) / float(np.max(self.imgOrig))
 
 class ClassificationResults:
   '''This class holds all of the results that we will need to store.'''
@@ -624,7 +673,13 @@ def analyzeTT_Angles(testImageName,
   smoothedHits = smoothedWTresults.stackedAngles
 
   ### Apply mask to the WTstackedHits so we don't have to apply it later and chop off part of the image
-  WTstackedHits = util.ReadResizeApplyMask(WTstackedHits,testImageName,ImgTwoSarcSize,filterTwoSarcSize=ImgTwoSarcSize,maskName=inputs.dic['maskName'])
+  WTstackedHits = util.ReadResizeApplyMask(
+    WTstackedHits,
+    testImageName,
+    ImgTwoSarcSize,
+    filterTwoSarcSize=ImgTwoSarcSize,
+    maskName=inputs.dic['maskName'],
+    maskImg = rotInputs.maskImg)
 
   ### pull out actual hits from smoothed results
   smoothedHits[WTstackedHits == 0] = 361
@@ -734,33 +789,57 @@ def giveMarkedMyocyte(
 
   ## apply preprocessed masks
   if inputs.dic['filterTypes']['TT']:
-    wtMasked = util.ReadResizeApplyMask(
-      WTstackedHits,
-      inputs.imageName,
-      ImgTwoSarcSize,
-      filterTwoSarcSize=ImgTwoSarcSize,
-      maskName=inputs.dic['maskName']
-    )
+    if isinstance(inputs.maskImg,np.ndarray):
+      wtMasked = util.applyMask(
+        WTstackedHits,
+        inputs.maskImg
+      )
+    else:
+      wtMasked = WTstackedHits
+    # wtMasked = util.ReadResizeApplyMask(
+    #   WTstackedHits,
+    #   inputs.imageName,
+    #   ImgTwoSarcSize,
+    #   filterTwoSarcSize=ImgTwoSarcSize,
+    #   maskName = inputs.maskName,
+    #   maskImg = inputs.maskImg
+    # )
   else:
     wtMasked = None
   if inputs.dic['filterTypes']['LT']:
-    ltMasked = util.ReadResizeApplyMask(
-      LTstackedHits,
-      inputs.imageName,
-      ImgTwoSarcSize,
-      filterTwoSarcSize=ImgTwoSarcSize,
-      maskName=inputs.dic['maskName']
-    )
+    if isinstance(inputs.maskImg,np.ndarray):
+      ltMasked = util.applyMask(
+        LTstackedHits,
+        inputs.maskImg
+      )
+    else:
+      ltMasked = LTstackedHits
+    # ltMasked = util.ReadResizeApplyMask(
+    #   LTstackedHits,
+    #   inputs.imageName,
+    #   ImgTwoSarcSize,
+    #   filterTwoSarcSize=ImgTwoSarcSize,
+    #   maskName=inputs.dic['maskName'],
+    #   maskImg = inputs.maskImg
+    # )
   else:
     ltMasked = None
   if inputs.dic['filterTypes']['TA']:
-    lossMasked = util.ReadResizeApplyMask(
-      LossstackedHits,
-      inputs.imageName,
-      ImgTwoSarcSize,
-      filterTwoSarcSize=ImgTwoSarcSize,
-      maskName=inputs.dic['maskName']
-    )
+    if isinstance(inputs.maskImg,np.ndarray):
+      lossMasked = util.applyMask(
+        LossstackedHits,
+        inputs.maskImg
+      )
+    else:
+      lossMasked = LossstackedHits
+    # lossMasked = util.ReadResizeApplyMask(
+    #   LossstackedHits,
+    #   inputs.imageName,
+    #   ImgTwoSarcSize,
+    #   filterTwoSarcSize=ImgTwoSarcSize,
+    #   maskName=inputs.dic['maskName'],
+    #   maskImg = inputs.maskImg
+    # )
   else:
     lossMasked = None
 
@@ -812,13 +891,19 @@ def giveMarkedMyocyte(
     myResults.markedImage = util.markPastedFilters(inputs, lossMasked, ltMasked, wtMasked)
     
     ### apply mask to marked image to avoid content > 1.0
-    myResults.markedImage = util.ReadResizeApplyMask(
-      myResults.markedImage,
-      inputs.imageName,
-      ImgTwoSarcSize,
-      filterTwoSarcSize=ImgTwoSarcSize,
-      maskName=inputs.dic['maskName']
-    )
+    if isinstance(inputs.maskImg, np.ndarray):
+      myResults.markedImage = util.applyMask(
+        myResults.markedImage,
+        inputs.maskImg
+      )
+    # myResults.markedImage = util.ReadResizeApplyMask(
+    #   myResults.markedImage,
+    #   inputs.imageName,
+    #   ImgTwoSarcSize,
+    #   filterTwoSarcSize=ImgTwoSarcSize,
+    #   maskName=inputs.dic['maskName'],
+    #   maskImg = inputs.maskImg
+    # )
 
     ## Superimpose hits onto image
     colorImgDummy = inputs.colorImage.copy()

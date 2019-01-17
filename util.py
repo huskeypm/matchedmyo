@@ -973,27 +973,40 @@ def makeMask(threshold = 245,
 
     return newmasker
 
-def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize=25,filterTwoSarcSize=25,maskName=None):
-  # function to apply the image mask before outputting results
-  if maskName == None:
-    if isinstance(imgName, str):
-      maskName = imgName[:-4]; fileType = imgName[-4:]
-      maskName = maskName+'_mask'+fileType
-  mask = cv2.imread(maskName)                       
-  if isinstance(mask, np.ndarray):
-    maskGray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+def applyMask(img, maskImg):
+  '''This function takes a mask image that consists of 1's and 0's and applies this to another image'''
+  if len(img.shape) == 2:
+    return img * maskImg
   else:
-    if maskName == None:
-      print "No mask was found. Circumventing masking."
-    else:
-      print "No mask named '"+maskName +"' was found. Circumventing masking."
+    for i in range(img.shape[-1]):
+      img[...,i] = img[...,i] * maskImg
     return img
-  if ImgTwoSarcSize != None:
-    scale = float(filterTwoSarcSize) / float(ImgTwoSarcSize)
-    maskResized = cv2.resize(maskGray,None,fx=scale,fy=scale,interpolation=cv2.INTER_CUBIC)
-  else:
-    maskResized = maskGray
-  normed = maskResized.astype('float') / float(np.max(maskResized))
+
+def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize=25,filterTwoSarcSize=25,maskName=None,maskImg=None):
+  # function to apply the image mask before outputting results
+  if not isinstance(maskImg, np.ndarray):
+    if maskName == None or maskName == False:
+      if isinstance(imgName, str):
+        maskName = imgName[:-4]; fileType = imgName[-4:]
+        maskName = maskName+'_mask'+fileType
+      else:
+        print "No mask was found. Circumventing masking."
+        return img
+    mask = cv2.imread(maskName)                       
+    if isinstance(mask, np.ndarray):
+      maskGray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+    else:
+      if maskName == None:
+        print "No mask was found. Circumventing masking."
+      else:
+        print "No mask named '"+maskName +"' was found. Circumventing masking."
+      return img
+    if ImgTwoSarcSize != None:
+      scale = float(filterTwoSarcSize) / float(ImgTwoSarcSize)
+      maskImg = cv2.resize(maskGray,None,fx=scale,fy=scale,interpolation=cv2.INTER_CUBIC)
+    else:
+      maskImg = maskGray
+  normed = maskImg.astype('float') / float(np.max(maskImg))
   normed[normed < 1.0] = 0
   dimensions = np.shape(img)
   if len(dimensions) < 3:
@@ -1248,8 +1261,9 @@ def autoDepadArray(img, verbose=False):
   
   return newImg
 
-def lightlyPreprocess(img,filterTwoSarcomereSize,colorImg=None):
+def lightlyPreprocess(img,filterTwoSarcomereSize,colorImg=None,maskImg=None):
   '''Function to lightly preprocess a given myocyte'''
+  raise RuntimeError("Function is deprecated. This has been moved to matchedmyo.Inputs.autoPreprocess()")
   ### Lightly preprocess the image
   imgDims = np.shape(img)
 
@@ -1271,6 +1285,9 @@ def lightlyPreprocess(img,filterTwoSarcomereSize,colorImg=None):
   # If colorImg is supplied, then we resize that too
   if isinstance(colorImg,np.ndarray):
     colorImg = cv2.resize(colorImg, None, fx=scale, fy=scale,interpolation=cv2.INTER_CUBIC)
+
+  if isinstance(maskImg,np.ndarray):
+    maskImg
 
   # intelligently threshold image using gaussian thresholding
   img = pp.normalizeToStriations(img, newIndexes, filterTwoSarcomereSize)
