@@ -1,4 +1,5 @@
 imageName: /net/share/dfco222/data/TT/LouchData/processedWithIntelligentThresholding/MI_D_76_processed.png
+maskName: /net/share/dfco222/data/TT/LouchData/processedWithIntelligentThresholding/MI_D_76_processed_mask.png
 outputParams:
     fileRoot: ./results/MI_D
     fileType: png
