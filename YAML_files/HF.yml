@@ -1,4 +1,5 @@
 imageName: /net/share/dfco222/data/TT/LouchData/processedWithIntelligentThresholding/HF_1_processed.png
+maskName: /net/share/dfco222/data/TT/LouchData/processedWithIntelligentThresholding/HF_1_processed_mask.png
 outputParams:
     fileRoot: ./results/HF
     fileType: png
