@@ -1,4 +1,5 @@
 imageName: /net/share/dfco222/data/TT/LouchData/processedMaskedNucleus/Sham_M_65_nucleus_processed.png
+maskName: /net/share/dfco222/data/TT/LouchData/processedMaskedNucleus/Sham_M_65_nucleus_processed_mask.png
 preprocess: False
 outputParams:
   fileRoot: ./results/WT
