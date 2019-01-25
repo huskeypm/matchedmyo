@@ -98,6 +98,26 @@ def LoadFilter(fileName):
 
   return filterImg
 
+def saveImg(img, inputs, switchChannels=True, fileName = None):
+  '''This function saves the image supplied.'''
+
+  if not fileName:
+    fileName = inputs.dic['outputParams']['fileRoot']+'_output.'+inputs.dic['outputParams']['fileType']
+
+  if len(np.shape(img)) == 3:
+    ## this indicates 2D image (with color channels)
+    plt.figure()
+    if switchChannels:
+      plt.imshow(switchBRChannels(img))
+    else:
+      plt.imshow(img)
+    outDict = inputs.dic['outputParams']
+    plt.gcf().savefig(fileName,dpi=outDict['dpi'])
+
+  elif len(np.shape(img)) == 4:
+    ## this indicates 3D image (with color channels)
+    Save3DImg(img, fileName, switchChannels=switchChannels)
+
 def Save3DImg(img, fileName, switchChannels=False):
   '''
   This function will roll the axis of img and save the image in the img variable to the fileName location.
