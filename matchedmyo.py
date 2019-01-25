@@ -115,7 +115,7 @@ class Inputs:
     ###   alpha value
     alpha = 0.85
     colorImageMax = 255
-    self.colorImage = np.dstack((self.imgOrig, self.imgOrig, self.imgOrig)).astype(np.float32)
+    self.colorImage = np.stack((self.imgOrig, self.imgOrig, self.imgOrig),axis=-1).astype(np.float32)
     self.colorImage *= alpha * colorImageMax
     self.colorImage = self.colorImage.astype(np.uint8)
 
@@ -796,16 +796,9 @@ def giveMarkedMyocyte(
       )
     else:
       wtMasked = WTstackedHits
-    # wtMasked = util.ReadResizeApplyMask(
-    #   WTstackedHits,
-    #   inputs.imageName,
-    #   ImgTwoSarcSize,
-    #   filterTwoSarcSize=ImgTwoSarcSize,
-    #   maskName = inputs.maskName,
-    #   maskImg = inputs.maskImg
-    # )
   else:
     wtMasked = None
+
   if inputs.dic['filterTypes']['LT']:
     if isinstance(inputs.maskImg,np.ndarray):
       ltMasked = util.applyMask(
@@ -814,16 +807,9 @@ def giveMarkedMyocyte(
       )
     else:
       ltMasked = LTstackedHits
-    # ltMasked = util.ReadResizeApplyMask(
-    #   LTstackedHits,
-    #   inputs.imageName,
-    #   ImgTwoSarcSize,
-    #   filterTwoSarcSize=ImgTwoSarcSize,
-    #   maskName=inputs.dic['maskName'],
-    #   maskImg = inputs.maskImg
-    # )
   else:
     ltMasked = None
+
   if inputs.dic['filterTypes']['TA']:
     if isinstance(inputs.maskImg,np.ndarray):
       lossMasked = util.applyMask(
@@ -832,14 +818,6 @@ def giveMarkedMyocyte(
       )
     else:
       lossMasked = LossstackedHits
-    # lossMasked = util.ReadResizeApplyMask(
-    #   LossstackedHits,
-    #   inputs.imageName,
-    #   ImgTwoSarcSize,
-    #   filterTwoSarcSize=ImgTwoSarcSize,
-    #   maskName=inputs.dic['maskName'],
-    #   maskImg = inputs.maskImg
-    # )
   else:
     lossMasked = None
 
@@ -881,10 +859,10 @@ def giveMarkedMyocyte(
       cI_written = myResults.markedImage
 
       ### write output image
-      plt.figure()
-      plt.imshow(util.switchBRChannels(cI_written))
-      outDict = inputs.dic['outputParams']
-      plt.gcf().savefig(outDict['fileRoot']+"_output."+outDict['fileType'],dpi=outDict['dpi'])
+      util.saveImg(
+        img = cI_written,
+        inputs = inputs
+      )
 
   if inputs.dic['returnPastedFilter']:
     ## Mark filter-sized unit cells on blank image to represent hits
@@ -896,14 +874,6 @@ def giveMarkedMyocyte(
         myResults.markedImage,
         inputs.maskImg
       )
-    # myResults.markedImage = util.ReadResizeApplyMask(
-    #   myResults.markedImage,
-    #   inputs.imageName,
-    #   ImgTwoSarcSize,
-    #   filterTwoSarcSize=ImgTwoSarcSize,
-    #   maskName=inputs.dic['maskName'],
-    #   maskImg = inputs.maskImg
-    # )
 
     ## Superimpose hits onto image
     colorImgDummy = inputs.colorImage.copy()
@@ -920,10 +890,14 @@ def giveMarkedMyocyte(
       cI_written = myResults.markedImage
 
       ### write outputs	  
-      plt.figure()
-      plt.imshow(util.switchBRChannels(cI_written))
-      outDict = inputs.dic['outputParams']
-      plt.gcf().savefig(outDict['fileRoot']+"_output."+outDict['fileType'],dpi=outDict['dpi'])
+      # plt.figure()
+      # plt.imshow(util.switchBRChannels(cI_written))
+      # outDict = inputs.dic['outputParams']
+      # plt.gcf().savefig(outDict['fileRoot']+"_output."+outDict['fileType'],dpi=outDict['dpi'])
+      util.saveImg(
+        img = cI_written,
+        inputs = inputs
+      )
 
   if inputs.dic['returnAngles']:
     myResults.angleCounts, myResults.markedAngles = analyzeTT_Angles(
@@ -934,10 +908,15 @@ def giveMarkedMyocyte(
     )
 
     if isinstance(inputs.dic['outputParams']['fileRoot'], str):
-      plt.figure()
-      plt.imshow(util.switchBRChannels(myResults.markedAngles))
-      outDict = inputs.dic['outputParams']
-      plt.gcf().savefig(outDict['fileRoot']+"_angles_output."+outDict['fileType'],dpi=outDict['dpi'])
+      # plt.figure()
+      # plt.imshow(util.switchBRChannels(myResults.markedAngles))
+      # outDict = inputs.dic['outputParams']
+      # plt.gcf().savefig(outDict['fileRoot']+"_angles_output."+outDict['fileType'],dpi=outDict['dpi'])
+      util.saveImg(
+        img = myResults.markedImage,
+        inputs = inputs,
+        fileName = inputs.dic['outputParams']['fileRoot']+'_angles_output.'+inputs.dic['outputParams']['fileType']
+      )
     
   ### Write results of the classification
   if isinstance(inputs.dic['outputParams']['csvFile'],str):
@@ -1076,7 +1055,11 @@ def give3DMarkedMyocyte(
   
   ### Save detection image
   if isinstance(inputs.dic['outputParams']['fileRoot'], str):
-    util.Save3DImg(myResults.markedImage,inputs.dic['outputParams']['fileRoot']+'.'+inputs.dic['outputParams']['fileType'],switchChannels=True)
+    # util.Save3DImg(myResults.markedImage,inputs.dic['outputParams']['fileRoot']+'.'+inputs.dic['outputParams']['fileType'],switchChannels=True)
+    util.saveImg(
+      img = myResults.markedImage,
+      inputs = inputs
+    )
 
   ### Write results of the classification
   myResults.writeToCSV(inputs=inputs)
@@ -1097,7 +1080,6 @@ def arbitraryFiltering(inputs):
     myResults -> See ClassificationResults class
   '''
   start = time.time()
-
   myResults = ClassificationResults(
     markedImage = inputs.colorImage.copy()
   )
@@ -1147,6 +1129,8 @@ def arbitraryFiltering(inputs):
           cellDimensions=filtDims,
           thresh=0
         )
+      print("Marked image dims:", np.shape(myResults.markedImage))
+      print("StackedHits image dims:", np.shape(filterResults.stackedHits))
       myResults.markedImage[..., channelIndex][filterResults.stackedHits != 0] = 255
 
       ## Measure amount of hits in image relative to image size
@@ -1166,17 +1150,26 @@ def arbitraryFiltering(inputs):
           print filterKey+' hits at {} rotation: {}'.format(it, angleCounts[it])
 
         if isinstance(inputs.dic['outputParams']['fileRoot'],str):
-          plt.figure()
-          plt.imshow(util.switchBRChannels(coloredAngles))
-          outDict = inputs.dic['outputParams']
-          plt.gcf().savefig(outDict['fileRoot']+'_'+filterKey+'_angles_output.'+outDict['fileType'],dpi=outDict['dpi'])
+          # plt.figure()
+          # plt.imshow(util.switchBRChannels(coloredAngles))
+          # outDict = inputs.dic['outputParams']
+          # plt.gcf().savefig(outDict['fileRoot']+'_'+filterKey+'_angles_output.'+outDict['fileType'],dpi=outDict['dpi'])
+          util.saveImg(
+            img = myResults.markedImage,
+            inputs = inputs,
+            fileName = inputs.dic['outputParams']['fileRoot']+filterKey+'_angles_output.'+inputs.dic['outputParams']['fileType']
+          )
 
   ## Save image if indicated in inputs
   if isinstance(inputs.dic['outputParams']['fileRoot'], str):
-    plt.figure()
-    plt.imshow(util.switchBRChannels(myResults.markedImage))
-    outDict = inputs.dic['outputParams']
-    plt.gcf().savefig(outDict['fileRoot']+"_output."+outDict['fileType'],dpi=outDict['dpi'])
+    # plt.figure()
+    # plt.imshow(util.switchBRChannels(myResults.markedImage))
+    # outDict = inputs.dic['outputParams']
+    # plt.gcf().savefig(outDict['fileRoot']+"_output."+outDict['fileType'],dpi=outDict['dpi'])
+    util.saveImg(
+        img = myResults.markedImage,
+        inputs = inputs,
+      )
 
   ### Write results of the classification
   myResults.writeToCSV(inputs=inputs)

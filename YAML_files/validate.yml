@@ -1,4 +1,6 @@
 imageName: ./myoimages/MI_M_45_processed.png
+outputParams:
+  fileRoot: ./results/2DValidationData
 filterTypes: 
   TT: True
   LT: True
