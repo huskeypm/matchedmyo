@@ -24,6 +24,8 @@ import matchedFilter as mF
 import argparse
 import yaml
 import preprocessing as pp
+import cPickle as pkl
+
 
 root = '/'.join(os.path.realpath(__file__).split('/')[:-1])
 
@@ -1117,6 +1119,11 @@ def arbitraryFiltering(inputs):
       if inputs.dic['outputParams']['saveHitsArray']:
         outDict = inputs.dic['outputParams']
         np.save(outDict['fileRoot']+'_'+filterKey+'_hits', filterResults.stackedHits)
+        if inputs.dic['dimensions'] == 2:
+          np.save(outDict['fileRoot']+'_'+filterKey+'_hit_angles', filterResults.stackedAngles)
+        else:
+          with open(inputs.dic['outputParams']['fileRoot']+'_'+filterKey+'_hit_angles.pkl', 'w') as f:
+            pkl.dump(filterResults.stackedAngles, f)
 
       ## Mark hits on the colored image
       if inputs.dic['returnPastedFilter']:
@@ -1140,25 +1147,35 @@ def arbitraryFiltering(inputs):
 
       ## Save angles of detection if indicated
       if inputs.dic['returnAngles']:
-        ## NOTE: not saving in myResults since we'd overwrite during each iteration of loop
-        coloredAngles = painter.colorAngles(inputs.colorImage.copy(),filterResults.stackedAngles,inputs.dic['iters'])
+        ## This following is only implemented in 2D
+        if inputs.dic['dimensions'] == 2:
+          ## NOTE: not saving in myResults since we'd overwrite during each iteration of loop
+          coloredAngles = painter.colorAngles(inputs.colorImage.copy(),filterResults.stackedAngles,inputs.dic['iters'])
+
+          if isinstance(inputs.dic['outputParams']['fileRoot'],str):
+            # plt.figure()
+            # plt.imshow(util.switchBRChannels(coloredAngles))
+            # outDict = inputs.dic['outputParams']
+            # plt.gcf().savefig(outDict['fileRoot']+'_'+filterKey+'_angles_output.'+outDict['fileType'],dpi=outDict['dpi'])
+            util.saveImg(
+              img = coloredAngles,
+              inputs = inputs,
+              fileName = inputs.dic['outputParams']['fileRoot']+filterKey+'_angles_output.'+inputs.dic['outputParams']['fileType']
+            )
 
         ## Count num hits at each rotation
         angleCounts = {}
         for it in inputs.dic['iters']:
-          angleCounts[it] = np.count_nonzero(filterResults.stackedAngles == it)
-          print filterKey+' hits at {} rotation: {}'.format(it, angleCounts[it])
+          if isinstance(it,list):
+            print "The counting of angles hits for 3D images is not yet supported."
+            itCopy = [str(thisIt) for thisIt in it]
+            key = '_'.join(itCopy)
+          else:
+            key = it
+          angleCounts[key] = np.count_nonzero(filterResults.stackedAngles == it)
+          print filterKey+' hits at {} rotation: {}'.format(key, angleCounts[key])
 
-        if isinstance(inputs.dic['outputParams']['fileRoot'],str):
-          # plt.figure()
-          # plt.imshow(util.switchBRChannels(coloredAngles))
-          # outDict = inputs.dic['outputParams']
-          # plt.gcf().savefig(outDict['fileRoot']+'_'+filterKey+'_angles_output.'+outDict['fileType'],dpi=outDict['dpi'])
-          util.saveImg(
-            img = myResults.markedImage,
-            inputs = inputs,
-            fileName = inputs.dic['outputParams']['fileRoot']+filterKey+'_angles_output.'+inputs.dic['outputParams']['fileType']
-          )
+        
 
   ## Save image if indicated in inputs
   if isinstance(inputs.dic['outputParams']['fileRoot'], str):
