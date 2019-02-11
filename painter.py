@@ -246,7 +246,11 @@ def StackHits(correlated,  # an array of 'correlation planes'
       if returnAngles:
         ## Now we fix the stackedAngles format
         stackedAngles = correlated['rotSNRArray']
-        stackedAngles[stackedHits == 0] = 361 # 361 indicates no hit at that pixel/voxel
+        if len(np.shape(stackedHits)) == 2: # indicates 2D image
+          stackedAngles[stackedHits == 0] = 361 # 361 indicates no hit at that pixel/voxel
+        else: # indicates 3D image
+          # there's no good way to represent this using our current angle storage structure
+          pass
         return stackedHits, stackedAngles
       else:
         return stackedHits
