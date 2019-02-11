@@ -43,24 +43,12 @@ To preprocess a directory containing user supplied images, run:
 `matchedmyo.py` contains all of the routines needed to analyze user-supplied images with command line functionality. All arguments for analysis routines have default values that can be changed
 via the specifed YAML file when calling the `matchedmyo.py` script as such:
 
-`python matchedmyo.py <ANALYSIS_ROUTINE> <IMAGE_NAME> -yaml <YAML_NAME>`
+`python matchedmyo.py run -yamlFile <YAML_NAME>`
 
-Where ANALYSIS_ROUTINE is either giveMarkedMyocyte or give3DMarkedMyocyte, IMAGE_NAME is the path to and the name of the image to be analyzed, and -yaml indicates the optional
-YAML_NAME argument where parameters can be changed from their default.
+Where -yamlFile indicates the YAML_NAME argument where parameters can be changed from their default.
 
-## detect.py 
-To run with yaml: (follow ex.yml for an example) 
-`python detect.py -updatedSimpleYaml ex.yml`
+To run, a YAML file is required (follow YAML_files/template.yml for an example). By default, all parameters used for analysis within the detect.py script are the same as the parameters used within the paper. The YAML (.yml) file contains the functionality for changing parameters the user would like to change from the default settings in the analysis they are running. 
 
-By default, all parameters used for analysis within the detect.py script are the same as the parameters used within the paper. The YAML (.yml) file contains the functionality for changing parameters the user would like to change from the default settings in the analysis they are running. 
-
-
-## GPU-accelerated Detection
-GPU-accelerated matched filter detection. NOTE: This is currently being phased out. In future iterations of this repository, this will no longer be available and large tissue-section analysis will be run in the same way that isolated myocyte analysis is run.
-
-Requires tensorflow cuda (python).
-
-GPU-acceleration implemented in 'twoDtense.py'. This can be turned on and off with the "useGPU" flag in the parameter dictionary.
 
 # Miscellaneous 
 
