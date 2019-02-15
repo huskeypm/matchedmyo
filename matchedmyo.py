@@ -827,13 +827,28 @@ def giveMarkedMyocyte(
   if inputs.dic['outputParams']['saveHitsArray']:
     outDict = inputs.dic['outputParams']
     if inputs.dic['filterTypes']['TA']:
-      np.save(outDict['fileRoot']+'_TA_hits', lossMasked)
+      util.saveImg(
+        img=lossMasked, 
+        inputs=inputs, 
+        switchChannels=False, 
+        fileName=outDict['fileRoot']+'_TA_hits'
+      )
     
     if inputs.dic['filterTypes']['LT']:
-      np.save(outDict['fileRoot']+'_LT_hits', ltMasked)
+      util.saveImg(
+        img=ltMasked,
+        inputs=inputs,
+        switchChannels=False,
+        fileName=outDict['fileRoot']+'_LT_hits'
+      )
 
     if inputs.dic['filterTypes']['TT']:
-      np.save(outDict['fileRoot']+'_TT_hits', wtMasked)
+      util.saveImg(
+        img=wtMasked,
+        inputs=inputs,
+        switchChannels=False,
+        fileName=outDict['fileRoot']+'_TT_hits'
+      )
 
   if not inputs.dic['returnPastedFilter']:
     ### create holders for marking channels
@@ -1117,10 +1132,19 @@ def arbitraryFiltering(inputs):
 
       ## Save the hits as full-resolution arrays for future use 
       if inputs.dic['outputParams']['saveHitsArray']:
-        outDict = inputs.dic['outputParams']
-        np.save(outDict['fileRoot']+'_'+filterKey+'_hits', filterResults.stackedHits)
+        util.saveImg(
+          img = filterResults.stackedHits,
+          inputs = inputs,
+          switchChannels=False,
+          fileName = inputs.dic['outputParams']['fileRoot']+'_'+filterKey+'_hits'
+        )
         if inputs.dic['dimensions'] == 2:
-          np.save(outDict['fileRoot']+'_'+filterKey+'_hit_angles', filterResults.stackedAngles)
+          util.saveImg(
+            img = filterResults.stackedAngles,
+            inputs = inputs,
+            switchChannels=False,
+            fileName = inputs.dic['outputParams']['fileRoot']+'_'+filterKey+'_hits_angles'
+          )
         else:
           with open(inputs.dic['outputParams']['fileRoot']+'_'+filterKey+'_hit_angles.pkl', 'w') as f:
             pkl.dump(filterResults.stackedAngles, f)
