@@ -101,7 +101,11 @@ def LoadFilter(fileName):
 def saveImg(img, inputs, switchChannels=True, fileName = None):
   '''This function saves the image supplied.'''
 
+  if not fileName and not inputs.dic['outputParams']['fileRoot']:
+    raise RuntimeError("Either fileName or inputs.dic['outputParams']['fileRoot'] must be specified.")
+
   if not fileName:
+    # set default file name
     fileName = inputs.dic['outputParams']['fileRoot']+'_output.'+inputs.dic['outputParams']['fileType']
 
   if len(np.shape(img)) == 3:
