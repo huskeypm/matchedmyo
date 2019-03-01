@@ -52,7 +52,11 @@ To run, a YAML file is required (follow YAML_files/template.yml for an example).
 
 # Miscellaneous 
 
-### validation test
+### Virtual Machine Installation
+The virtual machine implementation can be found at https://drive.google.com/open?id=1KZxfzhJegcdxk0uaOViC1uiunWX370Sq.
+To execute the program within the virtual machine, the user must launch a terminal, navigate to “∼/scratch/matchedmyo/” and run the program asdescribed herein.
+
+### Validation Tests
 To validate the 2D usage of the software:
 
 `python myocyteFigs.py -validate`
