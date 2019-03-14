@@ -1010,13 +1010,8 @@ def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize=25,filterTwoSarcSize=25,maskN
   # function to apply the image mask before outputting results
   if not isinstance(maskImg, np.ndarray):
     if maskName == None or maskName == False:
-      if isinstance(imgName, str):
-        maskName = imgName[:-4]; fileType = imgName[-4:]
-        maskName = maskName+'_mask'+fileType
-      else:
-        print "No mask was found. Circumventing masking."
-        return img
-    mask = cv2.imread(maskName)                       
+      print "No mask was found. Circumventing masking."
+      return img
     if isinstance(mask, np.ndarray):
       maskGray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
     else:

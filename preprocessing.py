@@ -437,7 +437,7 @@ def applyCLAHE(img,filterTwoSarcomereSize):
 ###
 ###############################################################################
 
-def preprocess(fileName,filterTwoSarcomereSize,writeImage=False):
+def preprocess(fileName, filterTwoSarcomereSize, maskImg=None, writeImage=False):
   img = util.ReadImg(fileName)
 
   img,degreesOffCenter = reorient(img)
@@ -446,10 +446,8 @@ def preprocess(fileName,filterTwoSarcomereSize,writeImage=False):
   img = normalizeToStriations(img,idxs,filterTwoSarcomereSize)
 
   # fix mask based on img orientation and resize scale
-  try:
-    processMask(fileName,degreesOffCenter,resizeScale)
-  except:
-    1
+  if maskImg is not None:
+    maskImg = processMask(degreesOffCenter,resizeScale,fileName=fileName, maskImg = maskImg)
 
   # write file
   if writeImage:
@@ -459,18 +457,23 @@ def preprocess(fileName,filterTwoSarcomereSize,writeImage=False):
 
   img = img.astype(np.float32) / float(np.max(img))
 
-  return img
+  if maskImg is not None:
+    return img, maskImg
+  else:
+    return img
 
-def processMask(fileName,degreesOffCenter,resizeScale):
+def processMask(degreesOffCenter,resizeScale, fileName = None, maskImg = None):
   '''
   function to reorient and resize the mask that was generated for the original
   image.
   '''
   maskName = fileName[:-4]+"_mask"+fileName[-4:]
-  mask = util.ReadImg(maskName)
-  reoriented = imutils.rotate_bound(mask,degreesOffCenter)
+  # mask = util.ReadImg(maskName)
+  reoriented = imutils.rotate_bound(maskImg,degreesOffCenter)
   resized = cv2.resize(reoriented,None,fx=resizeScale,fy=resizeScale,interpolation=cv2.INTER_CUBIC)
   cv2.imwrite(fileName[:-4]+"_processed_mask"+fileName[-4:],resized)
+
+  return resized
 
 def preprocessTissue():
   '''
