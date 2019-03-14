@@ -233,6 +233,16 @@ class Inputs:
           ## if the key is not already specified in the default dictionary, then we continue on
           pass
     
+    ## Update the image name
+    if isinstance(self.yamlDict['imageName'],str):
+      self.imageName = self.yamlDict['imageName']
+    
+    ## Update the mask name
+    try:
+      self.maskName = self.yamlDict['maskName']
+    except:
+      pass
+    
     ### Check to see if '.csv' is present in the output csv file
     if (isinstance(self.dic['outputParams']['csvFile'],str) 
         and self.dic['outputParams']['csvFile'][-4:] != '.csv'):
@@ -317,8 +327,10 @@ class Inputs:
 
     ### Check to see if we need to preprocess the image at all
     if self.dic['preprocess']:
-      self.imgOrig = util.ReadImg(self.imageName)
-      self.imgOrig = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'])
+      if self.maskImg is not None:
+        self.imgOrig, self.maskImg = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg)
+      else:  
+        self.imgOrig = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg)
       ## remake the color image
       eightBitImage = self.imgOrig.astype(np.float32).copy()
       eightBitImage = eightBitImage / np.max(eightBitImage) * 255. * 0.8 # 0.8 is to kill the brightness
