@@ -930,7 +930,7 @@ def giveMarkedMyocyte(
       # outDict = inputs.dic['outputParams']
       # plt.gcf().savefig(outDict['fileRoot']+"_angles_output."+outDict['fileType'],dpi=outDict['dpi'])
       util.saveImg(
-        img = myResults.markedImage,
+        img = myResults.markedAngles,
         inputs = inputs,
         fileName = inputs.dic['outputParams']['fileRoot']+'_angles_output.'+inputs.dic['outputParams']['fileType']
       )
