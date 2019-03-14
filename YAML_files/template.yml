@@ -1,7 +1,8 @@
 # This is a template yml file that contains all of the parameters that one might want to change
 #   for their own classification.
 #   NOTE: 
-#         - Every parameter is optional except for the imageName parameter. 
+#         - Every parameter is optional except for the imageName parameter. This means if you 
+#           would like for a parameter to not be included. Comment it out with a '#'.
 #         - Parameters that require you to input your own parameters into are shown as:
 #                                       <CAPITAL_LETTERS>
 #           and should be substituted for the parameter you would like to specify. For example,
@@ -11,6 +12,9 @@
 
 # This is the name of the image that you would like to classify.
 imageName: <NAME_OF_IMAGE>
+
+# This is the name of the mask for the image. Note: This is not necessary and can be commented out.
+maskName: <NAME_OF_MASK>
 
 # This is how output file parameters are specified
 outputParams:
