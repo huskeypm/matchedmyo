@@ -328,6 +328,10 @@ class Inputs:
 
     ### Check to see if we need to preprocess the image at all
     if self.dic['preprocess']:
+      ## Catch 3D images since we don't have preprocessing routine for them yet
+      if self.dic['dimensions'] > 2:
+        raise RuntimeError("Preprocessing is not implemented for 3D images.")
+      
       if self.maskImg is not None:
         self.imgOrig, self.maskImg = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg)
       else:  
