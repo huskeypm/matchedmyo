@@ -59,13 +59,7 @@ To validate the code fully:
 `python myocyteFigs.py fullValidation`
 
 ### Generate Paper Figures
-To preprocess images:
-
-`python preprocessing.py -preprocessAll`
-
-To generate the paper figures:
-
-`python myocyteFigs.py -allFigs`
+To generate the figures shown within the manuscript, run `python matchedmyo.py run --yamlFile YAML_files/<FILENAME>` where `<FILENAME>` is the name of the appropriate YAML file, e.g. `MI_M.yml`.
 
 ### ROC optimization
 

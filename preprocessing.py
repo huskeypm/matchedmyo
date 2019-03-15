@@ -1,3 +1,4 @@
+from __future__ import print_function
 ###
 ### Group of functions that will walk the user fully through the preprocessing
 ### routines.
@@ -29,7 +30,7 @@ def normalizeToStriations(img, subsectionIdxs,filterSize):
   based on those values.
   '''
 
-  print "Normalizing myocyte to striations"
+  print ("Normalizing myocyte to striations")
   
   ### Load in filter that will be used to smooth the subsection
   thisPath = os.path.realpath(__file__).split('/')[:-1]
@@ -84,10 +85,10 @@ def normalizeToStriations(img, subsectionIdxs,filterSize):
   valleyValue = np.mean(valleys)
   valleySTD = np.std(valleys)
 
-  print "Average Striation Value:", peakValue
-  print "Standard Deviation of Striation:", peakSTD
-  print "Average Striation Gap Value:", valleyValue
-  print "Stand Deviation of Striation Gap", valleySTD
+  print ("Average Striation Value:", peakValue)
+  print ("Standard Deviation of Striation:", peakSTD)
+  print ("Average Striation Gap Value:", valleyValue)
+  print ("Stand Deviation of Striation Gap", valleySTD)
 
   ### Calculate ceiling and floor thresholds empirically
   ceiling = peakValue + 3 * peakSTD
@@ -99,8 +100,8 @@ def normalizeToStriations(img, subsectionIdxs,filterSize):
   
   ceiling = int(round(ceiling))
   floor = int(round(floor))
-  print "Ceiling Pixel Value:", ceiling
-  print "Floor Pixel Value:", floor
+  print ("Ceiling Pixel Value:", ceiling)
+  print ("Floor Pixel Value:", floor)
 
   ### Threshold
   #img = img.astype(np.float64)
@@ -168,7 +169,7 @@ def autoReorient(img):
   degreeOffCenter = (180./np.pi) * np.arccos(np.dot(yAx,majorAxDirection)\
                     / (np.linalg.norm(majorAxDirection)))
 
-  print "Image is", degreeOffCenter," degrees off center"
+  print ("Image is", degreeOffCenter," degrees off center")
 
   ### convert img to cv2 acceptable format
   acceptableImg = np.asarray(img * 255.,dtype=np.uint8)
@@ -248,7 +249,7 @@ def reorient(img):
   Function to reorient the myocyte based on a user selected line that is
   orthogonal to the TTs 
   '''
-  print "Reorienting Myocyte"
+  print ("Reorienting Myocyte")
 
   ### get direction vector from line drawn by user
   dVect = giveSubsectionLine(img)
@@ -265,7 +266,7 @@ def reorient(img):
   ### ensure directionality is correct 
   if dVect[1] <= 0:
     dOffCenter *= -1
-  print "Image is",dOffCenter,"degrees off center"
+  print ("Image is",dOffCenter,"degrees off center")
 
   ### rotate image
   rotated = imutils.rotate_bound(img,dOffCenter)
@@ -346,7 +347,7 @@ def resizeToFilterSize(img,filterTwoSarcomereSize):
   Function to semi-automate the resizing of the image based on the filter
   '''
 
-  print "Resizing myocyte based on user selected subsection"
+  print ("Resizing myocyte based on user selected subsection")
 
   ### 1. Select subsection of image that exhibits highly conserved network of TTs
   subsection,indexes = giveSubsection(img)#,dtype=np.float32)
@@ -356,7 +357,7 @@ def resizeToFilterSize(img,filterTwoSarcomereSize):
   ### 2. Resize based on the subsection
   resized, scale, newIndexes = resizeGivenSubsection(img,subsection,filterTwoSarcomereSize,indexes)
 
-  print "Image Two Sarcomere Size:",scale
+  print ("Image Two Sarcomere Size:",scale)
   
   return resized,scale,subsection,newIndexes
 
@@ -388,11 +389,11 @@ def resizeGivenSubsection(img,subsection,filterTwoSarcomereSize,indexes):
   ### Find peak value of periodogram and calculate striation size
   striationSize = 1. / fBig[np.argmax(bigSum)]
   imgTwoSarcomereSize = int(round(2 * striationSize))
-  print "Two Sarcomere size:", imgTwoSarcomereSize,"Pixels per Two Sarcomeres"
+  print ("Two Sarcomere size:", imgTwoSarcomereSize,"Pixels per Two Sarcomeres")
 
   if imgTwoSarcomereSize > 70 or imgTwoSarcomereSize < 10:
-    print "WARNING: Image likely failed to be properly resized. Manual resizing",\
-           "may be necessary!!!!!"
+    print ("WARNING: Image likely failed to be properly resized. Manual resizing",\
+           "may be necessary!!!!!")
 
   ### Using peak value, resize the image
   scale = float(filterTwoSarcomereSize) / float(imgTwoSarcomereSize)
@@ -413,7 +414,7 @@ def resizeGivenSubsection(img,subsection,filterTwoSarcomereSize,indexes):
 ###############################################################################
 
 def applyCLAHE(img,filterTwoSarcomereSize):
-  print "Applying CLAHE to Myocyte"
+  print ("Applying CLAHE to Myocyte")
 
   if img.dtype != np.uint8:
     # convert to uint8 data type to use with clahe algorithm
@@ -431,6 +432,7 @@ def applyCLAHE(img,filterTwoSarcomereSize):
     img = img.astype(np.float32) / float(np.max(img)) * oldImgMax
 
   return clahedImage
+  
 ###############################################################################
 ###
 ### Main Routines

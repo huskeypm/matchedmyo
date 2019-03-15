@@ -1,3 +1,4 @@
+from __future__ import print_function
 """
 For processing large tissue subsection from Frank
 """
@@ -96,13 +97,13 @@ def get_fiji(gray, loc_um,d_um):
     subregion = gray[loc[0]:(loc[0]+d[0]),loc[1]:(loc[1]+d[1])]
     subregionDim = np.shape(subregion) 
   
-    print "Extracting %dx%d region from %dx%d image"%(
+    print ("Extracting %dx%d region from %dx%d image"%(
       #d_um[0]*params.px_per_um[0],
       #d_um[1]*params.px_per_um[1],
       subregionDim[0]/params.px_per_um[0],
       subregionDim[1]/params.px_per_um[1],
       params.dim[0]/params.px_per_um[1],
-      params.dim[1]/params.px_per_um[0])
+      params.dim[1]/params.px_per_um[0]))
 
 
     return subregion
@@ -293,10 +294,10 @@ def validate():
   totInfo = np.sum( results.threshed ) 
 
   # assert 
-  print "WARNING: this test only verifies that the integrated total response is conserved - says nothing about accuracy" 
+  print ("WARNING: this test only verifies that the integrated total response is conserved - says nothing about accuracy" )
   truthVal = 2233257.
   assert( np.abs( totInfo - truthVal) < 1), "FAIL: %f != %f"%(totInfo,truthVal) 
-  print "PASS" 
+  print ("PASS" )
 
 
 #

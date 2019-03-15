@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import os
 import sys
 import time
@@ -34,7 +35,7 @@ class empty:pass
 ### Change default matplotlib settings to display figures
 plt.rcParams['font.size'] = 18
 plt.rcParams['axes.labelsize'] = 'large'
-print "Comment out for HESSE"
+# print "Comment out for HESSE"
 #plt.rcParams['axes.labelpad'] = 12.0 
 plt.rcParams['figure.autolayout'] = True
 
@@ -277,8 +278,8 @@ def tissueComparison(fullAnalysis=True):
     cases['MILike'].TTcontent /= cases['WTLike'].TTcontent
     cases['WTLike'].TTcontent /= cases['WTLike'].TTcontent
 
-    print "WT TT Content:", cases['WTLike'].TTcontent
-    print "MI TT Content:", cases['MILike'].TTcontent
+    print ("WT TT Content:", cases['WTLike'].TTcontent)
+    print ("MI TT Content:", cases['MILike'].TTcontent)
 
     ### Quantify TA 
     cases['WTLike'].TAcontent = float(np.sum(cases['WTLike'].TApasted))
@@ -287,8 +288,8 @@ def tissueComparison(fullAnalysis=True):
     cases['MILike'].TAcontent /= cases['WTLike'].TAcontent
     cases['WTLike'].TAcontent /= cases['WTLike'].TAcontent
 
-    print "WT TA Content:", cases['WTLike'].TAcontent
-    print "MI TA Content:", cases['MILike'].TAcontent
+    print ("WT TA Content:", cases['WTLike'].TAcontent)
+    print ("MI TA Content:", cases['MILike'].TAcontent)
 
 
   ### Make Bar Chart of TT content
@@ -362,7 +363,7 @@ def figAngleHeterogeneity():
   plt.colorbar()
   plt.show()
 
-  print case.results.stackedAngles
+  print (case.results.stackedAngles)
 
 def full_ROC():
   '''
@@ -383,7 +384,7 @@ def full_ROC():
                        }
 
   for key,imgName in imgNames.iteritems():
-      print imgName
+      print (imgName)
       ### setup dataset
       dataSet = optimizer.DataSet(
                   root = root,
@@ -711,10 +712,10 @@ def test3DSimulatedData(LT_probability = [0., .15, .3],
     pkl.dump(storage, fil)
 
   for probs, contentDict in storage.iteritems():
-    print probs+':'
-    print '\tTA Content '+str(np.mean(contentDict['TA']))[:5]+' +- '+str(np.std(contentDict['TA']))[:5]
-    print '\tLT Content '+str(np.mean(contentDict['LT']))[:5]+' +- '+str(np.std(contentDict['LT']))[:5]
-    print '\tTT Content '+str(np.mean(contentDict['TT']))[:5]+' +- '+str(np.std(contentDict['TT']))[:5]
+    print (probs+':')
+    print ('\tTA Content '+str(np.mean(contentDict['TA']))[:5]+' +- '+str(np.std(contentDict['TA']))[:5])
+    print ('\tLT Content '+str(np.mean(contentDict['LT']))[:5]+' +- '+str(np.std(contentDict['LT']))[:5])
+    print ('\tTT Content '+str(np.mean(contentDict['TT']))[:5]+' +- '+str(np.std(contentDict['TT']))[:5])
 
 
 ###################################################################################################
@@ -935,7 +936,7 @@ def analyzeAllMyo(root="/net/share/dfco222/data/TT/LouchData/processedWithIntell
   for name in os.listdir(root):
     if "mask" in name:
       continue
-    print name
+    print (name)
     iters=[-25,-20,-15,-10,-5,0,5,10,15,20,25]
 
     ### Form inputs
@@ -968,7 +969,7 @@ def analyzeAllMyo(root="/net/share/dfco222/data/TT/LouchData/processedWithIntell
     hitsInRange =   np.count_nonzero(np.equal(angleCounts, iters[idxs[0]])) \
                   + np.count_nonzero(np.equal(angleCounts, iters[idxs[1]])) \
                   + np.count_nonzero(np.equal(angleCounts, iters[idxs[2]])) 
-    print "Percentage of WT hits within 5 degrees of minor axis:", float(hitsInRange)/float(totalHits) * 100.
+    print ("Percentage of WT hits within 5 degrees of minor axis:", float(hitsInRange)/float(totalHits) * 100.)
 
     ### assess content
     wtC, ltC, lossC = util.assessContent(markedMyocyte,imgName=root+name)
@@ -1177,8 +1178,8 @@ def minDistanceROC(dataSet,paramDict,param1Range,param2Range,
     paramDict[param1] = p1
     for j,p2 in enumerate(param2Range):
       paramDict[param2] = p2
-      print "Param 1:",p1
-      print "Param 2:",p2
+      print ("Param 1:",p1)
+      print ("Param 2:",p2)
       # having to manually assign the thresholds due to structure of TestParams function
       if param1 == "snrThresh":
         dataSet.filter1Thresh = p1
@@ -1199,15 +1200,15 @@ def minDistanceROC(dataSet,paramDict,param1Range,param2Range,
   optimumTP = TruePosStorage[optP1idx,optP2idx]
   optimumFP = FalsePosStorage[optP1idx,optP2idx]
 
-  print ""
-  print 100*"#"
-  print "Minimum Distance to Perfect Detection:",distanceStorage.min()
-  print "True Postive Rate:",optimumTP
-  print "False Positive Rate:",optimumFP
-  print "Optimum",param1,"->",optimumP1
-  print "Optimum",param2,"->",optimumP2
-  print 100*"#"
-  print ""
+  print ("")
+  print (100*"#")
+  print ("Minimum Distance to Perfect Detection:",distanceStorage.min())
+  print ("True Postive Rate:",optimumTP)
+  print ("False Positive Rate:",optimumFP)
+  print ("Optimum",param1,"->",optimumP1)
+  print ("Optimum",param2,"->",optimumP2)
+  print (100*"#")
+  print ("")
   return optimumP1, optimumP2, distanceStorage
 
 def optimizeWT():
@@ -1318,13 +1319,13 @@ def scoreTest():
     display=False)  
     #display=True)  
 
-  print filter1PS, filter1NS
+  print (filter1PS, filter1NS)
 
   val = 0.926816518557
   assert((filter1PS - val) < 1e-3), "Filter 1 Positive Score failed"
   val = 0.342082872458
   assert((filter1NS - val) < 1e-3), "Filter 1 Negative Score failed"
-  print "PASSED"
+  print ("PASSED")
 
 
 #
