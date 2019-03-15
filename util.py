@@ -1,3 +1,4 @@
+from __future__ import print_function
 import sys
 import os
 import matplotlib.pylab as plt 
@@ -149,7 +150,7 @@ def Save3DImg(img, fileName, switchChannels=False):
   ### Write image
   tifffile.imsave(fileName, data=dummyImg)
 
-  print "Wrote file to:",fileName
+  print ("Wrote file to:",fileName)
 
 def measureFilterDimensions(grayFilter,returnFilterPaddingLocations=False,verbose=False,epsilon = 1e-8):
   '''
@@ -178,12 +179,12 @@ def measureFilterDimensions(grayFilter,returnFilterPaddingLocations=False,verbos
     otherAxes = np.delete(np.arange(len(filterShape)),i)
 
     if verbose:
-      print "Axes with which we are summing: {}".format(otherAxes)
+      print ("Axes with which we are summing: {}".format(otherAxes))
        
     collapsedDim = np.sum(grayFilter,axis=tuple(otherAxes))
 
     if verbose:
-      print "Sum along both of the previous axes {}".format(collapsedDim)
+      print ("Sum along both of the previous axes {}".format(collapsedDim))
     
     ## Measure padding before the filter in this dimension
     previousPadding = np.argmax(collapsedDim > epsilon)
@@ -197,7 +198,7 @@ def measureFilterDimensions(grayFilter,returnFilterPaddingLocations=False,verbos
       paddingLocs.append([previousPadding,afterPadding])
 
   if verbose:
-    print "Filter Dimensions:",newDimLengths
+    print ("Filter Dimensions:",newDimLengths)
 
   if returnFilterPaddingLocations:
     return newDimLengths, paddingLocs
@@ -219,7 +220,7 @@ def markMaskOnMyocyte(img,imgName):
     maskName = imgName[:-4]+"_mask"+imgName[-4:]
     mask = np.asarray(ReadImg(maskName,renorm=True) * 255.,dtype=np.uint8)
   except:
-    print "No mask found, circumventing marking"
+    print ("No mask found, circumventing marking")
     return img
 
   ### ROI is marked as greatest pixel intensity, so we thresh and only keep the ROI
@@ -527,7 +528,8 @@ def saveFixedPunishmentFilter():
   cv2.imwrite(root+"WTPunishmentFilter.png",punishFilter)
 
 def saveAllMyo():
-      print "Generating and saving all 2D filters."
+      print ('')
+      print ("Generating and saving all 2D filters.")
       saveFixedWTFilter()
       saveSimpleWTFilter()
       saveGaussLongFilter()
@@ -535,12 +537,15 @@ def saveAllMyo():
       saveFixedPunishmentFilter()
       saveSingleTTFilter()
       saveSingleTTPunishmentFilter()
+      print ("Successfuly saved all 2D filters.")
+      print ('')
       scopeResolutions = [10,10,5]
-      print "Generating and saving all 3D filters."
-      print "WARNING: This is generating 3D filters with an assumed scope resolution of xy = 10 vx/um and z = 5 vx/um."
+      print ("Generating and saving all 3D filters.")
+      print ("WARNING: This is generating 3D filters with an assumed scope resolution of xy = 10 vx/um and z = 5 vx/um.")
       generate3DTTFilter(scopeResolutions)
       generate3DLTFilter(scopeResolutions)
       generate3DTAFilter(scopeResolutions)
+      print ("Successfully saved all 3D filters.\n\nYou are free to start running the software!")
 
 def determineZStacksFromResolution(zResolution, # [voxels/um]
                                    DiameterTT=.2 # [um]
@@ -603,9 +608,9 @@ def generate3DTTFilter(scopeResolutions, # [vx/um]
   punishFilt3D = ndimage.zoom(punishFilt3D, zoom=zoomOut)
 
   # temporarily save the intremediate result for debug purposes
-  print np.max(filt3D)
-  print np.min(filt3D)
-  Save3DImg(filt3D.astype(np.uint16), './myoimages/DEBUG.tif')
+  # print np.max(filt3D)
+  # print np.min(filt3D)
+  # Save3DImg(filt3D.astype(np.uint16), './myoimages/DEBUG.tif')
 
   ### Threshold the filter to get rid of rotation numerical artifacts
   filt3DMean = np.mean(filt3D)
@@ -697,7 +702,7 @@ def generate3DTAFilter(scopeResolutions, # [vx/um]
   #zZoomOut = float(scopeResolutions[2]) / float(scopeResolutions[0])
   _,_,currentZLength = measureFilterDimensions(filt3D)
   zZoomOut = float(lengthTARegion * scopeResolutions[2]) / float(currentZLength)
-  print "WARNING: TEMPORARILY ZOOMING OUT OF X AND Y AXIS TO MAKE TA FILTER SMALLER AND WORK WITH SIMULATED DATA"
+  print ("WARNING: TEMPORARILY ZOOMING OUT OF X AND Y AXIS TO MAKE TA FILTER SMALLER AND WORK WITH SIMULATED DATA")
   #zoomOut = [1., 1., zZoomOut]
   zoomOut = [.75, .75, zZoomOut]
   filt3D = ndimage.zoom(filt3D,zoom=zoomOut)
@@ -791,11 +796,11 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
         numVoxelsInDimension[i] = int(np.floor(numUnitCellsInDimension[i] * unitCellVoxels[i]))
 
     for i in range(3):
-        print "Final truncated cell size in {} dimension: {} [um]".format(i, float(numVoxelsInDimension[i])/float(scopeResolutions[i]))
-        print "Number of unit cells in {} dimension: {}".format(i, numUnitCellsInDimension[i])
-        print "Number of voxels in {} dimension: {}".format(i, numVoxelsInDimension[i])
+        print ("Final truncated cell size in {} dimension: {} [um]".format(i, float(numVoxelsInDimension[i])/float(scopeResolutions[i])))
+        print ("Number of unit cells in {} dimension: {}".format(i, numUnitCellsInDimension[i]))
+        print ("Number of voxels in {} dimension: {}".format(i, numVoxelsInDimension[i]))
 
-    print "Total number of unit cells: {}".format(np.prod(numUnitCellsInDimension))
+    print ("Total number of unit cells: {}".format(np.prod(numUnitCellsInDimension)))
     
     ## construct the cell
     cell = np.zeros(
@@ -841,7 +846,7 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
     ] = 1.
 
     ### Save unit cells to display later
-    print "Saving unit cells"
+    print ("Saving unit cells")
     Save3DImg(TTcell, './myoimages/TTcell.tif')
     Save3DImg(LTcell, './myoimages/LTcell.tif')
 
@@ -887,7 +892,7 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
                         j += 2
                     except:
                         if verbose:
-                            print "There is not enough room to place the LT unit cell. Setting this as TA for now"
+                            print ("There is not enough room to place the LT unit cell. Setting this as TA for now")
                         j += 1
                 else:
                     # Try to stick in two TT unit cells. If we can't do that, we've hit the edge of the cell
@@ -906,7 +911,7 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
                         j += 1
                     except:
                         if verbose:
-                            print "Attempted to insert two TT unit cells but could not do to cell boundary. Setting as single TT unit cell for now."
+                            print ("Attempted to insert two TT unit cells but could not do to cell boundary. Setting as single TT unit cell for now.")
             k += 1
         i += 1
     
@@ -927,7 +932,7 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
     cell = cell.astype(np.uint16)
     cell = np.moveaxis(cell, 2, 0)
     tifffile.imsave(fileName,data=cell)
-    print "Wrote:",fileName
+    print ("Wrote:",fileName)
 
 ###################################################################################################
 ###################################################################################################
@@ -1010,15 +1015,15 @@ def ReadResizeApplyMask(img,imgName,ImgTwoSarcSize=25,filterTwoSarcSize=25,maskN
   # function to apply the image mask before outputting results
   if not isinstance(maskImg, np.ndarray):
     if maskName == None or maskName == False:
-      print "No mask was found. Circumventing masking."
+      print ("No mask was found. Circumventing masking.")
       return img
     if isinstance(mask, np.ndarray):
       maskGray = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
     else:
       if maskName == None:
-        print "No mask was found. Circumventing masking."
+        print ("No mask was found. Circumventing masking.")
       else:
-        print "No mask named '"+maskName +"' was found. Circumventing masking."
+        print ("No mask named '"+maskName +"' was found. Circumventing masking.")
       return img
     if ImgTwoSarcSize != None:
       scale = float(filterTwoSarcSize) / float(ImgTwoSarcSize)
@@ -1102,7 +1107,7 @@ def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpola
   maxVal = np.max(A)
 
   if verbose:
-    print "Original Filter Values\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(A[:,:,0]), np.max(A[:,:,0]))
+    print ("Original Filter Values\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(A[:,:,0]), np.max(A[:,:,0])))
 
   ### 1. Interpolate and Form New Matrix with Homogeneous Coordinates
   ## Find zoom levels based on resolutions. We need to zoom in for all dimensions with resolutiosn lower than the maximum
@@ -1119,20 +1124,20 @@ def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpola
     zoomed[zoomed > maxVal] = maxVal
 
   if verbose:
-    print "Filter Values After Zooming In\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomed[:,:,0]),np.max(zoomed[:,:,0]))
+    print ("Filter Values After Zooming In\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomed[:,:,0]),np.max(zoomed[:,:,0])))
 
   ### 2. Rotate the Matrix Using Homogeneous Coordinate Rotation Routine
   ## Pad the zoomed in image first to ensure that rotation does not induce artifacts
   padded = pad3DArray(zoomed)
 
   if verbose:
-    print "Filter Values After Padding\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(padded[:,:,0]),np.max(padded[:,:,0]))
+    print ("Filter Values After Padding\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(padded[:,:,0]),np.max(padded[:,:,0])))
 
   ## Rotate the matrix
   rotated = rotate3DArray_Homogeneous(padded, angles, clipOutput=clipValues, interpolationOrder=interpolationOrder)
 
   if verbose:
-    print "Filter Values After Rotating\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(rotated[:,:,0]),np.max(rotated[:,:,0]))
+    print ("Filter Values After Rotating\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(rotated[:,:,0]),np.max(rotated[:,:,0])))
 
   ### 3. Downsample by Zooming Out
   ## Find the amount we'll have to zoom out to return to previous levels
@@ -1145,7 +1150,7 @@ def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpola
     zoomedOut[zoomedOut > maxVal] = maxVal
 
   if verbose:
-    print "Filter Values After Zooming Out\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomedOut[:,:,0]),np.max(zoomedOut[:,:,0]))
+    print ("Filter Values After Zooming Out\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomedOut[:,:,0]),np.max(zoomedOut[:,:,0])))
 
   return zoomedOut
 
@@ -1252,12 +1257,12 @@ def autoDepadArray(img, verbose=False):
   filtDims, paddingLocs = measureFilterDimensions(img,returnFilterPaddingLocations=True,epsilon=5e-5)
 
   if verbose:
-    print "Image Padding Locations: {}".format(paddingLocs)
+    print ("Image Padding Locations: {}".format(paddingLocs))
 
   ### Check to see if there is padding in all 3 dimensions. If not, exit out of the routine
   for i in range(len(paddingLocs)):
     if paddingLocs[i][0] == 0 and paddingLocs[i][1] == 0:
-      print "There is no padding in the {} dimension of the image. Exiting routine without depadding.".format(i)
+      print ("There is no padding in the {} dimension of the image. Exiting routine without depadding.".format(i))
       return img
 
   ### Make a new array to store the depadded array
@@ -1377,18 +1382,18 @@ def assessContent(markedImg,imgName=None):
     ttContent /= cellArea
     ltContent /= cellArea
     taContent /= cellArea
-    print "TT Content:", ttContent
-    print "LT Content:", ltContent
-    print "Loss Content:", taContent
-    print "Sum of Content:", ttContent+ltContent+taContent
+    print ("TT Content:", ttContent)
+    print ("LT Content:", ltContent)
+    print ("Loss Content:", taContent)
+    print ("Sum of Content:", ttContent+ltContent+taContent)
     ## these should sum to 1 exactly but I'm leaving wiggle room
     assert (ttContent+ltContent+taContent) < 1.2, ("Something went " 
             +"wrong with the normalization of content to the cell area calculated "
             +"by the mask. Double check the masking routine.") 
   else:
-    print "TT Content:", ttContent
-    print "LT Content:", ltContent
-    print "TA Content:", taContent  
+    print ("TT Content:", ttContent)
+    print ("LT Content:", ltContent)
+    print ("TA Content:", taContent) 
 
   return ttContent, ltContent, taContent
 
@@ -1453,7 +1458,7 @@ def estimateTubuleContentFromColoredImage(cI,
 
   if verbose:
     for key, value in content.iteritems():
-      print "Corrected {} Morphological Feature Occupied Cell Space: {}".format(key, value)
+      print ("Corrected {} Morphological Feature Occupied Cell Space: {}".format(key, value))
 
   return content
 
@@ -1541,7 +1546,7 @@ def markPastedFilters(
   if inputs.dic['filterTypes']['TA']:
     labeledTA = painter.doLabel(TAholder,cellDimensions=TADimensions,thresh=0)
     if inputs.dic['dimensions'] == 3:
-      print "Warning: Shifting TA hits down one index in the z domain to make consistent hit detection."
+      print ("Warning: Shifting TA hits down one index in the z domain to make consistent hit detection.")
       dummy = np.zeros_like(labeledTA[:,:,0])
       labeledTA = np.dstack((dummy,labeledTA))[:,:,:-1]
   # else:
@@ -1549,7 +1554,7 @@ def markPastedFilters(
   if inputs.dic['filterTypes']['LT']:
     labeledLT = painter.doLabel(LTholder,cellDimensions=LTDimensions,thresh=0)
     if inputs.dic['dimensions'] == 3:
-      print "Warning: Shifting LT hits down one index in the z domain to make consistent hit detection."
+      print ("Warning: Shifting LT hits down one index in the z domain to make consistent hit detection.")
       dummy = np.zeros_like(labeledLT[:,:,0])
       labeledLT = np.dstack((dummy,labeledLT))[:,:,:-1]
   # else:
@@ -1624,7 +1629,7 @@ def GetAnnulus(region,sidx,innerMargin,outerMargin=None):
       raise RuntimeError("Antiquated. See GetRegion")
 
   if innerMargin%2==0 or outerMargin%2==0:
-      print "WARNING: should use odd values for margin!" 
+      print ("WARNING: should use odd values for margin!" )
 
   # grab entire region
   outerRegion,dummy,dummy = GetRegion(region,sidx,outerMargin)
@@ -1685,7 +1690,7 @@ def dissimilar(
     plt.imshow(k,cmap='gray')
     ks = fftp.fftshift(k)
     Ks = fftp.fftn(ks)
-    print np.min(k), np.min(Ks)
+    print (np.min(k), np.min(Ks))
     #Ks = cv2.filter2D(np.real(Ks),-1,kernel)
     #Ks = cv2.filter2D(np.real(Ks),-1,kernel)
     #Ks = cv2.filter2D(np.real(Ks),-1,kernel)    
