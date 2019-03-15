@@ -1,3 +1,4 @@
+from __future__ import print_function
 """
 Purpose of this program is to optimize the threshold parameters 
 to cleanly pick out data features
@@ -334,7 +335,7 @@ def TestParams_Single(
         dataSet.filter1PositiveData,
         display=display)    
         
-    print dataSet.filter1Thresh,filter1PS,filter1NS    
+    print (dataSet.filter1Thresh,filter1PS,filter1NS)
     return filter1PS, filter1NS    
 ## 
 ##  Returns true positive/false positive rates for two filters, given respective true positive 
@@ -350,7 +351,7 @@ def TestParams_Simultaneous(
     #dataSet.iters = [30], # focus on best angle for fused pore data
     ## Test both filters on filter1 test data 
     optimalAngleFused = 30
-    print np.max(dataSet.filter1TestData)
+    print (np.max(dataSet.filter1TestData))
     filter1_filter1Test, filter2_filter1Test = bD.TestFilters(
       testData = dataSet.filter1TestData, 
       filter1Data = dataSet.filter1Data,
@@ -416,7 +417,7 @@ def TestParams_Simultaneous(
                             display=display)   
     
     ## 
-    print dataSet.filter1Thresh,dataSet.filter2Thresh,filter1PS,filter2NS,filter2PS,filter1NS
+    print (dataSet.filter1Thresh,dataSet.filter2Thresh,filter1PS,filter2NS,filter2PS,filter1NS)
     return filter1PS,filter2NS,filter2PS,filter1NS
 
 ##
@@ -544,7 +545,7 @@ def Assess_Simultaneous(
         df=df.append(dfi)
 
   # store in hdf5 file
-  print "Printing " , hdf5Name 
+  print ("Printing " , hdf5Name )
   df.to_hdf(hdf5Name,'table', append=False)
   
   return df,hdf5Name     
@@ -566,7 +567,7 @@ def Assess_Single(
   ['filter1Thresh','filter1PS','filter1NS'])
   
   # iterate of thresholds
-  print "Threshold, Positive Score, Negative Score"
+  print ("Threshold, Positive Score, Negative Score")
   for i,filter1Thresh in enumerate(filter1Threshes):
         # set params 
         dataSet.filter1Thresh=filter1Thresh
@@ -593,7 +594,7 @@ def Assess_Single(
         df=df.append(dfi)
 
   # store in hdf5 file
-  print "Printing " , hdf5Name 
+  print ("Printing " , hdf5Name )
   df.to_hdf(hdf5Name,'table', append=False)
   
   return df,hdf5Name     
@@ -614,7 +615,7 @@ def GenFigROC_TruePos_FalsePos(
   ##
 
   if loadOnly:
-    print "Reading ", hdf5Name 
+    print ("Reading ", hdf5Name )
   else:
     Assess_Single(
         dataSet,
@@ -650,7 +651,7 @@ def GenFigROC_CompetingFilters(
   ## perform trials using parameter ranges 
   ##
   if loadOnly:
-    print "Reading ", hdf5Name 
+    print ("Reading ", hdf5Name )
   else:
     Assess_Simultaneous(
         dataSet,
@@ -746,7 +747,7 @@ if __name__ == "__main__":
         f2ts = np.linspace(0.05,0.30,3),   
       ) 
       # just checking that all still runs 
-      print "PASS"
+      print ("PASS")
       quit()
   
 

@@ -1,3 +1,4 @@
+from __future__ import print_function
 '''
 This script contains all of the general plotting utilities for this manuscript.
 '''
@@ -80,13 +81,13 @@ def giveAvgStdofDicts(ShamDict,HFDict,MI_DDict,MI_MDict,MI_PDict):
     ### make holders to store results
     angleAvgs = []; angleStds = []
     for name,angleCounts in dictionary.iteritems():
-      print name
+      print (name)
       if 'angle' not in name:
         continue
       angleAvgs.append(np.mean(angleCounts))
       angleStds.append(np.std(angleCounts))
-      print "Average striation angle:",angleAvgs[-1]
-      print "Standard deviation of striation angle:",angleStds[-1]
+      print ("Average striation angle:",angleAvgs[-1])
+      print ("Standard deviation of striation angle:",angleStds[-1])
     avgDict[model] = angleAvgs
     stdDict[model] = angleStds
 
