@@ -49,7 +49,11 @@ def ReadImg(fileName,cvtColor=True,renorm=False,bound=False, dataType = np.float
 
   if fileType == '.tif':
     ## Read in image
-    img = tifffile.imread(fileName)
+    try:
+      img = tifffile.imread(fileName)
+    except:
+      raise RuntimeError("Loading of image threw an error. This is likely due to a data type issue. "
+                         +"Try converting the image data type to 32 bit float instead.")
 
     ## Check dimensionality of image. If image is 3D, we want to roll the z axis to the last position since 
     ##   tifffile reads in the z-stacks in the first dimension.
