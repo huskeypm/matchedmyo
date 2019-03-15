@@ -361,7 +361,7 @@ def generateWTFilter(WTFilterRoot=root+"/filterImgs/WT/", filterTwoSarcSize=25):
           if slopes[i] > 0 and slopes[i+1] <= 0:
             idxs.append(i)
       if len(idxs) > 2:
-          raise RuntimeError, "You have more than two peaks striations in your filter, think about discarding this image"
+          raise RuntimeError("You have more than two peaks striations in your filter, think about discarding this image")
     
       twoSarcDist = 2 * (idxs[-1] - idxs[0])
       scale = float(filterTwoSarcSize) / float(twoSarcDist)
