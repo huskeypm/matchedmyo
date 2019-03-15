@@ -1,3 +1,4 @@
+from __future__ import print_function
 """
 Packages routines used to determine if correlation response
 constitutes a detection
@@ -76,7 +77,7 @@ def lobeDetect(
         #out -= np.min(out)
         #out /= np.max(out)
         #corrlobe += s*out
-        print "Needs work - something awry (negative numbes etc) "
+        print ("Needs work - something awry (negative numbes etc) ")
         corrlobe = mF.matchedFilter(corr,lobemf,parsevals=True,demean=False)
         corrlobe = np.ones_like(corr)
         
@@ -85,7 +86,7 @@ def lobeDetect(
         
     ## Determine SNR by comparing integrated area with corrlobe response 
     snr = integrated/corrlobe ##* corrThreshed
-    print "Overriding snr for now - NEED TO DEBUG" 
+    print ("Overriding snr for now - NEED TO DEBUG" )
     snr = corr
     #snr = corrThreshed
 
@@ -322,7 +323,7 @@ def FilterSingle(
   '''
 
   if mode is not None:
-      print "WARNING: replacing with paramDict"
+      print ("WARNING: replacing with paramDict")
     
   mode = paramDict['filterMode']  
   if mode=="lobemode":
@@ -338,7 +339,7 @@ def FilterSingle(
     results = filterRatio(inputs,paramDict)
   else: 
     #raise RuntimeError("need to define mode") 
-    print "Patiently ignoring you until this is implemented" 
+    print ("Patiently ignoring you until this is implemented" )
     results = Results(
       snr = None,
       corr = None

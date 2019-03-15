@@ -1,3 +1,4 @@
+from __future__ import print_function
 """
 Wrapper for 'simplist' of MF calls 
 Ultimately will be posted on athena
@@ -113,7 +114,7 @@ def docalc(img,
     TTchannel = 2
     cImg[:,:,TTchannel][results.threshed == 1] = 255
 
-    print "Writing file %s"%fileName
+    print ("Writing file %s"%fileName)
     #plt.figure()
     #DisplayHits(img,results.threshed,smooth=smooth)
     plt.figure()
@@ -152,7 +153,7 @@ def simpleYaml(ymlName):
   with open(ymlName) as fp:
     data=yaml.load(fp)
   #print data    
-  print "Rreading %s" % ymlName    
+  print ("Reading %s" % ymlName )
     
   if 'outName' in data:
       outName=data['outName']
@@ -172,10 +173,10 @@ def simpleYaml(ymlName):
 ### updated yaml call
 ###
 def updatedSimpleYaml(ymlName,outFileName,imgFileName,maskFileName):
-  print "Adapt to accept filter mode argument?"
+  print ("Adapt to accept filter mode argument?")
   with open(ymlName) as fp:
     data = yaml.load(fp)
-  print "Reading %s" % ymlName
+  print ("Reading %s" % ymlName)
 
   mfName = "./myoimages/newSimpleWTFilter.png"
   
@@ -369,7 +370,7 @@ def fullAnalysis(yamlFile,
   cImg[dummy == 255] = 255
 
   ### Save figure
-  print "Saving "+outFileName
+  print ("Saving "+outFileName)
   plt.figure()
   plt.imshow(myoF.switchBRChannels(cImg))
   plt.gcf().savefig(outFileName,dpi=300)
@@ -421,7 +422,7 @@ def do2DGPUFiltering():
 
   # call filtering code
   results,tElapsed = tdt.doTFloop(inputs,paramDict,ziters=iters)
-  print results.stackedHits
+  print (results.stackedHits)
 
 
   # crop image to subsection size
@@ -461,11 +462,11 @@ def validation():
   mfName ="myoimages/WTFilter.png"
   thresh = -0.08 
   thresh = 0.01
-  print "WHY IS THRESH NEGATIVE?"              
+  print ("WHY IS THRESH NEGATIVE?"              )
   simple(imgName,mfName,thresh,smooth=20,
          debug=True)
 
-  print "WARNING: should add an assert here of some sort"
+  print ("WARNING: should add an assert here of some sort")
 
 #
 # Message printed when program run without arguments 
