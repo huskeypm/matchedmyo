@@ -1,3 +1,4 @@
+from __future__ import print_function
 from copy import copy
 import numpy as np
 import matplotlib.pyplot as plt
@@ -232,7 +233,7 @@ def StackHits(correlated,  # an array of 'correlation planes'
     if rescaleCorr:
       raise RuntimeError("Why is this needed? IGNORING")
     if display:
-      print "Call me debug" 
+      print ("Call me debug" )
 
     ### Check to see if we previously used the new storage technique
     ###   if we did, then we can use a shortcut with this routine since we've done a lot of the leg
@@ -265,7 +266,7 @@ def StackHits(correlated,  # an array of 'correlation planes'
           daMask = util.makeMask(paramDict['snrThresh'],img = correlated[i].snr,
                                   inverseThresh=paramDict['inverseSNR'])
         except:
-          print "DC: Using workaround for tissue param dictionary. Fix me."
+          print ("DC: Using workaround for tissue param dictionary. Fix me.")
           daMask = util.makeMask(paramDict['snrThresh'], img=correlated[i].snr)
         ## pull out where there is a hit on the simple correlation for use in rotation angle
         hitMask = daMask > 0.
