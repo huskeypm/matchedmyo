@@ -342,6 +342,12 @@ class Inputs:
       eightBitImage = eightBitImage.astype(np.uint8)
       self.colorImage = np.dstack((eightBitImage,eightBitImage,eightBitImage))
 
+    ### Catch returnAngles flag for 3D images
+    if self.dic['dimensions'] > 2 and self.dic['returnAngles']:
+      raise RuntimeError("'returnAngles' is not yet implemented for 3D images. 'returnAngles' "
+                         +"should be False in the input YAML file.")
+
+
   def load_yaml(self):
     '''Function to read and store the yaml dictionary'''
     self.yamlDict = util.load_yaml(self.yamlFileName)
