@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+from __future__ import print_function
 
 '''This script will contain all of the necessary wrapper routines to perform analysis on a wide range of 
 cardiomyocyte/tissue images.
@@ -554,7 +555,7 @@ def TT_Filtering(inputs,
   '''
   Takes inputs class that contains original image and performs WT filtering on the image
   '''
-  print "TT Filtering"
+  print ("TT Filtering")
   start = time.time()
 
   ### Specify necessary inputs
@@ -574,7 +575,7 @@ def TT_Filtering(inputs,
   )  
 
   end = time.time()
-  print "Time for WT filtering to complete:",end-start,"seconds"
+  print ("Time for WT filtering to complete:",end-start,"seconds")
 
   return WTresults
 
@@ -585,7 +586,7 @@ def LT_Filtering(inputs,
   Takes inputs class that contains original image and performs LT filtering on the image
   '''
 
-  print "LT filtering"
+  print ("LT filtering")
   start = time.time()
 
   ### Specify necessary inputs
@@ -600,7 +601,7 @@ def LT_Filtering(inputs,
   )
 
   end = time.time()
-  print "Time for LT filtering to complete:",end-start,"seconds"
+  print ("Time for LT filtering to complete:",end-start,"seconds")
 
   return LTresults
 
@@ -611,7 +612,7 @@ def TA_Filtering(inputs,
   '''
   Takes inputs class that contains original image and performs Loss filtering on the image
   '''
-  print "TA filtering"
+  print ("TA filtering")
   start = time.time()
 
   ### Specify necessary inputs
@@ -633,7 +634,7 @@ def TA_Filtering(inputs,
   )
 
   end = time.time()
-  print "Time for TA filtering to complete:",end-start,"seconds"
+  print ("Time for TA filtering to complete:",end-start,"seconds")
 
   return Lossresults
 
@@ -953,7 +954,7 @@ def giveMarkedMyocyte(
 
   end = time.time()
   tElapsed = end - start
-  print "Total Elapsed Time: {}s".format(tElapsed)
+  print ("Total Elapsed Time: {}s".format(tElapsed))
   return myResults
 
 def give3DMarkedMyocyte(
@@ -1075,12 +1076,12 @@ def give3DMarkedMyocyte(
     myResults.ltContent = np.float(np.sum(myResults.markedImage[:,:,:,1] == 255)) / cellVolume
     myResults.ttContent = np.float(np.sum(myResults.markedImage[:,:,:,0] == 255)) / cellVolume
 
-    print "TA Content per Cell Volume:", myResults.taContent
-    print "LT Content per Cell Volume:", myResults.ltContent
-    print "TT Content per Cell Volume:", myResults.ttContent
+    print ("TA Content per Cell Volume:", myResults.taContent)
+    print ("LT Content per Cell Volume:", myResults.ltContent)
+    print ("TT Content per Cell Volume:", myResults.ttContent)
 
   if returnAngles:
-    print "WARNING: Striation angle analysis is not yet available in 3D"
+    print ("WARNING: Striation angle analysis is not yet available in 3D")
   
   ### Save detection image
   if isinstance(inputs.dic['outputParams']['fileRoot'], str):
@@ -1094,7 +1095,7 @@ def give3DMarkedMyocyte(
   myResults.writeToCSV(inputs=inputs)
 
   end = time.time()
-  print "Time for algorithm to run:",end-start,"seconds"
+  print ("Time for algorithm to run:",end-start,"seconds")
   
   return myResults
 
@@ -1116,7 +1117,7 @@ def arbitraryFiltering(inputs):
   ### Loop over filtering types and perform classification for that filter type if turned on by YAML file
   for filterKey, filterToggle in inputs.dic['filterTypes'].iteritems():
     if filterToggle:
-      print "Performing {} classification".format(filterKey)
+      print ("Performing {} classification".format(filterKey))
       ## Load in filter
       inputs.mfOrig = util.LoadFilter(inputs.paramDicts[filterKey]['filterName'])
       if inputs.paramDicts[filterKey]['filterMode'] == 'punishmentFilter':
@@ -1178,7 +1179,7 @@ def arbitraryFiltering(inputs):
 
       ## Measure amount of hits in image relative to image size
       hitRatio = float(np.count_nonzero(filterResults.stackedHits)) / float(np.prod(inputs.imgOrig.shape))
-      print filterKey+' detection to non-detection ratio: '+str(hitRatio)[:7]
+      print (filterKey+' detection to non-detection ratio: '+str(hitRatio)[:7])
       # storage{filterKey} = hitRatio
 
       ## Save angles of detection if indicated
@@ -1203,13 +1204,13 @@ def arbitraryFiltering(inputs):
         angleCounts = {}
         for it in inputs.dic['iters']:
           if isinstance(it,list):
-            print "The counting of angles hits for 3D images is not yet supported."
+            print ("The counting of angles hits for 3D images is not yet supported.")
             itCopy = [str(thisIt) for thisIt in it]
             key = '_'.join(itCopy)
           else:
             key = it
           angleCounts[key] = np.count_nonzero(filterResults.stackedAngles == it)
-          print filterKey+' hits at {} rotation: {}'.format(key, angleCounts[key])
+          print (filterKey+' hits at {} rotation: {}'.format(key, angleCounts[key]))
 
         
 
@@ -1230,7 +1231,7 @@ def arbitraryFiltering(inputs):
 
   end = time.time()
   tElapsed = end - start
-  print "Total Elapsed Time: {}s".format(tElapsed)
+  print ("Total Elapsed Time: {}s".format(tElapsed))
   return myResults
 
 
@@ -1252,8 +1253,8 @@ def fullValidation(args):
   validate(args)
   validate3D(args)
 
-  print "All validation tests have PASSED! MatchedMyo is installed properly on this machine."
-  print "Happy classifying!"
+  print ("All validation tests have PASSED! MatchedMyo is installed properly on this machine.")
+  print ("Happy classifying!")
 
 def validate(args,
              display=False
@@ -1284,7 +1285,7 @@ def validate(args,
     plt.imshow(myResults.markedImage)
     plt.show()
 
-  print "\nThe following content values are for validation purposes only.\n"
+  print ("\nThe following content values are for validation purposes only.\n")
 
   ### Calculate TT, LT, and TA content  
   ttContent, ltContent, taContent = util.assessContent(myResults.markedImage)
@@ -1302,7 +1303,7 @@ def validate(args,
   # print "Number of Hits at Rotation = 5 Degrees:", numHits
   assert(abs(numHits - 1621) < 1), "Rotation validation failed"
 
-  print "\nValidate Function has PASSED!\n"
+  print ("\nValidate Function has PASSED!\n")
 
 def validate3D(args):
   '''This function serves as a validation routine for the 3D functionality of this repo.
@@ -1355,7 +1356,7 @@ def validate3D(args):
     inputs = inputs
   )
 
-  print "\nThe following content values are for validation purposes only.\n"
+  print ("\nThe following content values are for validation purposes only.\n")
 
   ### Assess the amount of TT, LT, and TA content there is in the image 
   ttContent, ltContent, taContent = util.assessContent(myResults.markedImage)
@@ -1369,7 +1370,7 @@ def validate3D(args):
   assert(abs(ttContent - 301215) < 1), "TT validation failed."
   assert(abs(ltContent -  53293) < 1), "LT validation failed."
   assert(abs(taContent - 409003) < 1), "TA validation failed."
-  print "\n3D Validation has PASSED!\n"
+  print ("\n3D Validation has PASSED!\n")
 
 ###################################################################################################
 ###################################################################################################
