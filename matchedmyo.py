@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 from __future__ import print_function
+from six import iteritems
 
 '''This script will contain all of the necessary wrapper routines to perform analysis on a wide range of 
 cardiomyocyte/tissue images.
@@ -25,7 +26,10 @@ import matchedFilter as mF
 import argparse
 import yaml
 import preprocessing as pp
-import cPickle as pkl
+if sys.version_info[0] < 3:
+  import cPickle as pkl
+else:
+  import pickle as pkl
 
 
 root = '/'.join(os.path.realpath(__file__).split('/')[:-1])
@@ -206,7 +210,7 @@ class Inputs:
     ###   If they do, then we assign the non-default value specified in the yaml file in the 
     ###   dictionary we already formed.
     if isinstance(self.yamlDict, dict):
-      for key, value in self.yamlDict.iteritems():
+      for (key, value) in iteritems(self.yamlDict):
         ## Check to see if the key is pointing to the parameter dictionary. If it is, skip this
         ##   since we have functions that update it already
         if key == 'paramDicts':
@@ -215,7 +219,7 @@ class Inputs:
         ## Check to see if the key is pointing to the outputParams dictionary specified in the YAML file
         if key == "outputParams":
           ## iterate through the dictionary specified in the yaml file and store non-default values
-          for outputKey, outputValue in value.iteritems():
+          for (outputKey, outputValue) in iteritems(value):
             if outputKey in self.dic['outputParams'].keys():
               self.dic['outputParams'][outputKey] = outputValue
             else:
@@ -307,10 +311,10 @@ class Inputs:
     try:
       ## If this works, there are parameter options specified
       yamlParamDictOptions = self.yamlDict['paramDicts']
-      for filterType, paramDict in yamlParamDictOptions.iteritems():
+      for (filterType, paramDict) in iteritems(yamlParamDictOptions):
         ## Go through and assign all specified non-default parameters in the yaml file to the 
         ##   storageDict
-        for parameterName, parameter in paramDict.iteritems():
+        for (parameterName, parameter) in iteritems(paramDict):
           self.paramDicts[filterType][parameterName] = parameter
 
     except:
@@ -343,9 +347,9 @@ class Inputs:
       self.colorImage = np.dstack((eightBitImage,eightBitImage,eightBitImage))
 
     ### Catch returnAngles flag for 3D images
-    if self.dic['dimensions'] > 2 and self.dic['returnAngles']:
-      raise RuntimeError("'returnAngles' is not yet implemented for 3D images. 'returnAngles' "
-                         +"should be False in the input YAML file.")
+    # if self.dic['dimensions'] > 2 and self.dic['returnAngles']:
+    #   raise RuntimeError("'returnAngles' is not yet implemented for 3D images. 'returnAngles' "
+    #                      +"should be False in the input YAML file.")
 
 
   def load_yaml(self):
@@ -401,7 +405,7 @@ class Inputs:
       raise RuntimeError('Ensure that csvFile in outputParams is a string.')
 
     ### Check that filter types is either true or false for all entries
-    for key, value in self.dic['filterTypes'].iteritems():
+    for (key, value) in iteritems(self.dic['filterTypes']):
       if not isinstance(value, bool):
         raise RuntimeError('Check that {} in filterTypes is either True or False'.format(key))
 
@@ -411,7 +415,7 @@ class Inputs:
           raise RuntimeError('TT filtering must be turned on if returnAngles is specified as True')
 
     ### Check that filter modes are specified correctly
-    for filtType, pDict in self.paramDicts.iteritems():
+    for (filtType, pDict) in iteritems(self.paramDicts):
       try:
         filtMode = pDict['filterMode']
       except:
@@ -1125,7 +1129,7 @@ def arbitraryFiltering(inputs):
   )
 
   ### Loop over filtering types and perform classification for that filter type if turned on by YAML file
-  for filterKey, filterToggle in inputs.dic['filterTypes'].iteritems():
+  for (filterKey, filterToggle) in iteritems(inputs.dic['filterTypes']):
     if filterToggle:
       print ("Performing {} classification".format(filterKey))
       ## Load in filter
