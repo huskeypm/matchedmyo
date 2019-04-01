@@ -35,13 +35,9 @@ else:
 root = '/'.join(os.path.realpath(__file__).split('/')[:-1])
 
 ###################################################################################################
-###################################################################################################
-###################################################################################################
 ###
 ### Class Definitions
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 class Inputs:
@@ -117,6 +113,10 @@ class Inputs:
     self.imgOrig = util.ReadImg(self.dic['imageName'], renorm=True)
     self.dic['dimensions'] = len(self.imgOrig.shape)
 
+    ## Turn on printing of filtering progress automatically if the image is 3D
+    if self.dic['dimensions'] > 2:
+      self.dic['displayProgress'] = True
+
     ### Make a 'color' image with 3 channels in the final index to represent the color channels
     ###   We also want to dampen the brightness a bit for display purposes, so we multiply by an
     ###   alpha value
@@ -161,6 +161,7 @@ class Inputs:
     dic['iters'] = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
     dic['returnAngles'] = False
     dic['returnPastedFilter'] = True
+    dic['displayProgress'] = False
 
     if self.classificationType == 'arbitrary':
       ## We don't have a preprocessing routine defined for the arbitrary filtering case
@@ -248,12 +249,12 @@ class Inputs:
     except:
       pass
     
-    ### Check to see if '.csv' is present in the output csv file
+    ## Check to see if '.csv' is present in the output csv file
     if (isinstance(self.dic['outputParams']['csvFile'],str) 
         and self.dic['outputParams']['csvFile'][-4:] != '.csv'):
       self.dic['outputParams']['csvFile'] = self.dic['outputParams']['csvFile'] + '.csv'
 
-    ### Convert the scope resolutions into a list
+    ## Convert the scope resolutions into a list
     if isinstance(self.dic['scopeResolutions'], dict):
       scopeRes = [
         self.dic['scopeResolutions']['x'],
@@ -265,8 +266,8 @@ class Inputs:
         pass
       self.dic['scopeResolutions'] = scopeRes
 
-    ### Flatten out iters if it is still a dictionary. This is necessary for 3D classification where
-    ###   there are three axes of rotation
+    ## Flatten out iters if it is still a dictionary. This is necessary for 3D classification where
+    ##   there are three axes of rotation
     if isinstance(self.dic['iters'], dict):
       flattenedIters = []
       for i in self.dic['iters']['x']:
@@ -551,16 +552,10 @@ class ClassificationResults:
       ## Write outputs to csv file
       dummyWriter.writerow(output)
 
-
-
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 ###
 ### Individual Filtering Routines
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 def TT_Filtering(inputs,
@@ -735,13 +730,9 @@ def analyzeTT_Angles(testImageName,
   return angleCounts, coloredAnglesMasked
 
 ###################################################################################################
-###################################################################################################
-###################################################################################################
 ###
 ### Wrappers for Full Analysis of User-Supplied Images
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 def giveMarkedMyocyte(
@@ -1317,7 +1308,7 @@ def validate(args,
   # print "Number of Hits at Rotation = 5 Degrees:", numHits
   assert(abs(numHits - 1621) < 1), "Rotation validation failed"
 
-  print ("\nValidate Function has PASSED!\n")
+  print ("\nValidate Function has PASSED!")
 
 def validate3D(args):
   '''This function serves as a validation routine for the 3D functionality of this repo.
