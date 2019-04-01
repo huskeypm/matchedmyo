@@ -104,7 +104,7 @@ def correlateThresher(
     for rotNum,i in enumerate(iters):
       ## Print progress of filtering if designated so
       if inputs.dic['displayProgress']:
-        print ("\tPerforming classification for rotation {}/{}.".format(rotNum,len(iters)))
+        print ("\tPerforming classification for rotation {}/{}.".format(rotNum + 1,len(iters)))
 
       ## Check dimensionality of iteration and rotate filters accordingly
       if type(i) == list:
