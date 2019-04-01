@@ -101,7 +101,11 @@ def correlateThresher(
       correlated = []
 
     ### Iterate over all filter rotations desired
-    for i in iters:
+    for rotNum,i in enumerate(iters):
+      ## Print progress of filtering if designated so
+      if inputs.dic['displayProgress']:
+        print ("\tPerforming classification for rotation {}/{}.".format(rotNum,len(iters)))
+
       ## Check dimensionality of iteration and rotate filters accordingly
       if type(i) == list:
         ## This is 3D
