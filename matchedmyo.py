@@ -280,7 +280,18 @@ class Inputs:
           for k in self.dic['iters']['z']:
             flattenedIters.append( [i,j,k] )
       self.dic['iters'] = flattenedIters
-      
+
+    ## Turn on filtering types if parameter dictionaries are specified even if they weren't specified to be turned on explicitly
+    for (filterKey, filterToggle) in iteritems(self.dic['filterTypes']):
+      if "paramDicts" in self.yamlDict.keys():
+        if filterKey in self.yamlDict['paramDicts'].keys():
+          # check to see if parameters are specified and it's turned off for some reason
+          if "filterTypes" in self.yamlDict.keys():
+            if self.yamlDict["filterTypes"][filterKey]:
+              self.dic['filterTypes'][filterKey] = True
+          # otherwise just turn it on since parameters are specified anyway
+          else: self.dic['filterTypes'][filterKey] = True
+ 
   def setupDefaultParamDicts(self):
     '''This function forms the default parameter dictionaries for each filtering type, TT, LT, and 
     TA.'''
@@ -1101,6 +1112,9 @@ def give3DMarkedMyocyte(
   myResults.ltContent = np.count_nonzero(myResults.markedImage[...,1]) / inputs.dic['cell_size']   
   myResults.taContent = np.count_nonzero(myResults.markedImage[...,2]) / inputs.dic['cell_size'] 
 
+  ### Mark the hits on the color image
+  # myResults.colorImage = inputs.colorImage.copy()
+
   if returnAngles:
     print ("WARNING: Striation angle analysis is not yet available in 3D")
   
@@ -1272,6 +1286,7 @@ def fullValidation(args):
 
   validate(args)
   validate3D(args)
+  validate3D_arbitrary(args)
 
   print ("All validation tests have PASSED! MatchedMyo is installed properly on this machine.")
   print ("Happy classifying!")
@@ -1323,7 +1338,7 @@ def validate(args,
   # print "Number of Hits at Rotation = 5 Degrees:", numHits
   assert(abs(numHits - 1621) < 1), "Rotation validation failed"
 
-  print ("\nValidate Function has PASSED!")
+  print ("\n2D Validation has PASSED!")
 
 def validate3D(args):
   '''This function serves as a validation routine for the 3D functionality of this repo.
@@ -1370,7 +1385,7 @@ def validate3D(args):
   inputs = Inputs(
     yamlFileName = yamlFile
   )
-
+  print (inputs.dic['outputParams']['fileRoot'], inputs.dic['outputParams']['fileType'])
   ### Analyze the 3D cell
   myResults = give3DMarkedMyocyte(
     inputs = inputs
@@ -1390,7 +1405,74 @@ def validate3D(args):
   assert(abs(ttContent - 301215) < 1), "TT validation failed."
   assert(abs(ltContent -  53293) < 1), "LT validation failed."
   assert(abs(taContent - 409003) < 1), "TA validation failed."
-  print ("\n3D Validation has PASSED!\n")
+  print ("\n3D Validation has PASSED!")
+
+def validate3D_arbitrary(args):
+  '''This function serves as a validation routine for the arbitrary classification functionality of
+  this repo.
+
+  Inputs:
+    None
+  '''
+
+  ### Capture all print statements
+  sys.stdout = open('garbage.txt', 'w')
+
+  ### Specify the yaml file. NOTE: This will be done via command line for main classification routines
+  yamlFile = './YAML_files/validate3D_arbitrary.yml'
+  
+  ### Define test file name
+  testName = "./myoimages/3DValidationData.tif"
+
+  if not os.path.isfile(testName):
+    ### Define parameters for the simulation of the cell
+    ## Probability of finding a longitudinal tubule unit cell
+    filter2_Prob = 0.3
+    ## Probability of finding a tubule absence unit cell
+    filter3_Prob = 0.3
+    ## Amplitude of the Guassian White Noise
+    noiseAmplitude = 0.
+    ## Define scope resolutions for generating the filters and the cell. This is in x, y, and z resolutions
+    scopeResolutions = [10,10,5] #[vx / um]
+    ## x, y, and z Dimensions of the simulated cell [microns]
+    cellDimensions = [10, 10, 20]
+
+    ### Simulate the small 3D cell
+    util.generateSimulated3DCell(LT_probability=filter2_Prob,
+                                 TA_probability=filter3_Prob,
+                                 noiseAmplitude=noiseAmplitude,
+                                 scopeResolutions=scopeResolutions,
+                                 cellDimensions=cellDimensions,
+                                 fileName=testName,
+                                 seed=1001,
+                                 )
+
+  ### Setup input parameters for classification
+  inputs = Inputs(
+    yamlFileName = yamlFile
+  )
+
+  ### Analyze the 3D cell
+  myResults = arbitraryFiltering(
+    inputs = inputs
+  )
+
+  print ("\nThe following content values are for validation purposes only.\n")
+
+  ### Assess the amount of TT, LT, and TA content there is in the image 
+  filter1_Content, filter2_Content, filter3_Content = util.assessContent(myResults.markedImage)
+
+  sys.stdout.close()
+  sys.stdout = sys.__stdout__
+  subprocess.call(['rm', 'garbage.txt'])
+
+  ### Check to see that they are in close agreement with previous values
+  # These values are different from the 3D validation case using give3DMarkedMyocyte() since we 
+  # don't shift the results down one spot
+  assert(abs(filter1_Content - 361524) < 1), "Filter 1 validation failed."
+  assert(abs(filter2_Content -  55680) < 1), "Filter 2 validation failed."
+  assert(abs(filter3_Content - 412437) < 1), "Filter 3 validation failed."
+  print ("\nArbitrary 3D Validation has PASSED!\n")
 
 ###################################################################################################
 ###

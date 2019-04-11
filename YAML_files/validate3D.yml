@@ -1,6 +1,6 @@
 imageName: './myoimages/3DValidationData.tif'
 outputParams:
-    fileRoot: ./results/3DValidationData_analysis
+    fileRoot: "./results/3DValidationData_analysis"
 preprocess: False
 scopeResolutions: 
     x: 10

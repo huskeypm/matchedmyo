@@ -124,7 +124,7 @@ def saveImg(img, inputs, switchChannels=True, fileName = None):
     if fileName[-4:] != '.tif':
       if fileName[-4] == '.':
         print ("Changing hit array to be stored in TIFF file format.")
-        fileName = fileName[-4:] + '.tif'
+        fileName = fileName[:-4] + '.tif'
       else:
         fileName += '.tif'
     ## this indicates 3D image (with color channels)
@@ -1586,8 +1586,8 @@ def markPastedFilters(
     LTmask[TTmask] = False # prevents double marking of WT and LT
 
   ### Dampen brightness and mark hits
-  # markedImage = inputs.colorImage.copy()
-  markedImage = np.zeros_like(inputs.colorImage)
+  # markedImage = np.zeros_like(inputs.colorImage)
+  markedImage = inputs.colorImage.copy()
   alpha = 1.0
   hitValue = int(round(alpha * 255))
   if inputs.dic['filterTypes']['TA']:
