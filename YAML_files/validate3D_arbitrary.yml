@@ -1,0 +1,32 @@
+classificationType: arbitrary
+imageName: './myoimages/3DValidationData.tif'
+outputParams:
+    fileRoot: "./results/3DValidationData_arbitrary_analysis"
+    fileType: "tif"
+preprocess: False
+scopeResolutions: 
+    x: 10
+    y: 10
+    z: 5 #voxels per micron
+iters:
+    x: [0]
+    y: [0]
+    z: [0]
+paramDicts:
+    filter1:
+        filterMode: punishmentFilter
+        filterName: './myoimages/TT_3D.tif'
+        punishFilterName: './myoimages/TT_Punishment_3D.tif'
+        gamma: 3
+        snrThresh: 0.8
+    filter2:
+        filterMode: regionalDeviation
+        filterName: './myoimages/LT_3D.tif'
+        snrThresh: 0.9
+        stdDevThresh: 1.
+    filter3:
+        filterMode: regionalDeviation
+        filterName: ./myoimages/TA_3D.tif
+        inverseSNR: True
+        snrThresh: 0.04
+        stdDevThresh: 0.5
