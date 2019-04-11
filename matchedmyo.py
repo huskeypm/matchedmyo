@@ -84,6 +84,11 @@ class Inputs:
     self.paramDicts = paramDicts
     self.preprocess = preprocess
 
+    if sys.version_info[0] < 3:
+      self.writeMode = 'wb'
+    else:
+      self.writeMode = 'w'
+
     ## Update default dictionaries according to yaml file
     if yamlFileName:
       self.load_yaml()
@@ -352,7 +357,6 @@ class Inputs:
     #   raise RuntimeError("'returnAngles' is not yet implemented for 3D images. 'returnAngles' "
     #                      +"should be False in the input YAML file.")
 
-
   def load_yaml(self):
     '''Function to read and store the yaml dictionary'''
     self.yamlDict = util.load_yaml(self.yamlFileName)
@@ -515,7 +519,7 @@ class ClassificationResults:
 
     ### If the file does not already exist, we need to create headers for it
     if not fileExists:
-      with open(inputs.dic['outputParams']['csvFile'], 'wb') as csvFile:
+      with open(inputs.dic['outputParams']['csvFile'], inputs.writeMode) as csvFile:
         ## Create instance of writer object
         dummyWriter = csv.writer(csvFile)
       
@@ -531,7 +535,11 @@ class ClassificationResults:
         ]
         dummyWriter.writerow(header)
 
-    with open(inputs.dic['outputParams']['csvFile'], 'ab') as csvFile:
+    if sys.version_info[0] < 3:
+      appendMode = 'ab'
+    else:
+      appendMode = 'a'
+    with open(inputs.dic['outputParams']['csvFile'], appendMode) as csvFile:
       ## Create instance of writer object
       dummyWriter = csv.writer(csvFile)
       
@@ -1164,7 +1172,10 @@ def arbitraryFiltering(inputs):
             fileName = inputs.dic['outputParams']['fileRoot']+'_'+filterKey+'_hits_angles'
           )
         else:
-          with open(inputs.dic['outputParams']['fileRoot']+'_'+filterKey+'_hit_angles.pkl', 'w') as f:
+          ## Get correct writing mode
+          if sys.version_info[0] < 3: writeMode = 'w'
+          else: writeMode = 'wb'
+          with open(inputs.dic['outputParams']['fileRoot']+'_'+filterKey+'_hit_angles.pkl', writeMode) as f:
             pkl.dump(filterResults.stackedAngles, f)
 
       ## Mark hits on the colored image

@@ -1,4 +1,5 @@
 from __future__ import print_function
+from six import iteritems
 import sys
 import os
 import matplotlib.pylab as plt 
@@ -25,13 +26,9 @@ root = "myoimages/"
 thisFileRoot = '/'.join(os.path.realpath(__file__).split('/')[:-1])
 
 ###################################################################################################
-###################################################################################################
-###################################################################################################
 ###
 ### Functions for Convenience
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 def myplot(img,fileName=None,clim=None):
@@ -52,7 +49,7 @@ def ReadImg(fileName,cvtColor=True,renorm=False,bound=False, dataType = np.float
     try:
       img = tifffile.imread(fileName)
     except:
-      raise RuntimeError("Loading of image threw an error. This is likely due to a data type issue. "
+      raise RuntimeError("Loading of image {} threw an error. This is likely due to a data type issue. ".format(fileName)
                          +"Try converting the image data type to 32 bit float instead.")
 
     ## Check dimensionality of image. If image is 3D, we want to roll the z axis to the last position since 
@@ -113,7 +110,7 @@ def saveImg(img, inputs, switchChannels=True, fileName = None):
     # set default file name
     fileName = inputs.dic['outputParams']['fileRoot']+'_output.'+inputs.dic['outputParams']['fileType']
 
-  if len(np.shape(img)) == 3:
+  if inputs.dic['dimensions'] == 2:
     ## this indicates 2D image (with color channels)
     plt.figure()
     if switchChannels:
@@ -123,9 +120,18 @@ def saveImg(img, inputs, switchChannels=True, fileName = None):
     outDict = inputs.dic['outputParams']
     plt.gcf().savefig(fileName,dpi=outDict['dpi'])
 
-  elif len(np.shape(img)) == 4:
+  elif inputs.dic['dimensions'] == 3:
+    if fileName[-4:] != '.tif':
+      if fileName[-4] == '.':
+        print ("Changing hit array to be stored in TIFF file format.")
+        fileName = fileName[-4:] + '.tif'
+      else:
+        fileName += '.tif'
     ## this indicates 3D image (with color channels)
     Save3DImg(img, fileName, switchChannels=switchChannels)
+
+  else:
+    raise RuntimeError("Invalid number of image dimensions to save image.")
 
 def Save3DImg(img, fileName, switchChannels=False):
   '''
@@ -311,13 +317,9 @@ def switchBRChannels(img):
   return newImg
 
 ###################################################################################################
-###################################################################################################
-###################################################################################################
 ###
 ### Functions for Image/Filter Generation
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 def makeCubeFilter(prismFilter):
@@ -939,13 +941,9 @@ def generateSimulated3DCell(FilterTwoSarcomereSize = 25, # [vx]
     print ("Wrote:",fileName)
 
 ###################################################################################################
-###################################################################################################
-###################################################################################################
 ###
 ### Functions for Image Manipulation
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 def rotateTFFilter2D(img,rotation):
@@ -1328,13 +1326,9 @@ def lightlyPreprocess(img,filterTwoSarcomereSize,colorImg=None,maskImg=None):
     return img
 
 ###################################################################################################
-###################################################################################################
-###################################################################################################
 ###
 ### Functions for Image Analysis
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 def assessContent(markedImg,imgName=None):
@@ -1457,11 +1451,11 @@ def estimateTubuleContentFromColoredImage(cI,
   }
 
   if totalCellSpace:
-    for key,value in content.iteritems():
+    for (key,value) in iteritems(content):
       content[key] /= float(totalCellSpace)
 
   if verbose:
-    for key, value in content.iteritems():
+    for (key, value) in iteritems(content):
       print ("Corrected {} Morphological Feature Occupied Cell Space: {}".format(key, value))
 
   return content
@@ -1719,15 +1713,10 @@ def dissimilar(
     return f, Hs,Ks
 
 
-
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 ###
 ### Setup/YAML Routines
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 def load_yaml(fileName):
@@ -1742,13 +1731,9 @@ def load_yaml(fileName):
   return data
 
 ###################################################################################################
-###################################################################################################
-###################################################################################################
 ###
 ### Command Line Functionality
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 # Message printed when program run without arguments 
