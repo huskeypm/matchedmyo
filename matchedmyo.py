@@ -352,6 +352,12 @@ class Inputs:
       eightBitImage = eightBitImage.astype(np.uint8)
       self.colorImage = np.dstack((eightBitImage,eightBitImage,eightBitImage))
 
+    ### Get a measure of the size of the image
+    if isinstance(self.maskImg, np.ndarray):
+      ## sum all elements of mask image where 1's indicate inside of mask
+      self.dic['cell_size'] = float(np.sum(self.maskImg))
+    else: self.dic['cell_size'] = float(np.prod(np.shape(self.imgOrig)))
+
     ### Catch returnAngles flag for 3D images
     # if self.dic['dimensions'] > 2 and self.dic['returnAngles']:
     #   raise RuntimeError("'returnAngles' is not yet implemented for 3D images. 'returnAngles' "
@@ -551,9 +557,9 @@ class ClassificationResults:
         now.strftime('%Y-%m-%d'),
         now.strftime('%H:%M:%S'),
         inputs.imageName,
-        self.ttContent,
-        self.ltContent,
-        self.taContent,
+        str(self.ttContent),
+        str(self.ltContent),
+        str(self.taContent),
         inputs.dic['outputParams']['fileRoot']        
       ]
 
@@ -907,7 +913,7 @@ def giveMarkedMyocyte(
         inputs = inputs
       )
 
-  if inputs.dic['returnPastedFilter']:
+  else:
     ## Mark filter-sized unit cells on blank image to represent hits
     myResults.markedImage = util.markPastedFilters(inputs, lossMasked, ltMasked, wtMasked)
     
@@ -961,6 +967,12 @@ def giveMarkedMyocyte(
         fileName = inputs.dic['outputParams']['fileRoot']+'_angles_output.'+inputs.dic['outputParams']['fileType']
       )
     
+  ### Get accurate measure of feature content based on cell size
+  ###   TODO: In later versions of the code, I'd like for this to be informed from an automatic mask segmentation
+  myResults.ttContent = np.count_nonzero(myResults.markedImage[...,0] == 255) / inputs.dic['cell_size'] 
+  myResults.ltContent = np.count_nonzero(myResults.markedImage[...,1] == 255) / inputs.dic['cell_size']   
+  myResults.taContent = np.count_nonzero(myResults.markedImage[...,2] == 255) / inputs.dic['cell_size'] 
+
   ### Write results of the classification
   if isinstance(inputs.dic['outputParams']['csvFile'],str):
     myResults.writeToCSV(inputs=inputs)
@@ -1067,13 +1079,13 @@ def give3DMarkedMyocyte(
     cellVolume = np.float(np.product(inputs.imgOrig.shape))
 
     ### Now based on the marked hits, we can obtain an estimate of tubule content
-    estimatedContent = util.estimateTubuleContentFromColoredImage(
-      myResults.markedImage,
-      totalCellSpace=cellVolume,
-      taFilterName=inputs.paramDicts['TA']['filterName'],
-      ltFilterName=inputs.paramDicts['LT']['filterName'],
-      ttFilterName=inputs.paramDicts['TT']['filterName']
-    )
+    # estimatedContent = util.estimateTubuleContentFromColoredImage(
+    #   myResults.markedImage,
+    #   totalCellSpace=cellVolume,
+    #   taFilterName=inputs.paramDicts['TA']['filterName'],
+    #   ltFilterName=inputs.paramDicts['LT']['filterName'],
+    #   ttFilterName=inputs.paramDicts['TT']['filterName']
+    # )
 
   else:
     ## Just mark exactly where detection is instead of pasting unit cells on detections
@@ -1083,15 +1095,11 @@ def give3DMarkedMyocyte(
     myResults.markedImage[:,:,:,1][LTstackedHits > 0] = 255
     myResults.markedImage[:,:,:,0][TTstackedHits > 0] = 255
 
-    ### Determine percentages of volume represented by each filter
-    cellVolume = np.float(np.product(inputs.imgOrig.shape))
-    myResults.taContent = np.float(np.sum(myResults.markedImage[:,:,:,2] == 255)) / cellVolume
-    myResults.ltContent = np.float(np.sum(myResults.markedImage[:,:,:,1] == 255)) / cellVolume
-    myResults.ttContent = np.float(np.sum(myResults.markedImage[:,:,:,0] == 255)) / cellVolume
-
-    print ("TA Content per Cell Volume:", myResults.taContent)
-    print ("LT Content per Cell Volume:", myResults.ltContent)
-    print ("TT Content per Cell Volume:", myResults.ttContent)
+  ### Normalize the number of detections to the cell area/volume
+  ###   TODO: In later versions of the code, I'd like for this to be informed from an automatic mask segmentation
+  myResults.ttContent = np.count_nonzero(myResults.markedImage[...,0]) / inputs.dic['cell_size'] 
+  myResults.ltContent = np.count_nonzero(myResults.markedImage[...,1]) / inputs.dic['cell_size']   
+  myResults.taContent = np.count_nonzero(myResults.markedImage[...,2]) / inputs.dic['cell_size'] 
 
   if returnAngles:
     print ("WARNING: Striation angle analysis is not yet available in 3D")
