@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 from __future__ import print_function
+from six import iteritems
 
 '''This script will contain all of the necessary wrapper routines to perform analysis on a wide range of 
 cardiomyocyte/tissue images.
@@ -25,19 +26,18 @@ import matchedFilter as mF
 import argparse
 import yaml
 import preprocessing as pp
-import cPickle as pkl
+if sys.version_info[0] < 3:
+  import cPickle as pkl
+else:
+  import pickle as pkl
 
 
 root = '/'.join(os.path.realpath(__file__).split('/')[:-1])
 
 ###################################################################################################
-###################################################################################################
-###################################################################################################
 ###
 ### Class Definitions
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 class Inputs:
@@ -84,6 +84,11 @@ class Inputs:
     self.paramDicts = paramDicts
     self.preprocess = preprocess
 
+    if sys.version_info[0] < 3:
+      self.writeMode = 'wb'
+    else:
+      self.writeMode = 'w'
+
     ## Update default dictionaries according to yaml file
     if yamlFileName:
       self.load_yaml()
@@ -112,6 +117,10 @@ class Inputs:
     ### Read in the original image and determine number of dimensions from this
     self.imgOrig = util.ReadImg(self.dic['imageName'], renorm=True)
     self.dic['dimensions'] = len(self.imgOrig.shape)
+
+    ## Turn on printing of filtering progress automatically if the image is 3D
+    if self.dic['dimensions'] > 2:
+      self.dic['displayProgress'] = True
 
     ### Make a 'color' image with 3 channels in the final index to represent the color channels
     ###   We also want to dampen the brightness a bit for display purposes, so we multiply by an
@@ -157,6 +166,7 @@ class Inputs:
     dic['iters'] = [-25,-20,-15,-10,-5,0,5,10,15,20,25]
     dic['returnAngles'] = False
     dic['returnPastedFilter'] = True
+    dic['displayProgress'] = False
 
     if self.classificationType == 'arbitrary':
       ## We don't have a preprocessing routine defined for the arbitrary filtering case
@@ -206,7 +216,7 @@ class Inputs:
     ###   If they do, then we assign the non-default value specified in the yaml file in the 
     ###   dictionary we already formed.
     if isinstance(self.yamlDict, dict):
-      for key, value in self.yamlDict.iteritems():
+      for (key, value) in iteritems(self.yamlDict):
         ## Check to see if the key is pointing to the parameter dictionary. If it is, skip this
         ##   since we have functions that update it already
         if key == 'paramDicts':
@@ -215,7 +225,7 @@ class Inputs:
         ## Check to see if the key is pointing to the outputParams dictionary specified in the YAML file
         if key == "outputParams":
           ## iterate through the dictionary specified in the yaml file and store non-default values
-          for outputKey, outputValue in value.iteritems():
+          for (outputKey, outputValue) in iteritems(value):
             if outputKey in self.dic['outputParams'].keys():
               self.dic['outputParams'][outputKey] = outputValue
             else:
@@ -244,12 +254,12 @@ class Inputs:
     except:
       pass
     
-    ### Check to see if '.csv' is present in the output csv file
+    ## Check to see if '.csv' is present in the output csv file
     if (isinstance(self.dic['outputParams']['csvFile'],str) 
         and self.dic['outputParams']['csvFile'][-4:] != '.csv'):
       self.dic['outputParams']['csvFile'] = self.dic['outputParams']['csvFile'] + '.csv'
 
-    ### Convert the scope resolutions into a list
+    ## Convert the scope resolutions into a list
     if isinstance(self.dic['scopeResolutions'], dict):
       scopeRes = [
         self.dic['scopeResolutions']['x'],
@@ -261,8 +271,8 @@ class Inputs:
         pass
       self.dic['scopeResolutions'] = scopeRes
 
-    ### Flatten out iters if it is still a dictionary. This is necessary for 3D classification where
-    ###   there are three axes of rotation
+    ## Flatten out iters if it is still a dictionary. This is necessary for 3D classification where
+    ##   there are three axes of rotation
     if isinstance(self.dic['iters'], dict):
       flattenedIters = []
       for i in self.dic['iters']['x']:
@@ -270,7 +280,18 @@ class Inputs:
           for k in self.dic['iters']['z']:
             flattenedIters.append( [i,j,k] )
       self.dic['iters'] = flattenedIters
-      
+
+    ## Turn on filtering types if parameter dictionaries are specified even if they weren't specified to be turned on explicitly
+    for (filterKey, filterToggle) in iteritems(self.dic['filterTypes']):
+      if "paramDicts" in self.yamlDict.keys():
+        if filterKey in self.yamlDict['paramDicts'].keys():
+          # check to see if parameters are specified and it's turned off for some reason
+          if "filterTypes" in self.yamlDict.keys():
+            if self.yamlDict["filterTypes"][filterKey]:
+              self.dic['filterTypes'][filterKey] = True
+          # otherwise just turn it on since parameters are specified anyway
+          else: self.dic['filterTypes'][filterKey] = True
+ 
   def setupDefaultParamDicts(self):
     '''This function forms the default parameter dictionaries for each filtering type, TT, LT, and 
     TA.'''
@@ -307,10 +328,10 @@ class Inputs:
     try:
       ## If this works, there are parameter options specified
       yamlParamDictOptions = self.yamlDict['paramDicts']
-      for filterType, paramDict in yamlParamDictOptions.iteritems():
+      for (filterType, paramDict) in iteritems(yamlParamDictOptions):
         ## Go through and assign all specified non-default parameters in the yaml file to the 
         ##   storageDict
-        for parameterName, parameter in paramDict.iteritems():
+        for (parameterName, parameter) in iteritems(paramDict):
           self.paramDicts[filterType][parameterName] = parameter
 
     except:
@@ -342,11 +363,16 @@ class Inputs:
       eightBitImage = eightBitImage.astype(np.uint8)
       self.colorImage = np.dstack((eightBitImage,eightBitImage,eightBitImage))
 
-    ### Catch returnAngles flag for 3D images
-    if self.dic['dimensions'] > 2 and self.dic['returnAngles']:
-      raise RuntimeError("'returnAngles' is not yet implemented for 3D images. 'returnAngles' "
-                         +"should be False in the input YAML file.")
+    ### Get a measure of the size of the image
+    if isinstance(self.maskImg, np.ndarray):
+      ## sum all elements of mask image where 1's indicate inside of mask
+      self.dic['cell_size'] = float(np.sum(self.maskImg))
+    else: self.dic['cell_size'] = float(np.prod(np.shape(self.imgOrig)))
 
+    ### Catch returnAngles flag for 3D images
+    # if self.dic['dimensions'] > 2 and self.dic['returnAngles']:
+    #   raise RuntimeError("'returnAngles' is not yet implemented for 3D images. 'returnAngles' "
+    #                      +"should be False in the input YAML file.")
 
   def load_yaml(self):
     '''Function to read and store the yaml dictionary'''
@@ -401,7 +427,7 @@ class Inputs:
       raise RuntimeError('Ensure that csvFile in outputParams is a string.')
 
     ### Check that filter types is either true or false for all entries
-    for key, value in self.dic['filterTypes'].iteritems():
+    for (key, value) in iteritems(self.dic['filterTypes']):
       if not isinstance(value, bool):
         raise RuntimeError('Check that {} in filterTypes is either True or False'.format(key))
 
@@ -411,7 +437,7 @@ class Inputs:
           raise RuntimeError('TT filtering must be turned on if returnAngles is specified as True')
 
     ### Check that filter modes are specified correctly
-    for filtType, pDict in self.paramDicts.iteritems():
+    for (filtType, pDict) in iteritems(self.paramDicts):
       try:
         filtMode = pDict['filterMode']
       except:
@@ -510,7 +536,7 @@ class ClassificationResults:
 
     ### If the file does not already exist, we need to create headers for it
     if not fileExists:
-      with open(inputs.dic['outputParams']['csvFile'], 'wb') as csvFile:
+      with open(inputs.dic['outputParams']['csvFile'], inputs.writeMode) as csvFile:
         ## Create instance of writer object
         dummyWriter = csv.writer(csvFile)
       
@@ -526,7 +552,11 @@ class ClassificationResults:
         ]
         dummyWriter.writerow(header)
 
-    with open(inputs.dic['outputParams']['csvFile'], 'ab') as csvFile:
+    if sys.version_info[0] < 3:
+      appendMode = 'ab'
+    else:
+      appendMode = 'a'
+    with open(inputs.dic['outputParams']['csvFile'], appendMode) as csvFile:
       ## Create instance of writer object
       dummyWriter = csv.writer(csvFile)
       
@@ -538,25 +568,19 @@ class ClassificationResults:
         now.strftime('%Y-%m-%d'),
         now.strftime('%H:%M:%S'),
         inputs.imageName,
-        self.ttContent,
-        self.ltContent,
-        self.taContent,
+        str(self.ttContent),
+        str(self.ltContent),
+        str(self.taContent),
         inputs.dic['outputParams']['fileRoot']        
       ]
 
       ## Write outputs to csv file
       dummyWriter.writerow(output)
 
-
-
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 ###
 ### Individual Filtering Routines
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 def TT_Filtering(inputs,
@@ -731,13 +755,9 @@ def analyzeTT_Angles(testImageName,
   return angleCounts, coloredAnglesMasked
 
 ###################################################################################################
-###################################################################################################
-###################################################################################################
 ###
 ### Wrappers for Full Analysis of User-Supplied Images
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 def giveMarkedMyocyte(
@@ -904,7 +924,7 @@ def giveMarkedMyocyte(
         inputs = inputs
       )
 
-  if inputs.dic['returnPastedFilter']:
+  else:
     ## Mark filter-sized unit cells on blank image to represent hits
     myResults.markedImage = util.markPastedFilters(inputs, lossMasked, ltMasked, wtMasked)
     
@@ -958,6 +978,12 @@ def giveMarkedMyocyte(
         fileName = inputs.dic['outputParams']['fileRoot']+'_angles_output.'+inputs.dic['outputParams']['fileType']
       )
     
+  ### Get accurate measure of feature content based on cell size
+  ###   TODO: In later versions of the code, I'd like for this to be informed from an automatic mask segmentation
+  myResults.ttContent = np.count_nonzero(myResults.markedImage[...,0] == 255) / inputs.dic['cell_size'] 
+  myResults.ltContent = np.count_nonzero(myResults.markedImage[...,1] == 255) / inputs.dic['cell_size']   
+  myResults.taContent = np.count_nonzero(myResults.markedImage[...,2] == 255) / inputs.dic['cell_size'] 
+
   ### Write results of the classification
   if isinstance(inputs.dic['outputParams']['csvFile'],str):
     myResults.writeToCSV(inputs=inputs)
@@ -1064,13 +1090,13 @@ def give3DMarkedMyocyte(
     cellVolume = np.float(np.product(inputs.imgOrig.shape))
 
     ### Now based on the marked hits, we can obtain an estimate of tubule content
-    estimatedContent = util.estimateTubuleContentFromColoredImage(
-      myResults.markedImage,
-      totalCellSpace=cellVolume,
-      taFilterName=inputs.paramDicts['TA']['filterName'],
-      ltFilterName=inputs.paramDicts['LT']['filterName'],
-      ttFilterName=inputs.paramDicts['TT']['filterName']
-    )
+    # estimatedContent = util.estimateTubuleContentFromColoredImage(
+    #   myResults.markedImage,
+    #   totalCellSpace=cellVolume,
+    #   taFilterName=inputs.paramDicts['TA']['filterName'],
+    #   ltFilterName=inputs.paramDicts['LT']['filterName'],
+    #   ttFilterName=inputs.paramDicts['TT']['filterName']
+    # )
 
   else:
     ## Just mark exactly where detection is instead of pasting unit cells on detections
@@ -1080,15 +1106,14 @@ def give3DMarkedMyocyte(
     myResults.markedImage[:,:,:,1][LTstackedHits > 0] = 255
     myResults.markedImage[:,:,:,0][TTstackedHits > 0] = 255
 
-    ### Determine percentages of volume represented by each filter
-    cellVolume = np.float(np.product(inputs.imgOrig.shape))
-    myResults.taContent = np.float(np.sum(myResults.markedImage[:,:,:,2] == 255)) / cellVolume
-    myResults.ltContent = np.float(np.sum(myResults.markedImage[:,:,:,1] == 255)) / cellVolume
-    myResults.ttContent = np.float(np.sum(myResults.markedImage[:,:,:,0] == 255)) / cellVolume
+  ### Normalize the number of detections to the cell area/volume
+  ###   TODO: In later versions of the code, I'd like for this to be informed from an automatic mask segmentation
+  myResults.ttContent = np.count_nonzero(myResults.markedImage[...,0]) / inputs.dic['cell_size'] 
+  myResults.ltContent = np.count_nonzero(myResults.markedImage[...,1]) / inputs.dic['cell_size']   
+  myResults.taContent = np.count_nonzero(myResults.markedImage[...,2]) / inputs.dic['cell_size'] 
 
-    print ("TA Content per Cell Volume:", myResults.taContent)
-    print ("LT Content per Cell Volume:", myResults.ltContent)
-    print ("TT Content per Cell Volume:", myResults.ttContent)
+  ### Mark the hits on the color image
+  # myResults.colorImage = inputs.colorImage.copy()
 
   if returnAngles:
     print ("WARNING: Striation angle analysis is not yet available in 3D")
@@ -1125,7 +1150,7 @@ def arbitraryFiltering(inputs):
   )
 
   ### Loop over filtering types and perform classification for that filter type if turned on by YAML file
-  for filterKey, filterToggle in inputs.dic['filterTypes'].iteritems():
+  for (filterKey, filterToggle) in iteritems(inputs.dic['filterTypes']):
     if filterToggle:
       print ("Performing {} classification".format(filterKey))
       ## Load in filter
@@ -1169,7 +1194,10 @@ def arbitraryFiltering(inputs):
             fileName = inputs.dic['outputParams']['fileRoot']+'_'+filterKey+'_hits_angles'
           )
         else:
-          with open(inputs.dic['outputParams']['fileRoot']+'_'+filterKey+'_hit_angles.pkl', 'w') as f:
+          ## Get correct writing mode
+          if sys.version_info[0] < 3: writeMode = 'w'
+          else: writeMode = 'wb'
+          with open(inputs.dic['outputParams']['fileRoot']+'_'+filterKey+'_hit_angles.pkl', writeMode) as f:
             pkl.dump(filterResults.stackedAngles, f)
 
       ## Mark hits on the colored image
@@ -1246,13 +1274,9 @@ def arbitraryFiltering(inputs):
 
 
 ###################################################################################################
-###################################################################################################
-###################################################################################################
 ###
 ###  Validation Routines
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 def fullValidation(args):
@@ -1262,6 +1286,7 @@ def fullValidation(args):
 
   validate(args)
   validate3D(args)
+  validate3D_arbitrary(args)
 
   print ("All validation tests have PASSED! MatchedMyo is installed properly on this machine.")
   print ("Happy classifying!")
@@ -1313,7 +1338,7 @@ def validate(args,
   # print "Number of Hits at Rotation = 5 Degrees:", numHits
   assert(abs(numHits - 1621) < 1), "Rotation validation failed"
 
-  print ("\nValidate Function has PASSED!\n")
+  print ("\n2D Validation has PASSED!")
 
 def validate3D(args):
   '''This function serves as a validation routine for the 3D functionality of this repo.
@@ -1360,7 +1385,7 @@ def validate3D(args):
   inputs = Inputs(
     yamlFileName = yamlFile
   )
-
+  print (inputs.dic['outputParams']['fileRoot'], inputs.dic['outputParams']['fileType'])
   ### Analyze the 3D cell
   myResults = give3DMarkedMyocyte(
     inputs = inputs
@@ -1380,16 +1405,79 @@ def validate3D(args):
   assert(abs(ttContent - 301215) < 1), "TT validation failed."
   assert(abs(ltContent -  53293) < 1), "LT validation failed."
   assert(abs(taContent - 409003) < 1), "TA validation failed."
-  print ("\n3D Validation has PASSED!\n")
+  print ("\n3D Validation has PASSED!")
 
-###################################################################################################
-###################################################################################################
+def validate3D_arbitrary(args):
+  '''This function serves as a validation routine for the arbitrary classification functionality of
+  this repo.
+
+  Inputs:
+    None
+  '''
+
+  ### Capture all print statements
+  sys.stdout = open('garbage.txt', 'w')
+
+  ### Specify the yaml file. NOTE: This will be done via command line for main classification routines
+  yamlFile = './YAML_files/validate3D_arbitrary.yml'
+  
+  ### Define test file name
+  testName = "./myoimages/3DValidationData.tif"
+
+  if not os.path.isfile(testName):
+    ### Define parameters for the simulation of the cell
+    ## Probability of finding a longitudinal tubule unit cell
+    filter2_Prob = 0.3
+    ## Probability of finding a tubule absence unit cell
+    filter3_Prob = 0.3
+    ## Amplitude of the Guassian White Noise
+    noiseAmplitude = 0.
+    ## Define scope resolutions for generating the filters and the cell. This is in x, y, and z resolutions
+    scopeResolutions = [10,10,5] #[vx / um]
+    ## x, y, and z Dimensions of the simulated cell [microns]
+    cellDimensions = [10, 10, 20]
+
+    ### Simulate the small 3D cell
+    util.generateSimulated3DCell(LT_probability=filter2_Prob,
+                                 TA_probability=filter3_Prob,
+                                 noiseAmplitude=noiseAmplitude,
+                                 scopeResolutions=scopeResolutions,
+                                 cellDimensions=cellDimensions,
+                                 fileName=testName,
+                                 seed=1001,
+                                 )
+
+  ### Setup input parameters for classification
+  inputs = Inputs(
+    yamlFileName = yamlFile
+  )
+
+  ### Analyze the 3D cell
+  myResults = arbitraryFiltering(
+    inputs = inputs
+  )
+
+  print ("\nThe following content values are for validation purposes only.\n")
+
+  ### Assess the amount of TT, LT, and TA content there is in the image 
+  filter1_Content, filter2_Content, filter3_Content = util.assessContent(myResults.markedImage)
+
+  sys.stdout.close()
+  sys.stdout = sys.__stdout__
+  subprocess.call(['rm', 'garbage.txt'])
+
+  ### Check to see that they are in close agreement with previous values
+  # These values are different from the 3D validation case using give3DMarkedMyocyte() since we 
+  # don't shift the results down one spot
+  assert(abs(filter1_Content - 361524) < 1), "Filter 1 validation failed."
+  assert(abs(filter2_Content -  55680) < 1), "Filter 2 validation failed."
+  assert(abs(filter3_Content - 412437) < 1), "Filter 3 validation failed."
+  print ("\nArbitrary 3D Validation has PASSED!\n")
+
 ###################################################################################################
 ###
 ### Command Line Functionality
 ###
-###################################################################################################
-###################################################################################################
 ###################################################################################################
 
 def run(args):
