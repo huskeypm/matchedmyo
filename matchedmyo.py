@@ -1203,14 +1203,22 @@ def arbitraryFiltering(inputs):
       ## Mark hits on the colored image
       if inputs.dic['returnPastedFilter']:
         ## Read in filter dimensions
-        filtDims = util.measureFilterDimensions(inputs.mfOrig)
+        # filtDims = util.measureFilterDimensions(inputs.mfOrig)
 
         ## Perform dilation of hits based on filter dimensions
-        filterResults.stackedHits = painter.doLabel(
+        # filterResults.stackedHits = painter.doLabel(
+        #   filterResults,
+        #   cellDimensions=filtDims,
+        #   thresh=0
+        # )
+
+        ## Trying new marking scheme based on filter dilation
+        filterResults.stackedHits = painter.doLabel_dilation(
           filterResults,
-          cellDimensions=filtDims,
-          thresh=0
+          inputs.mfOrig,
+          inputs
         )
+
       print("Marked image dims:", np.shape(myResults.markedImage))
       print("StackedHits image dims:", np.shape(filterResults.stackedHits))
       myResults.markedImage[..., channelIndex][filterResults.stackedHits != 0] = 255
@@ -1402,9 +1410,9 @@ def validate3D(args):
 
   ### Check to see that they are in close agreement with previous values
   ###   NOTE: We have to have a lot of wiggle room since we're generating a new cell for each validation
-  assert(abs(ttContent - 301215) < 1), "TT validation failed."
-  assert(abs(ltContent -  53293) < 1), "LT validation failed."
-  assert(abs(taContent - 409003) < 1), "TA validation failed."
+  assert(abs(ttContent - 305247) < 1), "TT validation failed."
+  assert(abs(ltContent -  48624) < 1), "LT validation failed."
+  assert(abs(taContent - 409161) < 1), "TA validation failed."
   print ("\n3D Validation has PASSED!")
 
 def validate3D_arbitrary(args):
@@ -1469,9 +1477,9 @@ def validate3D_arbitrary(args):
   ### Check to see that they are in close agreement with previous values
   # These values are different from the 3D validation case using give3DMarkedMyocyte() since we 
   # don't shift the results down one spot
-  assert(abs(filter1_Content - 361524) < 1), "Filter 1 validation failed."
-  assert(abs(filter2_Content -  55680) < 1), "Filter 2 validation failed."
-  assert(abs(filter3_Content - 412437) < 1), "Filter 3 validation failed."
+  assert(abs(filter1_Content - 242448) < 1), "Filter 1 validation failed."
+  assert(abs(filter2_Content -  50112) < 1), "Filter 2 validation failed."
+  assert(abs(filter3_Content - 412595) < 1), "Filter 3 validation failed."
   print ("\nArbitrary 3D Validation has PASSED!\n")
 
 ###################################################################################################
