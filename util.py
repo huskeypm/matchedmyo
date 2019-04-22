@@ -1109,7 +1109,7 @@ def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpola
   maxVal = np.max(A)
 
   if verbose:
-    print ("Original Filter Values\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(A[:,:,0]), np.max(A[:,:,0])))
+    print ("Original Filter Values\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(A), np.max(A)))
 
   ### 1. Interpolate and Form New Matrix with Homogeneous Coordinates
   ## Find zoom levels based on resolutions. We need to zoom in for all dimensions with resolutiosn lower than the maximum
@@ -1126,20 +1126,21 @@ def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpola
     zoomed[zoomed > maxVal] = maxVal
 
   if verbose:
-    print ("Filter Values After Zooming In\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomed[:,:,0]),np.max(zoomed[:,:,0])))
+    print ("Filter Values After Zooming In\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomed),np.max(zoomed)))
 
   ### 2. Rotate the Matrix Using Homogeneous Coordinate Rotation Routine
   ## Pad the zoomed in image first to ensure that rotation does not induce artifacts
-  padded = pad3DArray(zoomed)
+  # padded = pad3DArray(zoomed)
+  padded = zoomed # turns out I don't think this is necessary
 
   if verbose:
-    print ("Filter Values After Padding\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(padded[:,:,0]),np.max(padded[:,:,0])))
+    print ("Filter Values After Padding\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(padded),np.max(padded)))
 
   ## Rotate the matrix
   rotated = rotate3DArray_Homogeneous(padded, angles, clipOutput=clipValues, interpolationOrder=interpolationOrder)
 
   if verbose:
-    print ("Filter Values After Rotating\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(rotated[:,:,0]),np.max(rotated[:,:,0])))
+    print ("Filter Values After Rotating\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(rotated),np.max(rotated)))
 
   ### 3. Downsample by Zooming Out
   ## Find the amount we'll have to zoom out to return to previous levels
@@ -1151,8 +1152,14 @@ def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpola
     zoomedOut[zoomedOut < minVal] = minVal
     zoomedOut[zoomedOut > maxVal] = maxVal
 
+    # we've got to do some additional thresholding since there's interpolation artifacts
+    minThresh = np.min(zoomedOut) + .35 * (np.max(zoomedOut) - np.min(zoomedOut))
+    zoomedOut[zoomedOut < minThresh] = minVal
+
   if verbose:
-    print ("Filter Values After Zooming Out\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomedOut[:,:,0]),np.max(zoomedOut[:,:,0])))
+    print ("Filter Values After Zooming Out\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomedOut),np.max(zoomedOut)))
+
+  
 
   return zoomedOut
 
@@ -1191,7 +1198,7 @@ def pad3DArray(array,
 
   return padded
 
-def rotate3DArray_Homogeneous(array, angles, clipOutput=True, interpolationOrder=3):
+def rotate3DArray_Homogeneous(array, angles, clipOutput=True, interpolationOrder=3, eps=1e-14):
   '''
   Rotates an array in 3D space.
 
@@ -1223,24 +1230,24 @@ def rotate3DArray_Homogeneous(array, angles, clipOutput=True, interpolationOrder
 
   ### Clip rotation output if desired
   if clipOutput:
-    rot[rot < inputMin] = inputMin
-    rot[rot > inputMax] = inputMax
+    rot[rot < inputMin + eps] = inputMin
+    rot[rot > inputMax - eps] = inputMax
 
   ### Rotate about y axis (x,z plane)
   rot = ndimage.rotate(rot, angles[1], axes=(0,2), order=interpolationOrder)
 
   ### Clip rotation output if desired
   if clipOutput:
-    rot[rot < inputMin] = inputMin
-    rot[rot > inputMax] = inputMax
+    rot[rot < inputMin + eps] = inputMin
+    rot[rot > inputMax - eps] = inputMax
 
   ### Rotate about z axis (x,y plane)
   rot = ndimage.rotate(rot, angles[2], axes=(0,1), order=interpolationOrder)
 
   ### Clip rotation output if desired
   if clipOutput:
-    rot[rot < inputMin] = inputMin
-    rot[rot > inputMax] = inputMax
+    rot[rot < inputMin + eps] = inputMin
+    rot[rot > inputMax - eps] = inputMax
 
   return rot
 

@@ -2,19 +2,15 @@ from __future__ import print_function
 from copy import copy
 import numpy as np
 import matplotlib.pyplot as plt
-#import matplotlib.colors as colors
 import matplotlib.mlab as mlab
 import cv2
 from scipy.misc import toimage
-from scipy.ndimage.filters import *
 from scipy import ndimage
+from scipy import signal
 import matchedFilter as mF
 import imutils
-#from matplotlib import cm
 import detection_protocols as dps
-from scipy import signal
-import util 
-#import util2
+import util
 
 
 ##
@@ -336,6 +332,12 @@ def colorAngles(rawOrig, stackedAngles,iters,leftChannel='red',rightChannel='blu
         coloredImg[i,j,channelDict[rightChannel]] = int(rotIndex*spacing)
   return coloredImg
 
+###################################################################################################
+###
+### Filter Labeling Routines
+###
+###################################################################################################
+
 # Basically just finds a 'unit cell' sized area around each detection 
 # for the purpose of interpolating the data 
 def doLabel(result,cellDimensions = [10, None, None],thresh=0):
@@ -384,6 +386,75 @@ def doLabel(result,cellDimensions = [10, None, None],thresh=0):
   labeled = filtered > 0
   
   return labeled
+
+def doLabel_dilation(filterResults, thisFilter, inputs, eps = 1e-14):
+  '''Performs the superimposing of the filter onto each filter 'hit' of the result image by dilation
+  instead of by convolution. This is a bit faster and can handle asymmetric filters. Thus, marking
+  of filter hits at different rotations is much more favorable in this routine.'''
+  
+  # Get temporary binary representation of hits to use with dilation routine
+  temp_binary_hits = np.greater(np.nan_to_num(filterResults.stackedHits),eps)
+
+  # Get binary representation of the filter
+  binary_filter = np.greater(thisFilter, np.min(thisFilter) + eps)
+
+  # Get unique permutations of rotations for x, y, and z
+  if isinstance(filterResults.correlated['rotSNRArray'], dict): # indicates the image has x, y, and z rotations
+    unique_x = [x for x in np.unique(filterResults.correlated["rotSNRArray"]['x']) if x <= 360]
+    unique_y = [x for x in np.unique(filterResults.correlated["rotSNRArray"]['y']) if x <= 360]
+    unique_z = [x for x in np.unique(filterResults.correlated["rotSNRArray"]['z']) if x <= 360]
+
+    print ("Unique xs: {}".format(unique_x))    
+    print ("Unique ys: {}".format(unique_y))    
+    print ("Unique zs: {}".format(unique_z))
+
+    labeled = np.zeros_like(filterResults.stackedHits,dtype=bool)
+
+    for x_rot in unique_x:
+      these_unique_x_hits = np.equal(filterResults.correlated['rotSNRArray']['x'], x_rot)
+      for y_rot in unique_y:
+        these_unique_xy_hits = np.logical_and(
+          these_unique_x_hits,
+          np.equal(filterResults.correlated['rotSNRArray']['y'], y_rot)
+        )
+        for z_rot in unique_z:
+          # rotate the filter 
+          # rFN = util.rotate3DArray_Nonhomogeneous(
+          #   thisFilter,
+          #   [x_rot, y_rot, z_rot],
+          #   inputs.dic['scopeResolutions']
+          # )
+          rFN = thisFilter
+
+          binary_filter = np.greater(rFN, np.min(rFN + eps))
+
+          # find the hits that correspond with this rotation angle exactly
+          where_hits = np.logical_and(
+            np.logical_and(
+              these_unique_xy_hits,
+              np.equal(filterResults.correlated['rotSNRArray']['z'], z_rot)
+            ),
+            temp_binary_hits
+          )
+
+          # dilate this with the binarized rotated filter
+          new_dilation = ndimage.morphology.binary_dilation(where_hits, structure = binary_filter)
+
+          # store these new dilated hits in the storage array
+          labeled = np.logical_or(new_dilation, labeled)
+  
+  else: # this is 2D and much simpler
+    # TODO
+    labeled = ndimage.morphology.binary_dilation(filterResults.stackedHits, binary_filter)
+
+  return labeled
+  
+
+###################################################################################################
+###
+### Miscellaneous Routines
+###
+###################################################################################################
 
 def WT_SNR(Img, WTfilter, WTPunishmentFilter,C,gamma):
   # calculates SNR of WT filter
