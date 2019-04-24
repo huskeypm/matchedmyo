@@ -1155,6 +1155,12 @@ def arbitraryFiltering(inputs):
       print ("Performing {} classification".format(filterKey))
       ## Load in filter
       inputs.mfOrig = util.LoadFilter(inputs.paramDicts[filterKey]['filterName'])
+
+      ## Try trimming down the filter as much as possible
+      print (inputs.mfOrig[:,:,inputs.mfOrig.shape[-1]//2])
+      inputs.mfOrig = util.trimFilter(inputs.mfOrig)
+      print (inputs.mfOrig[:,:,inputs.mfOrig.shape[-1]//2])
+
       if inputs.paramDicts[filterKey]['filterMode'] == 'punishmentFilter':
         # We have to load in the punishment filter too
         inputs.paramDicts[filterKey]['mfPunishment'] = util.LoadFilter(

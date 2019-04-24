@@ -107,8 +107,9 @@ def correlateThresher(
         ## This is 3D
         ## pad/rotate filter
         rFN = util.rotate3DArray_Nonhomogeneous(filterRef,i,inputs.dic['scopeResolutions'])
+        
         ## Depad the array to reduce computational expense
-        rFN = util.autoDepadArray(rFN)
+        rFN = util.trimFilter(rFN)
         inputs.mf = rFN
 
         ## check to see if we need to rotate other matched filters for the detection

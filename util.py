@@ -1294,6 +1294,30 @@ def autoDepadArray(img, verbose=False):
   
   return newImg
 
+def trimFilter(filt, verbose=False):
+  '''Function to automatically depad an array for computational efficiency in the convolution step.'''
+  nonzero_filter_elements = np.count_nonzero(filt)
+
+  ## filter is loaded in and normalized s.t. sum of intensity is 1. So anything lower 
+  ##  than 1 / nonzero_filter_elements is almost certainly padding
+  thresh = 1. / float(nonzero_filter_elements) * (1./3.) + np.min(filt) # the 1/3 gives us a margin for error
+
+  _, paddingLocs = measureFilterDimensions(filt,True,verbose=verbose,epsilon = thresh)
+
+  if verbose:
+    print ("Locations of padding:",paddingLocs)
+
+  ## Change the padding locations into an indexable tuple of tuples
+  # print (paddingLocs)
+  paddingLocs = [[loc[0], filt.shape[i]] for i,loc in enumerate(paddingLocs) if loc[1] == 0]
+  paddingLocs = tuple([slice(loc[0],-loc[1],1) for loc in paddingLocs])
+
+  ## Make the depadded filter
+  newFilter = filt[paddingLocs]
+
+  return newFilter
+
+
 def lightlyPreprocess(img,filterTwoSarcomereSize,colorImg=None,maskImg=None):
   '''Function to lightly preprocess a given myocyte'''
   raise RuntimeError("Function is deprecated. This has been moved to matchedmyo.Inputs.autoPreprocess()")
