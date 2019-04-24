@@ -1317,7 +1317,6 @@ def trimFilter(filt, verbose=False):
 
   return newFilter
 
-
 def lightlyPreprocess(img,filterTwoSarcomereSize,colorImg=None,maskImg=None):
   '''Function to lightly preprocess a given myocyte'''
   raise RuntimeError("Function is deprecated. This has been moved to matchedmyo.Inputs.autoPreprocess()")
@@ -1355,6 +1354,53 @@ def lightlyPreprocess(img,filterTwoSarcomereSize,colorImg=None,maskImg=None):
     return img, colorImg
   else:
     return img
+
+def decomposeFilter(kernel, verbose=False):
+  '''This function checks if a filter is linearly decomposable in all axes for the purpose of 
+  performing separable filtering (which is way quicker for large filters)'''
+  slice_locs = [slice(0, kernel.shape[i], 1) for i in range(len(kernel.shape))]
+
+  reshape_shape = [kernel.shape[i] for i in range(len(kernel.shape))]
+
+  # this tells us which axes our filter is linearly decomposable in (just instantiating storage here, though)
+  single_dimension_convolution = [False for i in range(len(kernel.shape))] # initialize single dimension convolution boolean array
+  single_dimension_decomposition = [ [] for i in range(len(kernel.shape))]
+
+  for i in range(len(kernel.shape)):
+    # take slice of kernel for each dimension
+    this_slice = slice_locs.copy()
+    this_slice[i] = kernel.shape[i] // 2
+    this_slice = tuple(this_slice)
+    slice_of_kernel = kernel[this_slice]
+    
+    if verbose: print ("kernel slice size:", slice_of_kernel.shape)
+    
+    # figure out if each slice along this dimension is a scaled copy of the slice
+    slice_broadcast = [slice(0,kernel.shape[i],1) for i in range(len(kernel.shape))]
+    slice_broadcast[i] = None
+    slice_broadcast = tuple(slice_broadcast)
+    
+    kernel_scales = kernel / slice_of_kernel[slice_broadcast]
+    
+    # continue through this loop if there are any infinite numbers since this indicates the slice is not linearly separable
+    if np.any(np.equal(kernel_scales, np.inf)): continue
+    else: kernel_scales = np.nan_to_num(kernel_scales)
+    
+    # check if the scales are the exact same for each index along the axis
+    this_reshape_shape = reshape_shape.copy()
+    this_reshape_shape[i] = -1
+    collapsed_kernel_scales = np.median(kernel_scales,axis=i).reshape(this_reshape_shape)
+
+    if verbose: print ("collapsed kernel scales:",collapsed_kernel_scales)
+    
+    if np.all(np.equal(collapsed_kernel_scales, kernel_scales)):
+      if verbose: print ("Filter is linearly decomposable along {} axis!".format(i))
+      
+      # indicate that the filter is linearly separable for this axis and store the vector
+      single_dimension_convolution[i] = True
+      single_dimension_decomposition[i] = collapsed_kernel_scales
+  
+  return single_dimension_decomposition
 
 ###################################################################################################
 ###
