@@ -20,7 +20,7 @@ def matchedFilter(
 
   ### Check to see if the image is 2D or 3D. cv2 algorithm is a bit quicker for 2D but it is not compatible with 3D images
   if len(np.shape(dimg)) == 3:
-    if isinstance(daFilter, dict):
+    if isinstance(daFilter, list):
       # this indicates that we've decomposed the filter for sequential filtering
       h = sequential_filtering(dimg, daFilter)
     
@@ -30,13 +30,13 @@ def matchedFilter(
   else:
     useCV2 = True
     if useCV2:
-      if isinstance(daFilter, dict):
+      if isinstance(daFilter, list):
         # this indicates that we've decomposed the filter for sequential filtering
         h = sequential_filtering(dimg, daFilter)
 
       else:
         h = cv2.filter2D(dimg,-1,daFilter)
-        
+
     else:
       # placeholder for 'noise' component (will refine later)
       fsC = np.ones(np.shape(dimg))
@@ -82,20 +82,20 @@ def matchedFilter(
         h *= 1/np.float(np.prod(np.shape(h)))
   return h 
 
-def sequential_filtering(dimg,daFilter_dict):
-  '''Function to perform sequential filtering of 'dimg' given a dictionary of filters (daFilter_dict).
+def sequential_filtering(dimg,daFilter_list):
+  '''Function to perform sequential filtering of 'dimg' given a list of filters.
   This is advantageous since there is a massive speedup for large 2D or 3D filters that can be 
   linearly decomposed.'''
 
   # loop through the filters and sequentially apply them
-  for (axis, filt) in iteritems(daFilter_dict):
-    # check if it's a one-dimensional filter
-    if isinstance(axis, int):
-      dimg = ndimage.convolve1d(dimg, filt, axis=axis)
+  # for (axis, filt) in iteritems(daFilter_dict):
+  #   # check if it's a one-dimensional filter
+  #   if isinstance(axis, int):
+  #     dimg = ndimage.convolve1d(dimg, filt, axis=axis)
     
-    elif isinstance(axis, str):
-      dimg = ndimage.convolve(dimg, filt)
-  
-    else: raise RuntimeError("The 'axis' key is not an understood type.")
-
+  #   elif isinstance(axis, str):
+  #     dimg = ndimage.convolve(dimg, filt)
+  for filt in daFilter_list:
+    dimg = ndimage.convolve(dimg, filt)
+    
   return dimg
