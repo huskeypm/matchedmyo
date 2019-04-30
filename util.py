@@ -1493,7 +1493,7 @@ def decomposeFilter(kernel, verbose=False):
   else:
     return filter_storage
 
-def decompose_2D(kernel, axis_to_ignore, verbose=False):
+def decompose_2D(kernel, axis_to_ignore, standard_dev_thresh, verbose=False):
     '''Checks to see if the 2D kernel is decomposable.'''
     
     axes_to_check = [k for k in range(len(kernel.shape)) if k != axis_to_ignore]
@@ -1507,30 +1507,29 @@ def decompose_2D(kernel, axis_to_ignore, verbose=False):
     # check std along the second axis
     st = np.nan_to_num(np.nanstd(div_out,axis=axes_to_check[1]))
     
-    if np.all(np.equal(st,0)):
+    if verbose: print ("2D Standard Deviation:",st)
+
+    if np.all(np.less(st,standard_dev_thresh)):
         if verbose: print("2D kernel is separable!")
         second_array = np.nanmean(div_out, axis=axes_to_check[1], keepdims=True)
         decomposable = True
         arrays = [np.nan_to_num(min_first), np.nan_to_num(second_array)]
     else: 
         decomposable = False
-        array = None
+        arrays = None
         
     return decomposable, arrays
 
-def decompose_3D(Arr, verbose=False):
+def decompose_3D(Arr, verbose=False, standard_dev_thresh = 1e-14):
     masked_array = Arr.copy()
     masked_array[masked_array == 0] = np.nan
+
+    numDims = len(Arr.shape)
     
     filtering_vectors = []
 
     for i in range(numDims):
         min_0th = np.nanmin(masked_array, axis=i, keepdims=True)
-
-    #     if verbose:
-    #         plt.figure()
-    #         plt.imshow(min_0th[0,:,:])
-    #         plt.title("Min 0th")
 
         # divide out the masked array by the min_0th
         divided_out = np.divide(masked_array,min_0th)
@@ -1541,7 +1540,7 @@ def decompose_3D(Arr, verbose=False):
         if verbose: print ("Standard deviations along {} axis:".format(i),st)
 
         # check to make sure that the st vector satisfies our criteria of zero everywhere
-        if np.all(np.equal(np.nan_to_num(st),0)):
+        if np.all(np.less(np.nan_to_num(st),standard_dev_thresh)):
             if verbose: print ("Decomposable along the {} axis!".format(i))
 
             # find the values of the 1D decomposed vector
@@ -1556,17 +1555,25 @@ def decompose_3D(Arr, verbose=False):
                 if verbose: print("success!")
 
             # check and see if the matrix we created (min_0th) is decomposable
-            decomposable, decomposed_arrays = decompose_2D(min_0th, i, verbose=verbose)
+            decomposable, decomposed_arrays = decompose_2D(min_0th, i, standard_dev_thresh=standard_dev_thresh, verbose=verbose)
 
             if decomposable:
                 # store all other 2 1D vectors
                 filtering_vectors += decomposed_arrays    
             else:
                 # store non-decomposable 2D vector
-                filter_vectors.append(min_0th)
+                filtering_vectors.append(np.nan_to_num(min_0th))
+            
+            break
 
-            # exit the function since we decomposed as much as possible
-            return filtering_vectors
+    if len(filtering_vectors) == 0:
+      # indicates that the filter is not linearly separable at all and we need to return original array
+      decomposable = False
+      return decomposable, Arr
+
+    # exit the function since we decomposed as much as possible
+    decomposable = True
+    return decomposable, filtering_vectors
 
 ###################################################################################################
 ###
