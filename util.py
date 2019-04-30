@@ -1358,49 +1358,215 @@ def lightlyPreprocess(img,filterTwoSarcomereSize,colorImg=None,maskImg=None):
 def decomposeFilter(kernel, verbose=False):
   '''This function checks if a filter is linearly decomposable in all axes for the purpose of 
   performing separable filtering (which is way quicker for large filters)'''
+  raise RuntimeError("Deprecated. Use decompose_2D and decompose_3D instead")
+
+  numDims = len(kernel.shape)
   slice_locs = [slice(0, kernel.shape[i], 1) for i in range(len(kernel.shape))]
 
   reshape_shape = [kernel.shape[i] for i in range(len(kernel.shape))]
 
-  # this tells us which axes our filter is linearly decomposable in (just instantiating storage here, though)
-  single_dimension_convolution = [False for i in range(len(kernel.shape))] # initialize single dimension convolution boolean array
-  single_dimension_decomposition = [ [] for i in range(len(kernel.shape))]
+  # create a dictinoary to store the decomposed filters
+  filter_storage = dict()
 
-  for i in range(len(kernel.shape)):
-    # take slice of kernel for each dimension
+  for i in range(numDims):
+    # take slice of kernel for each dimension from the middle of the filter
     this_slice = slice_locs.copy()
     this_slice[i] = kernel.shape[i] // 2
     this_slice = tuple(this_slice)
-    slice_of_kernel = kernel[this_slice]
+    print ("Slice location:",this_slice[i])
+    #slice_of_kernel = np.expand_dims(kernel[this_slice],axis=i)
+    slice_of_kernel = kernel[this_slice].copy()
+    # slice_of_kernel[slice_of_kernel == 0] = 1e-13 # do this so division doesn't throw an error
+
+    plt.figure()
+    plt.title("Slice of the kernel")
+    plt.imshow(slice_of_kernel)
+    plt.colorbar()
     
-    if verbose: print ("kernel slice size:", slice_of_kernel.shape)
+    if verbose: 
+      print ("kernel slice size:", slice_of_kernel.shape)
+      print ("Kernel minimum:", np.min(kernel))
+      print ("Kernel slice minimum:", np.min(slice_of_kernel))
+    
     
     # figure out if each slice along this dimension is a scaled copy of the slice
     slice_broadcast = [slice(0,kernel.shape[i],1) for i in range(len(kernel.shape))]
     slice_broadcast[i] = None
     slice_broadcast = tuple(slice_broadcast)
+    expanded_kernel = np.broadcast_to(slice_of_kernel[slice_broadcast],kernel.shape)
+    # expanded_kernel = slice_of_kernel[slice_broadcast]
+    # expanded_kernel = np.broadcast_to(slice_of_kernel,kernel.shape) # this implicitly handles the dimension to add and expand
+    plt.figure()
+    plt.title("Expanded kernel slice along ith dimension")
+    plt.imshow(expanded_kernel[this_slice])
+
+    # print ("Expanded kernel shape:",expanded_kernel.shape)
+    # if verbose: print("expanded kernel:", expanded_kernel)
+
+    # plt.figure()
+    # plt.imshow(expanded_kernel)
     
-    kernel_scales = kernel / slice_of_kernel[slice_broadcast]
+    #kernel_scales = np.divide(kernel, slice_of_kernel[slice_broadcast])
+    points_of_interest = np.greater(expanded_kernel, 1e-200)
+    kernel_scales = np.divide(kernel, expanded_kernel, where = points_of_interest)
+    # kernel_scales = kernel / expanded_kernel
+
+    plt.figure()
+    plt.title("Kernel scales along dimension of interest")
+    plt.imshow(kernel_scales[this_slice])
     
     # continue through this loop if there are any infinite numbers since this indicates the slice is not linearly separable
-    if np.any(np.equal(kernel_scales, np.inf)): continue
+    if np.any(np.equal(kernel_scales, np.inf)): 
+      if verbose: print ("Skipping {} dimension".format(i))
+      continue
     else: kernel_scales = np.nan_to_num(kernel_scales)
     
-    # check if the scales are the exact same for each index along the axis
-    this_reshape_shape = reshape_shape.copy()
-    this_reshape_shape[i] = -1
-    collapsed_kernel_scales = np.median(kernel_scales,axis=i).reshape(this_reshape_shape)
+    # create a boolean array to determine where to check the 1D vectors
+    # where_to_check_vecs = np.equal(slice_of_kernel, 1e-13)
+    # expanded_mask = np.broadcast_to(where_to_check_vecs, kernel.shape)
+    #kernel_scales[expanded_mask] = 0
+    # print ("Masked scales slice:", kernel_scales[this_slice])
+    axes_of_interest = tuple([k for k in range(numDims) if k != i])
+    # print ("axes_of_interest:", axes_of_interest)
 
-    if verbose: print ("collapsed kernel scales:",collapsed_kernel_scales)
-    
-    if np.all(np.equal(collapsed_kernel_scales, kernel_scales)):
+    # get 1D max along the ith dimension
+    max_1D = np.max(kernel_scales,axis=axes_of_interest)
+    if np.all(np.less(max_1D,1e-200)): continue # indicates that the filter slice is zero on non-decomposable
+    # print ("max_1D:",max_1D)
+
+    # fix weird numerical error where we're getting infintesimal numbers
+    max_1D[max_1D < 1e-30] = 0
+
+    dims_to_expand = tuple([np.newaxis if k != i else slice(0,kernel.shape[i]) for k in range(numDims)])
+    # max_1D = max_1D[:,np.newaxis, np.newaxis]
+    max_1D = max_1D[dims_to_expand]
+    expanded_max = np.broadcast_to(max_1D,kernel.shape)
+
+    # bool_decomposition_matrix = np.equal(expanded_max,kernel_scales,where=points_of_interest)
+
+    # plt.figure()
+    # plt.imshow(expanded_max[this_slice],cmap='gray')
+    # plt.colorbar()
+    # plt.title("Expanded max")
+
+    # plt.figure()
+    # plt.imshow(bool_decomposition_matrix[this_slice],cmap='gray')
+    # plt.title("Bool matrix")
+
+    decomposable = np.all(
+      np.logical_or(
+        np.equal(expanded_max,kernel_scales),
+        np.equal(kernel,0)
+      )
+    )
+
+    if decomposable:
       if verbose: print ("Filter is linearly decomposable along {} axis!".format(i))
       
       # indicate that the filter is linearly separable for this axis and store the vector
-      single_dimension_convolution[i] = True
-      single_dimension_decomposition[i] = collapsed_kernel_scales
-  
-  return single_dimension_decomposition
+      filter_storage[i] = max_1D
+
+      # we also need to store the other filter
+      if len(kernel.shape) == 3:
+        # indicates we should store the 2D filter just in case it isn't entirely separable
+        this_key = "_".join([str(k) for k in range(numDims) if k != i])
+        print (this_key)
+
+        # we need to add in the ith dimension that we took out for the filter to be correctly 
+        #   oriented for convolution
+        filter_2D_slice = np.expand_dims(slice_of_kernel, axis = i)
+
+        filter_storage[this_key] = filter_2D_slice
+
+  if numDims == 3:
+    # check to see if there are three linear filters. If so, that means we can get rid of the 
+    #   intermediate 2D slice we saved
+    print ("Filter keys:",filter_storage.keys())
+    if 0 in filter_storage.keys() and 1 in filter_storage.keys() and 2 in filter_storage.keys():
+      keys_to_delete = [key for key in filter_storage.keys() if key not in [0, 1, 2]]
+      if verbose: print ("Keys deleted:",keys_to_delete)
+      for key in keys_to_delete:
+        del filter_storage[key]
+
+  if len(filter_storage.keys()) is 0:
+    return kernel
+  else:
+    return filter_storage
+
+def decompose_2D(kernel, axis_to_ignore, verbose=False):
+    '''Checks to see if the 2D kernel is decomposable.'''
+    
+    axes_to_check = [k for k in range(len(kernel.shape)) if k != axis_to_ignore]
+    
+    # take min along first axis
+    min_first = np.nanmin(kernel, axis = axes_to_check[0], keepdims=True)
+    
+    # divide out by the min 
+    div_out = np.divide(kernel,min_first)
+    
+    # check std along the second axis
+    st = np.nan_to_num(np.nanstd(div_out,axis=axes_to_check[1]))
+    
+    if np.all(np.equal(st,0)):
+        if verbose: print("2D kernel is separable!")
+        second_array = np.nanmean(div_out, axis=axes_to_check[1], keepdims=True)
+        decomposable = True
+        arrays = [np.nan_to_num(min_first), np.nan_to_num(second_array)]
+    else: 
+        decomposable = False
+        array = None
+        
+    return decomposable, arrays
+
+def decompose_3D(Arr, verbose=False):
+    masked_array = Arr.copy()
+    masked_array[masked_array == 0] = np.nan
+    
+    filtering_vectors = []
+
+    for i in range(numDims):
+        min_0th = np.nanmin(masked_array, axis=i, keepdims=True)
+
+    #     if verbose:
+    #         plt.figure()
+    #         plt.imshow(min_0th[0,:,:])
+    #         plt.title("Min 0th")
+
+        # divide out the masked array by the min_0th
+        divided_out = np.divide(masked_array,min_0th)
+
+        # if standard deviation along the other axes are 0, then it is decomposable along this axis
+        axes_to_check = tuple([k for k in range(numDims) if k != i])
+        st = np.nanstd(divided_out,axis=axes_to_check,keepdims=True)
+        if verbose: print ("Standard deviations along {} axis:".format(i),st)
+
+        # check to make sure that the st vector satisfies our criteria of zero everywhere
+        if np.all(np.equal(np.nan_to_num(st),0)):
+            if verbose: print ("Decomposable along the {} axis!".format(i))
+
+            # find the values of the 1D decomposed vector
+            decomp_1D = np.nan_to_num(np.nanmean(divided_out,axis=axes_to_check,keepdims=True))
+            filtering_vectors.append(decomp_1D)
+
+            if verbose: print ("Decomposed {} axis vector:".format(i),decomp_1D)
+
+            # double check our matrix multiplication actually reproduces the 3D array
+            if np.all(np.equal(np.multiply(min_0th,decomp_1D), Arr)): assert("wtf")
+            else: 
+                if verbose: print("success!")
+
+            # check and see if the matrix we created (min_0th) is decomposable
+            decomposable, decomposed_arrays = decompose_2D(min_0th, i, verbose=verbose)
+
+            if decomposable:
+                # store all other 2 1D vectors
+                filtering_vectors += decomposed_arrays    
+            else:
+                # store non-decomposable 2D vector
+                filter_vectors.append(min_0th)
+
+            # exit the function since we decomposed as much as possible
+            return filtering_vectors
 
 ###################################################################################################
 ###

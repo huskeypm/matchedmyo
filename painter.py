@@ -50,21 +50,8 @@ def correlateThresher(
       else:
         correlated -> list. List of results class at each rotation that contains SNR and correlation plane
     '''
-    ### NOTE: This is an artifact of old image classification code but still needs to be here for old code to work
-    # TODO - this should be done in preprocessing, not here
-    #print "PKH: turn into separate proproccessing routine"
     img = inputs.imgOrig
     
-    if params['doCLAHE']:
-      if img.dtype != 'uint8':
-        myImg = np.array((img * 255),dtype='uint8')
-      else:
-        myImg = img
-      clahe99 = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(16,16))
-      img = clahe99.apply(myImg)
-
-    ### NOTE: Begin code meant for this repository
-    #filterRef = util.renorm(np.array(inputs.mfOrig,dtype=float),scale=1.)
     ### Save the unrotated filter as a reference
     filterRef = inputs.mfOrig.copy()
     
@@ -110,12 +97,17 @@ def correlateThresher(
         
         ## Depad the array to reduce computational expense
         rFN = util.trimFilter(rFN)
+
+        ## Check and see if we can decompose the rotated filter into a combo of 1D filters (much quicker)
+        rFN = util.decomposeFilter(rFN,verbose=True)
+
         inputs.mf = rFN
 
         ## check to see if we need to rotate other matched filters for the detection
         if params['filterMode'] == 'punishmentFilter':
           params['mfPunishmentRot'] = util.rotate3DArray_Nonhomogeneous(params['mfPunishment'].copy(),i,inputs.dic['scopeResolutions'])
-          params['mfPunishmentRot'] = util.autoDepadArray(params['mfPunishmentRot'])
+          params['mfPunishmentRot'] = util.trimFilter(params['mfPunishmentRot'])
+          params['mfPunishmentRot'] = util.decomposeFilter(params['mfPunishmentRot'])
       else:
         ## This is 2D
         ## pad/rotate 
