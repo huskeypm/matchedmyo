@@ -1294,13 +1294,16 @@ def autoDepadArray(img, verbose=False):
   
   return newImg
 
-def trimFilter(filt, verbose=False):
+def trimFilter(filt, verbose=False, thresh_override=False):
   '''Function to automatically depad an array for computational efficiency in the convolution step.'''
   nonzero_filter_elements = np.count_nonzero(filt)
 
   ## filter is loaded in and normalized s.t. sum of intensity is 1. So anything lower 
   ##  than 1 / nonzero_filter_elements is almost certainly padding
-  thresh = 1. / float(nonzero_filter_elements) * (1./3.) + np.min(filt) # the 1/3 gives us a margin for error
+  if isinstance(thresh_override, (float,int)):
+    thresh = thresh_override
+  else:
+    thresh = 1. / float(nonzero_filter_elements) * (1./3.) + np.min(filt) # the 1/3 gives us a margin for error
 
   _, paddingLocs = measureFilterDimensions(filt,True,verbose=verbose,epsilon = thresh)
 
@@ -1309,8 +1312,10 @@ def trimFilter(filt, verbose=False):
 
   ## Change the padding locations into an indexable tuple of tuples
   # print (paddingLocs)
-  paddingLocs = [[loc[0], filt.shape[i]] for i,loc in enumerate(paddingLocs) if loc[1] == 0]
+  paddingLocs = [[loc[0], filt.shape[i]] if loc[1] == 0 else loc for i,loc in enumerate(paddingLocs) ]
+  if verbose: print ("padding locs before correction:", paddingLocs)
   paddingLocs = tuple([slice(loc[0],-loc[1],1) for loc in paddingLocs])
+  if verbose: print ("padding after before correction:", paddingLocs)
 
   ## Make the depadded filter
   newFilter = filt[paddingLocs]

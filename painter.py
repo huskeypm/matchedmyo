@@ -99,15 +99,9 @@ def correlateThresher(
         rFN = util.trimFilter(rFN)
 
         ## Check and see if we can decompose the rotated filter into a combo of 1D filters (much quicker)
-        decomposable, decomp_arrays = util.decompose_3D(rFN,verbose=True)
-
-        #if decomposable:
-          # store the decomposed filters in inputs
-        #  inputs.mf = decomp_arrays
-        #else: inputs.mf = rFN
+        decomposable, decomp_arrays = util.decompose_3D(rFN,verbose=False)
         
         inputs.mf = decomp_arrays
-        #inputs.mf = rFN
 
         ## check to see if we need to rotate other matched filters for the detection
         if params['filterMode'] == 'punishmentFilter':
@@ -120,7 +114,7 @@ def correlateThresher(
         params['angle'] = i
         rFN = util.PadRotate(filterRef,i)  
         ## Depad the array to reduce computational expense
-        rFN = util.autoDepadArray(rFN)
+        rFN = util.trimFilter(rFN, thresh_override=1e-12)
         inputs.mf = rFN  
 
         ## check for other matched filters
