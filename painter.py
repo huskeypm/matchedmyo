@@ -99,22 +99,21 @@ def correlateThresher(
         rFN = util.trimFilter(rFN)
 
         ## Check and see if we can decompose the rotated filter into a combo of 1D filters (much quicker)
-        #decomposable, decomp_arrays = util.decompose_3D(rFN,verbose=True)
+        decomposable, decomp_arrays = util.decompose_3D(rFN,verbose=True)
 
         #if decomposable:
           # store the decomposed filters in inputs
         #  inputs.mf = decomp_arrays
         #else: inputs.mf = rFN
         
-        
-        #inputs.mf = decomp_arrays
-        inputs.mf = rFN
+        inputs.mf = decomp_arrays
+        #inputs.mf = rFN
 
         ## check to see if we need to rotate other matched filters for the detection
         if params['filterMode'] == 'punishmentFilter':
           params['mfPunishmentRot'] = util.rotate3DArray_Nonhomogeneous(params['mfPunishment'].copy(),i,inputs.dic['scopeResolutions'])
           params['mfPunishmentRot'] = util.trimFilter(params['mfPunishmentRot'])
-          #_,params['mfPunishmentRot'] = util.decompose_3D(params['mfPunishmentRot'])
+          _,params['mfPunishmentRot'] = util.decompose_3D(params['mfPunishmentRot'])
       else:
         ## This is 2D
         ## pad/rotate 
