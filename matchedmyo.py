@@ -1306,15 +1306,17 @@ def fullValidation(args):
   print ("Happy classifying!")
 
 def validate(args,
-             display=False
+             display=False,
+             capture_outputs = True
              ):
   '''This function serves as a validation routine for the 2D functionality of this repo.
   
   Inputs:
     display -> Bool. If True, display the marked image
   '''
-  ### Capture all print statements
-  sys.stdout = open('garbage.txt', 'w')
+  if capture_outputs:
+    ### Capture all print statements
+    sys.stdout = open('garbage.txt', 'w')
 
   ### Specify the yaml file NOTE: This will be done via command line for main classification routines
   yamlFile = './YAML_files/validate.yml'
@@ -1339,9 +1341,10 @@ def validate(args,
   ### Calculate TT, LT, and TA content  
   ttContent, ltContent, taContent = util.assessContent(myResults.markedImage)
 
-  sys.stdout.close()
-  sys.stdout = sys.__stdout__
-  subprocess.call(['rm', 'garbage.txt'])
+  if capture_outputs:
+    sys.stdout.close()
+    sys.stdout = sys.__stdout__
+    subprocess.call(['rm', 'garbage.txt'])
 
   assert(abs(ttContent - 103050) < 1), "TT validation failed."
   assert(abs(ltContent -  68068) < 1), "LT validation failed."
@@ -1354,14 +1357,15 @@ def validate(args,
 
   print ("\n2D Validation has PASSED!")
 
-def validate3D(args):
+def validate3D(args, capture_outputs=True):
   '''This function serves as a validation routine for the 3D functionality of this repo.
 
   Inputs:
     None
   '''
-  ### Capture all print statements
-  sys.stdout = open('garbage.txt', 'w')
+  if capture_outputs:
+    ### Capture all print statements
+    sys.stdout = open('garbage.txt', 'w')
 
   ### Specify the yaml file. NOTE: This will be done via command line for main classification routines
   yamlFile = './YAML_files/validate3D.yml'
@@ -1410,9 +1414,10 @@ def validate3D(args):
   ### Assess the amount of TT, LT, and TA content there is in the image 
   ttContent, ltContent, taContent = util.assessContent(myResults.markedImage)
 
-  sys.stdout.close()
-  sys.stdout = sys.__stdout__
-  subprocess.call(['rm', 'garbage.txt'])
+  if capture_outputs:
+    sys.stdout.close()
+    sys.stdout = sys.__stdout__
+    subprocess.call(['rm', 'garbage.txt'])
 
   ### Check to see that they are in close agreement with previous values
   ###   NOTE: We have to have a lot of wiggle room since we're generating a new cell for each validation
@@ -1421,16 +1426,16 @@ def validate3D(args):
   assert(abs(taContent - 409161) < 1), "TA validation failed."
   print ("\n3D Validation has PASSED!")
 
-def validate3D_arbitrary(args):
+def validate3D_arbitrary(args, capture_outputs=True):
   '''This function serves as a validation routine for the arbitrary classification functionality of
   this repo.
 
   Inputs:
     None
   '''
-
-  ### Capture all print statements
-  sys.stdout = open('garbage.txt', 'w')
+  if capture_outputs:
+    ### Capture all print statements
+    sys.stdout = open('garbage.txt', 'w')
 
   ### Specify the yaml file. NOTE: This will be done via command line for main classification routines
   yamlFile = './YAML_files/validate3D_arbitrary.yml'
@@ -1476,9 +1481,10 @@ def validate3D_arbitrary(args):
   ### Assess the amount of TT, LT, and TA content there is in the image 
   filter1_Content, filter2_Content, filter3_Content = util.assessContent(myResults.markedImage)
 
-  sys.stdout.close()
-  sys.stdout = sys.__stdout__
-  subprocess.call(['rm', 'garbage.txt'])
+  if capture_outputs:
+    sys.stdout.close()
+    sys.stdout = sys.__stdout__
+    subprocess.call(['rm', 'garbage.txt'])
 
   ### Check to see that they are in close agreement with previous values
   # These values are different from the 3D validation case using give3DMarkedMyocyte() since we 
