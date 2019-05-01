@@ -102,6 +102,7 @@ def correlateThresher(
         decomposable, decomp_arrays = util.decompose_3D(rFN,verbose=False)
         
         inputs.mf = decomp_arrays
+        # inputs.mf = rFN
 
         ## check to see if we need to rotate other matched filters for the detection
         if params['filterMode'] == 'punishmentFilter':
