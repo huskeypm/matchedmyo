@@ -4,6 +4,7 @@ Packages routines used to determine if correlation response
 constitutes a detection
 """
 
+import warnings
 import numpy as np 
 import matchedFilter as mF
 import sys
@@ -248,7 +249,9 @@ def regionalDeviation(inputs,paramDict):
   s = mF.matchedFilter(img,kernel,parsevals=False,demean=paramDict['demeanMF'])
   q = np.square(img)
   q = mF.matchedFilter(q, kernel,parsevals=False,demean=paramDict['demeanMF'])
-  stdDev = np.sqrt( np.divide((q-np.divide(np.square(s),n)),n-1)) 
+  with warnings.catch_warnings() as w: # turn off errors due to NaNs cropping up (not an issue)
+    warnings.simplefilter('ignore')
+    stdDev = np.sqrt( np.divide((q-np.divide(np.square(s),n)),n-1)) 
   ## if s^2/n > q, we get NaN, so we can just convert that to zero here
   stdDev = np.nan_to_num(stdDev)
 

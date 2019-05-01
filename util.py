@@ -2,6 +2,7 @@ from __future__ import print_function
 from six import iteritems
 import sys
 import os
+import warnings
 import matplotlib.pylab as plt 
 import numpy as np 
 import cv2
@@ -1294,7 +1295,7 @@ def autoDepadArray(img, verbose=False):
   
   return newImg
 
-def trimFilter(filt, verbose=False, thresh_override=False):
+def trimFilter(filt, verbose=False, thresh_override=None):
   '''Function to automatically depad an array for computational efficiency in the convolution step.'''
   nonzero_filter_elements = np.count_nonzero(filt)
 
@@ -1303,7 +1304,10 @@ def trimFilter(filt, verbose=False, thresh_override=False):
   if isinstance(thresh_override, (float,int)):
     thresh = thresh_override
   else:
-    thresh = 1. / float(nonzero_filter_elements) * (1./3.) + np.min(filt) # the 1/3 gives us a margin for error
+    if np.min(filt) == np.max(filt):
+      return filt
+    else:
+      thresh = 1. / float(nonzero_filter_elements) * (1./3.) + np.min(filt) # the 1/3 gives us a margin for error
 
   _, paddingLocs = measureFilterDimensions(filt,True,verbose=verbose,epsilon = thresh)
 
@@ -1500,7 +1504,9 @@ def decomposeFilter(kernel, verbose=False):
 
 def decompose_2D(kernel, axis_to_ignore, standard_dev_thresh, verbose=False):
     '''Checks to see if the 2D kernel is decomposable.'''
-    
+    # turn off NaN warnings
+    warnings.filterwarnings("ignore")
+
     axes_to_check = [k for k in range(len(kernel.shape)) if k != axis_to_ignore]
     
     # take min along first axis
@@ -1523,9 +1529,15 @@ def decompose_2D(kernel, axis_to_ignore, standard_dev_thresh, verbose=False):
         decomposable = False
         arrays = None
         
+    # turn warnings back on 
+    warnings.resetwarnings()
+
     return decomposable, arrays
 
 def decompose_3D(Arr, verbose=False, standard_dev_thresh = 1e-14):
+    # turn off NaN warnings
+    warnings.filterwarnings("ignore")
+
     masked_array = Arr.copy()
     masked_array[masked_array == 0] = np.nan
 
@@ -1570,6 +1582,9 @@ def decompose_3D(Arr, verbose=False, standard_dev_thresh = 1e-14):
                 filtering_vectors.append(np.nan_to_num(min_0th))
             
             break
+
+    # turn warnings back on
+    warnings.resetwarnings()
 
     if len(filtering_vectors) == 0:
       # indicates that the filter is not linearly separable at all and we need to return original array
