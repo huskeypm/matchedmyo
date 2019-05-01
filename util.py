@@ -45,11 +45,15 @@ def ReadImg(fileName,cvtColor=True,renorm=False,bound=False, dataType = np.float
   ### Check to see what the file type is
   fileType = fileName[-4:]
 
+  ### make sure the file exists, first and foremost
+  assert os.path.isfile(fileName), "The file, {}, does not exist. Check for mistakes in inputs.".format(fileName)
+
   if fileType == '.tif':
     ## Read in image
     try:
       img = tifffile.imread(fileName)
     except:
+      ### If it exists, then it's an issue with reading it in.
       raise RuntimeError("Loading of image {} threw an error. This is likely due to a data type issue. ".format(fileName)
                          +"Try converting the image data type to 32 bit float instead.")
 
