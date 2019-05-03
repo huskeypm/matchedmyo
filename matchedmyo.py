@@ -354,9 +354,11 @@ class Inputs:
         raise RuntimeError("Preprocessing is not implemented for 3D images.")
       
       if self.maskImg is not None:
-        self.imgOrig, self.maskImg = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg)
+        self.imgOrig, self.maskImg = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg, inputs=self)
+      # pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg, inputs=self)
       else:  
-        self.imgOrig = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg)
+        self.imgOrig = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg, inputs=self)
+      #  pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg, inputs=inputs)
       ## remake the color image
       eightBitImage = self.imgOrig.astype(np.float32).copy()
       eightBitImage = eightBitImage / np.max(eightBitImage) * 255. * 0.8 # 0.8 is to kill the brightness
@@ -874,7 +876,8 @@ def giveMarkedMyocyte(
         img=lossMasked, 
         inputs=inputs, 
         switchChannels=False, 
-        fileName=outDict['fileRoot']+'_TA_hits'
+        fileName=outDict['fileRoot']+'_TA_hits',
+        just_save_array=True
       )
     
     if inputs.dic['filterTypes']['LT']:
@@ -882,7 +885,8 @@ def giveMarkedMyocyte(
         img=ltMasked,
         inputs=inputs,
         switchChannels=False,
-        fileName=outDict['fileRoot']+'_LT_hits'
+        fileName=outDict['fileRoot']+'_LT_hits',
+        just_save_array=True
       )
 
     if inputs.dic['filterTypes']['TT']:
@@ -890,7 +894,8 @@ def giveMarkedMyocyte(
         img=wtMasked,
         inputs=inputs,
         switchChannels=False,
-        fileName=outDict['fileRoot']+'_TT_hits'
+        fileName=outDict['fileRoot']+'_TT_hits',
+        just_save_array=True
       )
 
   if not inputs.dic['returnPastedFilter']:
@@ -1205,13 +1210,6 @@ def arbitraryFiltering(inputs):
       if inputs.dic['returnPastedFilter']:
         ## Read in filter dimensions
         # filtDims = util.measureFilterDimensions(inputs.mfOrig)
-
-        ## Perform dilation of hits based on filter dimensions
-        # filterResults.stackedHits = painter.doLabel(
-        #   filterResults,
-        #   cellDimensions=filtDims,
-        #   thresh=0
-        # )
 
         ## Trying new marking scheme based on filter dilation
         filterResults.stackedHits = painter.doLabel_dilation(

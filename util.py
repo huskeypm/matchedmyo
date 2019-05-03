@@ -83,7 +83,7 @@ def ReadImg(fileName,cvtColor=True,renorm=False,bound=False, dataType = np.float
 
   ### Normalize the image to have maximum value of 1.
   if renorm:
-    img = img / np.float(np.amax(img))
+    img = np.divide(img.astype(float),np.float(np.amax(img)))
 
   ### Conver the data type of the image to the one that is specified
   img = img.astype(dataType)
@@ -105,7 +105,7 @@ def LoadFilter(fileName):
 
   return filterImg
 
-def saveImg(img, inputs, switchChannels=True, fileName = None):
+def saveImg(img, inputs, switchChannels=True, fileName = None, just_save_array=False):
   '''This function saves the image supplied.'''
 
   if not fileName and not inputs.dic['outputParams']['fileRoot']:
@@ -116,13 +116,26 @@ def saveImg(img, inputs, switchChannels=True, fileName = None):
     fileName = inputs.dic['outputParams']['fileRoot']+'_output.'+inputs.dic['outputParams']['fileType']
 
   if inputs.dic['dimensions'] == 2:
-    ## this indicates 2D image (with color channels)
+    if just_save_array:
+      np.save(fileName, img)
+
+    # save just the image
+    if inputs.dic['outputParams']['fileType'] == 'tif':
+      tifffile.imsave(fileName, img, photometric='rgb')
+    elif inputs.dic['outputParams']['fileType'] == 'png':
+      cv2.imwrite(fileName,img)
+    else:
+      raise RuntimeError ("Output filetype not understood")
+  
+    # save figure of the image
     plt.figure()
     if switchChannels:
       plt.imshow(switchBRChannels(img))
     else:
       plt.imshow(img)
+    
     outDict = inputs.dic['outputParams']
+    fileName = outDict['fileRoot']+'_output_figure.'+outDict['fileType']
     plt.gcf().savefig(fileName,dpi=outDict['dpi'])
 
   elif inputs.dic['dimensions'] == 3:
