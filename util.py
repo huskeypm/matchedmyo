@@ -118,25 +118,25 @@ def saveImg(img, inputs, switchChannels=True, fileName = None, just_save_array=F
   if inputs.dic['dimensions'] == 2:
     if just_save_array:
       np.save(fileName, img)
+    else:
+      # save just the image
+      if inputs.dic['outputParams']['fileType'] == 'tif':
+        tifffile.imsave(fileName, img, photometric='rgb')
+      elif inputs.dic['outputParams']['fileType'] == 'png':
+        cv2.imwrite(fileName,img)
+      else:
+        raise RuntimeError ("Output filetype not understood")
 
-    # save just the image
-    if inputs.dic['outputParams']['fileType'] == 'tif':
-      tifffile.imsave(fileName, img, photometric='rgb')
-    elif inputs.dic['outputParams']['fileType'] == 'png':
-      cv2.imwrite(fileName,img)
-    else:
-      raise RuntimeError ("Output filetype not understood")
-  
-    # save figure of the image
-    plt.figure()
-    if switchChannels:
-      plt.imshow(switchBRChannels(img))
-    else:
-      plt.imshow(img)
-    
-    outDict = inputs.dic['outputParams']
-    fileName = outDict['fileRoot']+'_output_figure.'+outDict['fileType']
-    plt.gcf().savefig(fileName,dpi=outDict['dpi'])
+      # save figure of the image
+      plt.figure()
+      if switchChannels:
+        plt.imshow(switchBRChannels(img))
+      else:
+        plt.imshow(img)
+
+      outDict = inputs.dic['outputParams']
+      fileName = outDict['fileRoot']+'_output_figure.'+outDict['fileType']
+      plt.gcf().savefig(fileName,dpi=outDict['dpi'])
 
   elif inputs.dic['dimensions'] == 3:
     if fileName[-4:] != '.tif':
