@@ -116,8 +116,13 @@ def saveImg(img, inputs, switchChannels=True, fileName = None, just_save_array=F
     fileName = inputs.dic['outputParams']['fileRoot']+'_output.'+inputs.dic['outputParams']['fileType']
 
   if inputs.dic['dimensions'] == 2:
-    if just_save_array:
-      np.save(fileName, img)
+    if just_save_array: # indicates we want to save the grayscale array
+      if inputs.dic['outputParams']['fileType'] == 'tif':
+        tifffile.imsave(fileName, img) # this is grayscale
+      elif inputs.dic['outputParams']['fileType'] == 'png':
+        cv2.imwrite(fileName,img)
+      else:
+        raise RuntimeError ("Output filetype not understood")
     else:
       # save just the image
       if inputs.dic['outputParams']['fileType'] == 'tif':
