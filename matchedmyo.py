@@ -511,12 +511,14 @@ class Inputs:
 class ClassificationResults:
   '''This class holds all of the results that we will need to store.'''
   def __init__(self,
+               inputs,
                markedImage=None,
                markedAngles=None,
                ttContent=None,
                ltContent=None,
                taContent=None,
-               angleCounts=None):
+               angleCounts=None
+               ):
     '''
     Inputs:
       markedImage -> Numpy array. The image with TT, LT, and TA hits superimposed on the original image.
@@ -529,30 +531,43 @@ class ClassificationResults:
     self.taContent = taContent
     self.angleCounts = angleCounts
   
+    ### Check to make sure the CSV file specified as output for the classification results actually
+    ###   exists and if it doesn't create it
+    fileExists = os.path.isfile(inputs.dic['outputParams']['csvFile'])
+    csv_output_dir = '/'.join(inputs.dic['outputParams']['csvFile'].split('/')[:-1])
+    csv_output_dir_exists = os.path.isdir(csv_output_dir)
+    ## Check to make sure the directory exists
+    if not csv_output_dir_exists:
+      msg = """
+      The directory, "{}/", with which you specified the classification results to be 
+      saved in the CSV file does not exist. Make sure to create this directory before 
+      you run this program. Alternatively, change the outputParams:csvFile option in
+      your input YAML file.""".format(csv_output_dir)
+      raise RuntimeError (msg)
+    else:
+      ## Check to make sure the CSV file exists. Write a CSV file if it doesn't
+      if not fileExists:
+        with open(inputs.dic['outputParams']['csvFile'], inputs.writeMode) as csvFile:
+          ## Create instance of writer object
+          dummyWriter = csv.writer(csvFile)
+
+          ## If the csv file did not already exists, we need to create headers for the output file
+          header = [
+            'Date of Classification',
+            'Time of Classification',
+            'Image Name',
+            'TT Content',
+            'LT Content',
+            'TA Content',
+            'Output Image Location and Root'
+          ]
+          dummyWriter.writerow(header)
+
+
+
   def writeToCSV(self, inputs):
     '''This function writes the results to a CSV file whose name is specified in the Inputs class 
     (Inputs.outputParams['csvFile'])'''
-
-    ### Check if the output csv file already exists
-    fileExists = os.path.isfile(inputs.dic['outputParams']['csvFile'])
-
-    ### If the file does not already exist, we need to create headers for it
-    if not fileExists:
-      with open(inputs.dic['outputParams']['csvFile'], inputs.writeMode) as csvFile:
-        ## Create instance of writer object
-        dummyWriter = csv.writer(csvFile)
-      
-        ## If the csv file did not already exists, we need to create headers for the output file
-        header = [
-          'Date of Classification',
-          'Time of Classification',
-          'Image Name',
-          'TT Content',
-          'LT Content',
-          'TA Content',
-          'Output Image Location and Root'
-        ]
-        dummyWriter.writerow(header)
 
     if sys.version_info[0] < 3:
       appendMode = 'ab'
@@ -565,6 +580,12 @@ class ClassificationResults:
       ## Get Date and Time
       now = datetime.datetime.now()
 
+      ## If the path specified for the output root is relative, get the absolute path
+      if inputs.dic['outputParams']['fileRoot'][0] == '.': # indicates relative path
+        real_path = root + inputs.dic['outputParams']['fileRoot'][1:]
+      else:
+        real_path = inputs.dic['outputParams']['fileRoot']
+
       ## Write the outputs of this classification to the csv file
       output = [
         now.strftime('%Y-%m-%d'),
@@ -573,7 +594,7 @@ class ClassificationResults:
         str(self.ttContent),
         str(self.ltContent),
         str(self.taContent),
-        inputs.dic['outputParams']['fileRoot']        
+        real_path
       ]
 
       ## Write outputs to csv file
@@ -773,7 +794,7 @@ def giveMarkedMyocyte(
   '''
   start = time.time()
   ### Create storage object for results
-  myResults = ClassificationResults()
+  myResults = ClassificationResults(inputs=inputs)
 
   ### Perform Filtering Routines
   ## Transverse Tubule Filtering
@@ -1026,7 +1047,7 @@ def give3DMarkedMyocyte(
   start = time.time()
 
   ### Insantiate storage object for results
-  myResults = ClassificationResults()
+  myResults = ClassificationResults(inputs=inputs)
 
   ### Transverse Tubule Filtering
   if inputs.dic['filterTypes']['TT']:
@@ -1151,6 +1172,7 @@ def arbitraryFiltering(inputs):
   '''
   start = time.time()
   myResults = ClassificationResults(
+    inputs = inputs,
     markedImage = inputs.colorImage.copy()
   )
 
