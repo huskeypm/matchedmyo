@@ -371,6 +371,7 @@ def reorient(img):
 ### Resizing Routines
 ###
 ###############################################################################
+
 def displayImage(screen, px, topleft, prior):
     # ensure that the rect always has positive width, height
     x, y = topleft
@@ -551,8 +552,31 @@ def preprocess(fileName, filterTwoSarcomereSize, maskImg=None, writeImage=False,
 
   img = util.ReadImg(fileName)
 
+  ### Check if the image is too large to be displayed fully using the current GUI
   if np.prod(img.shape) > img_size_cutoff: img_too_large = True
+  else: img_too_large = False
   
+  ### Make an assumption that if the image is too large, we'll likely need to CLAHE the whole thing
+  ### due to dye imbalances across the image.
+  if img_too_large: 
+    ## Convert to acceptable cv2 format
+    prev_img_max = np.max(img)
+    prev_img_min = np.min(img)
+    prev_img_dtype = img.dtype
+    img = (img - prev_img_min) / (prev_img_max - prev_img_min) * 255.
+    img = img.astype(np.uint8)
+    ## smooth image 
+    img = cv2.blur(img,(3,3))
+    ## clahe the image
+    img = util.ApplyCLAHE(
+      img,
+      tuple([int(1./8. * dim) for dim in np.shape(img)])
+    )
+    ## convert back to previous format
+    img = img.astype(np.float32) / float(np.max(img)) 
+    img *= (prev_img_max - prev_img_min)
+    img += prev_img_min
+
   ### Reorient the image
   img,degreesOffCenter = reorient(img)
 
@@ -575,7 +599,7 @@ def preprocess(fileName, filterTwoSarcomereSize, maskImg=None, writeImage=False,
     maskImg = processMask(degreesOffCenter,resizeScale,fileName=fileName, maskImg = maskImg, imgShape = img.shape)
 
   # write file
-  if writeImage:
+  if writeImage or img_too_large:
     name,fileType = fileName[:-4],fileName[-4:]
     newName = name+"_processed"+fileType
     if img_too_large: 
@@ -611,7 +635,9 @@ def processMask(degreesOffCenter,resizeScale, fileName = None, maskImg = None, i
 
 def preprocessTissue():
   '''
-  Function to preprocess the original tissue level image
+  Function to preprocess the original tissue level image. This is not a general routine for 
+  preprocessing any tissue image but one meant to standardize the preprocessing of the tissue
+  image used in the manuscript.
   '''
 
   #root = "/net/share/pmke226/DataLocker/cardiac/Sachse/171127_tissue/"
