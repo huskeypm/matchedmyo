@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
 import cv2
-from scipy.misc import toimage
 from scipy import ndimage
 from scipy import signal
 import matchedFilter as mF
