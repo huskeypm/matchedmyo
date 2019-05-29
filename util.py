@@ -42,6 +42,16 @@ def myplot(img,fileName=None,clim=None):
     plt.clim(clim)
 
 def ReadImg(fileName,cvtColor=True,renorm=False,bound=False, dataType = np.float32):
+  '''Function for reading in images in a standardized way. Built to handle PNGs and TIFFs.
+
+  fileName -> str. Path to the file.
+  cvtColor -> Bool. If True, the image is converted to a grayscale image.
+  renorm -> Bool. If True, normalizes the image from 0 to 1.
+  bound -> list of length two containing integers or False. Bounds with which to crop the image
+           upon reading in.
+  dataType -> numpy data type object. The data type with which you would like to convert the image 
+              to.
+  '''
   ### Check to see what the file type is
   fileType = fileName[-4:]
 
@@ -57,10 +67,22 @@ def ReadImg(fileName,cvtColor=True,renorm=False,bound=False, dataType = np.float
       raise RuntimeError("Loading of image {} threw an error. This is likely due to a data type issue. ".format(fileName)
                          +"Try converting the image data type to 32 bit float instead.")
 
-    ## Check dimensionality of image. If image is 3D, we want to roll the z axis to the last position since 
-    ##   tifffile reads in the z-stacks in the first dimension.
-    if len(np.shape(img)) == 3:
-      img = np.moveaxis(img,source=0,destination=2)
+    if cvtColor:
+      ## Indicates this is an RGB image that we should collapse along the last axis
+      if np.shape(img)[-1] == 3:
+        img = np.mean(img, axis = -1)
+      ## Otherwise, the last axis in the array isn't a color channel and the user of this function
+      ## forgot to turn off the cvtColor option
+    
+      ## Check dimensionality of image. If image is 3D, we want to roll the z axis to the last position since 
+      ##   tifffile reads in the z-stacks in the first dimension.
+      if len(np.shape(img)) == 3:
+        img = np.moveaxis(img,source=0,destination=2)
+    else:
+      if len(np.shape(img)) == 4:
+        ## Indicates a 3D color tiff image that we'll need to roll the axis to make sure it 
+        ## stays consistent with our convention of (rows,cols,z[, colorChannel])
+        img = np.moveaxis(img,source=0,destination=2)
 
   elif fileType == '.png':
     ## Read in image
