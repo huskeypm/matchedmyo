@@ -16,6 +16,10 @@ pygame.init() # initializes pygame modules
 from sklearn.decomposition import PCA
 import imutils
 import matchedFilter as mF
+import tifffile
+
+### Global variable to determine if the image is too large for certain operations (such as rotation, etc.)
+img_size_cutoff = 36e6 # [total pixels]
 
 ###############################################################################
 ###
@@ -116,14 +120,92 @@ def normalizeToStriations(img, subsectionIdxs,filterSize):
 
   return img
 
+def normalizeToStriations_given_subsection(img,subsection,filterSize):
+  '''Does the same thing as "normalizeToStriations" but instead of performing matched filtering 
+  with the whole image, just does it with the subsection to avoid long computation times.'''
+  print ("Normalizing myocyte to striations")
+  
+  ### Load in filter that will be used to smooth the subsection
+  thisPath = os.path.realpath(__file__).split('/')[:-1]
+  thisPath = '/'.join(thisPath)
+  WTfilterName = thisPath+'/myoimages/singleTTFilter.png'
+  WTfilter = util.LoadFilter(WTfilterName)
+
+  if subsection.dtype != np.uint8:
+    subsection = subsection.astype(np.float32) / float(np.max(subsection)) * 255.
+    subsection = subsection.astype(np.uint8)
+  if img.dtype != np.uint8:
+    img = img.astype(np.float32) / float(np.max(img)) * 255.
+    img = img.astype(np.uint8)
+
+  ### Perform smoothing on subsection
+  smoothedSubsection = np.asarray(mF.matchedFilter(subsection,WTfilter,demean=False))
+
+  ### Now we have to normalize to 255 for cv2 algorithm to work
+  if smoothedSubsection.dtype != np.uint8:
+    # smoothedSubsection = smoothedSubsection * 255. / np.max(smoothedSubsection)
+    # smoothedSubsection = smoothedSubsection.astype(np.uint8)
+    smoothedSubsection = smoothedSubsection.astype(np.uint8) # should already be normalized to 255
+  
+  ### Perform Gaussian thresholding to pull out striations
+  # blockSize is pixel neighborhood that each pixel is compared to
+  blockSize = int(round(float(filterSize) / 3.57)) # value is empirical
+  # blockSize must be odd so we have to check this
+  if blockSize % 2 == 0:
+    blockSize += 1
+  # constant is a constant that is subtracted from each distribution for each pixel
+  constant = 0
+  # threshValue is the value at which super threshold pixels are marked, else px = 0
+  threshValue = 1
+  gaussSubsection = cv2.adaptiveThreshold(smoothedSubsection, threshValue,
+                                          cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                          cv2.THRESH_BINARY, blockSize,
+                                          constant)
+
+  ### Calculate the peak and valley values from the segmented image
+  peaks = smoothedSubsection[np.nonzero(gaussSubsection)]
+  peakValue = np.mean(peaks)
+  peakSTD = np.std(peaks)
+  valleys = smoothedSubsection[np.where(gaussSubsection == 0)]
+  valleyValue = np.mean(valleys)
+  valleySTD = np.std(valleys)
+
+  print ("Average Striation Value:", peakValue)
+  print ("Standard Deviation of Striation:", peakSTD)
+  print ("Average Striation Gap Value:", valleyValue)
+  print ("Stand Deviation of Striation Gap", valleySTD)
+
+  ### Calculate ceiling and floor thresholds empirically
+  ceiling = peakValue + 3 * peakSTD
+  floor = valleyValue - valleySTD
+  if ceiling > 255:
+    ceiling = 255.
+  if floor < 0:
+    floor = 0
+  
+  ceiling = int(round(ceiling))
+  floor = int(round(floor))
+  print ("Ceiling Pixel Value:", ceiling)
+  print ("Floor Pixel Value:", floor)
+
+  ### Threshold 
+  img[img>=ceiling] = ceiling
+  img[img<=floor] = floor
+  img -= floor
+  img = img.astype(np.float64)
+  img /= np.max(img)
+  img *= 255
+  img = img.astype(np.uint8)
+
+  return img
+
 ###############################################################################
 ###
 ### FFT Filtering Routines
 ###
 ###############################################################################
 
-
-
+# clearly I've done a lot of work here
 
 ###############################################################################
 ###
@@ -179,11 +261,18 @@ def autoReorient(img):
 
 def setup(array):
     #px = pygame.image.load(path)
-    px = pygame.surfarray.make_surface(array)
+    # using a try/except here to catch images that are too large to display
+    try:
+      px = pygame.surfarray.make_surface(array)
+      idx_adjustment = (0,0)
+    except:
+      mid_x = array.shape[0] // 2; mid_y = array.shape[1] // 2
+      idx_adjustment = (mid_x - 1000, mid_y - 1000)
+      px = pygame.surfarray.make_surface(array[mid_x - 1000:mid_x + 1000, mid_y - 1000:mid_y + 1000])
     screen = pygame.display.set_mode( px.get_rect()[2:] )
     screen.blit(px, px.get_rect())
     pygame.display.flip()
-    return screen, px
+    return screen, px, idx_adjustment
 
 def displayImageLine(screen, px, topleft, prior):
     # ensure that the rect always has positive width, height
@@ -235,7 +324,7 @@ def mainLoopLine(screen, px):
 def giveSubsectionLine(array):
     # pygame has weird indexing
     newArray = np.swapaxes(array,0,1)
-    screen, px = setup(newArray)
+    screen, px, idx_adjustment = setup(newArray)
     pygame.display.set_caption("Draw a Line Orthogonal to Transverse Tubules")
     left, upper, right, lower = mainLoopLine(screen, px)
     pygame.display.quit()
@@ -244,11 +333,9 @@ def giveSubsectionLine(array):
     return directionVector
 
 def reorient(img):
+  '''Function to reorient the myocyte based on a user selected line that is
+  orthogonal to the TTs'''
 
-  '''
-  Function to reorient the myocyte based on a user selected line that is
-  orthogonal to the TTs 
-  '''
   print ("Reorienting Myocyte")
 
   ### get direction vector from line drawn by user
@@ -269,7 +356,13 @@ def reorient(img):
   print ("Image is",dOffCenter,"degrees off center")
 
   ### rotate image
-  rotated = imutils.rotate_bound(img,dOffCenter)
+  if np.prod(img.shape) < img_size_cutoff:
+    rotated = imutils.rotate_bound(img,dOffCenter)
+  else:
+    print ("Image is too large to rotate. Instead the filter rotation angles will be",
+           "adjusted accordingly. Developers: Keep in mind this invalidates the indexes", 
+           "returned by these preprocessing routines.")
+    rotated = img
 
   return rotated, dOffCenter
 
@@ -278,6 +371,7 @@ def reorient(img):
 ### Resizing Routines
 ###
 ###############################################################################
+
 def displayImage(screen, px, topleft, prior):
     # ensure that the rect always has positive width, height
     x, y = topleft
@@ -327,9 +421,13 @@ def mainLoop(screen, px):
 def giveSubsection(array):
     # pygame has weird indexing
     newArray = np.swapaxes(array,0,1)
-    screen, px = setup(newArray)
+    screen, px, idx_adjustment = setup(newArray)
     pygame.display.set_caption("Draw a Rectangle Around Several Conserved Transverse Tubule Striations")
     left, upper, right, lower = mainLoop(screen, px)
+
+    # apply index adjustments if necessary
+    upper += idx_adjustment[0]; lower += idx_adjustment[0]
+    left += idx_adjustment[1]; right += idx_adjustment[1]
 
     # ensure output rect always has positive width, height
     if right < left:
@@ -342,22 +440,32 @@ def giveSubsection(array):
     pygame.display.quit()
     return subsection, indexes
 
-def resizeToFilterSize(img,filterTwoSarcomereSize):
-  '''
-  Function to semi-automate the resizing of the image based on the filter
-  '''
+def resizeToFilterSize(img,filterTwoSarcomereSize,dOffCenter=None):
+  '''  Function to semi-automate the resizing of the image based on the filter'''
 
   print ("Resizing myocyte based on user selected subsection")
 
   ### 1. Select subsection of image that exhibits highly conserved network of TTs
-  subsection,indexes = giveSubsection(img)#,dtype=np.float32)
+  if np.prod(img.shape) < img_size_cutoff:
+    subsection,indexes = giveSubsection(img)#,dtype=np.float32)
+  else:
+    # image is too big so we have to use a subsection rotated by the previously informed offset angle
+    mid_row = img.shape[0] // 2; mid_col = img.shape[1] // 2
+    smaller_img = img[
+      mid_row - 1000:mid_row + 1000,
+      mid_col - 1000:mid_col + 1000
+    ]
+    smaller_img = imutils.rotate_bound(smaller_img,dOffCenter)
+    # now we can grab a portion of the smaller_img to resize based on TT information
+    subsection,indexes = giveSubsection(smaller_img)
+
   # best to normalize the subsection for display purposes
   subsection /= np.max(subsection)
 
   ### 2. Resize based on the subsection
   resized, scale, newIndexes = resizeGivenSubsection(img,subsection,filterTwoSarcomereSize,indexes)
 
-  print ("Image Two Sarcomere Size:",scale)
+  print ("Image Resizing Scale:",scale)
   
   return resized,scale,subsection,newIndexes
 
@@ -406,7 +514,6 @@ def resizeGivenSubsection(img,subsection,filterTwoSarcomereSize,indexes):
   return resized, scale, newIndexes
 
 
-
 ###############################################################################
 ###
 ### CLAHE Routines
@@ -439,23 +546,69 @@ def applyCLAHE(img,filterTwoSarcomereSize):
 ###
 ###############################################################################
 
-def preprocess(fileName, filterTwoSarcomereSize, maskImg=None, writeImage=False):
+def preprocess(fileName, filterTwoSarcomereSize, maskImg=None, writeImage=False, inputs=None):
+  '''The routine that handles all of the preprocessing subroutines. This is the routine that we'll
+  call from our main script.'''
+
   img = util.ReadImg(fileName)
 
+  ### Check if the image is too large to be displayed fully using the current GUI
+  if np.prod(img.shape) > img_size_cutoff: img_too_large = True
+  else: img_too_large = False
+  
+  ### Make an assumption that if the image is too large, we'll likely need to CLAHE the whole thing
+  ### due to dye imbalances across the image.
+  if img_too_large: 
+    ## Convert to acceptable cv2 format
+    prev_img_max = np.max(img)
+    prev_img_min = np.min(img)
+    prev_img_dtype = img.dtype
+    img = (img - prev_img_min) / (prev_img_max - prev_img_min) * 255.
+    img = img.astype(np.uint8)
+    ## smooth image 
+    img = cv2.blur(img,(3,3))
+    ## clahe the image
+    img = util.ApplyCLAHE(
+      img,
+      tuple([int(1./8. * dim) for dim in np.shape(img)])
+    )
+    ## convert back to previous format
+    img = img.astype(np.float32) / float(np.max(img)) 
+    img *= (prev_img_max - prev_img_min)
+    img += prev_img_min
+
+  ### Reorient the image
   img,degreesOffCenter = reorient(img)
-  img,resizeScale,subsection,idxs = resizeToFilterSize(img,filterTwoSarcomereSize)
+
+  ## If the image is too large, we have to modify the filter rotations instead of rotating the image
+  if img_too_large: inputs.dic['iters'] = [it - degreesOffCenter for it in inputs.dic['iters']]
+
+  img,resizeScale,subsection,idxs = resizeToFilterSize(img,filterTwoSarcomereSize,dOffCenter=degreesOffCenter)
   img = applyCLAHE(img,filterTwoSarcomereSize)
-  img = normalizeToStriations(img,idxs,filterTwoSarcomereSize)
+  if not img_too_large:
+    img = normalizeToStriations(img,idxs,filterTwoSarcomereSize)
+  else:
+    img = normalizeToStriations_given_subsection(img,subsection,filterTwoSarcomereSize)
+    writeImage = True # so we can overlay the results onto the resize and preprocessed image later on.
 
   # fix mask based on img orientation and resize scale
   if maskImg is not None:
-    maskImg = processMask(degreesOffCenter,resizeScale,fileName=fileName, maskImg = maskImg)
+    # if inputs is not None:
+    #   inputs.maskImg = processMask(degreesOffCenter,resizeScale,fileName=fileName, maskImg = maskImg, imgShape = img.shape)
+    # else:
+    maskImg = processMask(degreesOffCenter,resizeScale,fileName=fileName, maskImg = maskImg, imgShape = img.shape)
 
   # write file
-  if writeImage:
+  if writeImage or img_too_large:
     name,fileType = fileName[:-4],fileName[-4:]
     newName = name+"_processed"+fileType
-    cv2.imwrite(newName,img)
+    if img_too_large: 
+      print ("Image is too large to resize so preprocessed image is saved at {} for".format(newName),
+             "future processing purposes")
+    if fileType == ".tif":
+      tifffile.imsave(newName, img)
+    else:
+      cv2.imwrite(newName,img)
 
   img = img.astype(np.float32) / float(np.max(img))
 
@@ -464,14 +617,17 @@ def preprocess(fileName, filterTwoSarcomereSize, maskImg=None, writeImage=False)
   else:
     return img
 
-def processMask(degreesOffCenter,resizeScale, fileName = None, maskImg = None):
+def processMask(degreesOffCenter,resizeScale, fileName = None, maskImg = None, imgShape = 1):
   '''
   function to reorient and resize the mask that was generated for the original
   image.
   '''
   maskName = fileName[:-4]+"_mask"+fileName[-4:]
   # mask = util.ReadImg(maskName)
-  reoriented = imutils.rotate_bound(maskImg,degreesOffCenter)
+  if img.shape < img_size_cutoff:
+    reoriented = imutils.rotate_bound(maskImg,degreesOffCenter)
+  else:
+    reoriented = maskImg
   resized = cv2.resize(reoriented,None,fx=resizeScale,fy=resizeScale,interpolation=cv2.INTER_CUBIC)
   cv2.imwrite(fileName[:-4]+"_processed_mask"+fileName[-4:],resized)
 
@@ -479,7 +635,9 @@ def processMask(degreesOffCenter,resizeScale, fileName = None, maskImg = None):
 
 def preprocessTissue():
   '''
-  Function to preprocess the original tissue level image
+  Function to preprocess the original tissue level image. This is not a general routine for 
+  preprocessing any tissue image but one meant to standardize the preprocessing of the tissue
+  image used in the manuscript.
   '''
 
   #root = "/net/share/pmke226/DataLocker/cardiac/Sachse/171127_tissue/"

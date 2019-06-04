@@ -2,6 +2,7 @@ from __future__ import print_function
 from six import iteritems
 import sys
 import os
+import warnings
 import matplotlib.pylab as plt 
 import numpy as np 
 import cv2
@@ -41,21 +42,47 @@ def myplot(img,fileName=None,clim=None):
     plt.clim(clim)
 
 def ReadImg(fileName,cvtColor=True,renorm=False,bound=False, dataType = np.float32):
+  '''Function for reading in images in a standardized way. Built to handle PNGs and TIFFs.
+
+  fileName -> str. Path to the file.
+  cvtColor -> Bool. If True, the image is converted to a grayscale image.
+  renorm -> Bool. If True, normalizes the image from 0 to 1.
+  bound -> list of length two containing integers or False. Bounds with which to crop the image
+           upon reading in.
+  dataType -> numpy data type object. The data type with which you would like to convert the image 
+              to.
+  '''
   ### Check to see what the file type is
   fileType = fileName[-4:]
+
+  ### make sure the file exists, first and foremost
+  assert os.path.isfile(fileName), "The file, {}, does not exist. Check for mistakes in inputs.".format(fileName)
 
   if fileType == '.tif':
     ## Read in image
     try:
       img = tifffile.imread(fileName)
     except:
+      ### If it exists, then it's an issue with reading it in.
       raise RuntimeError("Loading of image {} threw an error. This is likely due to a data type issue. ".format(fileName)
                          +"Try converting the image data type to 32 bit float instead.")
 
-    ## Check dimensionality of image. If image is 3D, we want to roll the z axis to the last position since 
-    ##   tifffile reads in the z-stacks in the first dimension.
-    if len(np.shape(img)) == 3:
-      img = np.moveaxis(img,source=0,destination=2)
+    if cvtColor:
+      ## Indicates this is an RGB image that we should collapse along the last axis
+      if np.shape(img)[-1] == 3:
+        img = np.mean(img, axis = -1)
+      ## Otherwise, the last axis in the array isn't a color channel and the user of this function
+      ## forgot to turn off the cvtColor option
+    
+      ## Check dimensionality of image. If image is 3D, we want to roll the z axis to the last position since 
+      ##   tifffile reads in the z-stacks in the first dimension.
+      if len(np.shape(img)) == 3:
+        img = np.moveaxis(img,source=0,destination=2)
+    else:
+      if len(np.shape(img)) == 4:
+        ## Indicates a 3D color tiff image that we'll need to roll the axis to make sure it 
+        ## stays consistent with our convention of (rows,cols,z[, colorChannel])
+        img = np.moveaxis(img,source=0,destination=2)
 
   elif fileType == '.png':
     ## Read in image
@@ -78,7 +105,7 @@ def ReadImg(fileName,cvtColor=True,renorm=False,bound=False, dataType = np.float
 
   ### Normalize the image to have maximum value of 1.
   if renorm:
-    img = img / np.float(np.amax(img))
+    img = np.divide(img.astype(float),np.float(np.amax(img)))
 
   ### Conver the data type of the image to the one that is specified
   img = img.astype(dataType)
@@ -100,7 +127,7 @@ def LoadFilter(fileName):
 
   return filterImg
 
-def saveImg(img, inputs, switchChannels=True, fileName = None):
+def saveImg(img, inputs, switchChannels=True, fileName = None, just_save_array=False):
   '''This function saves the image supplied.'''
 
   if not fileName and not inputs.dic['outputParams']['fileRoot']:
@@ -111,14 +138,32 @@ def saveImg(img, inputs, switchChannels=True, fileName = None):
     fileName = inputs.dic['outputParams']['fileRoot']+'_output.'+inputs.dic['outputParams']['fileType']
 
   if inputs.dic['dimensions'] == 2:
-    ## this indicates 2D image (with color channels)
-    plt.figure()
-    if switchChannels:
-      plt.imshow(switchBRChannels(img))
+    if just_save_array: # indicates we want to save the grayscale array
+      if inputs.dic['outputParams']['fileType'] == 'tif':
+        tifffile.imsave(fileName, img) # this is grayscale
+      elif inputs.dic['outputParams']['fileType'] == 'png':
+        cv2.imwrite(fileName,img)
+      else:
+        raise RuntimeError ("Output filetype not understood")
     else:
-      plt.imshow(img)
-    outDict = inputs.dic['outputParams']
-    plt.gcf().savefig(fileName,dpi=outDict['dpi'])
+      # save just the image
+      if inputs.dic['outputParams']['fileType'] == 'tif':
+        tifffile.imsave(fileName, img, photometric='rgb')
+      elif inputs.dic['outputParams']['fileType'] == 'png':
+        cv2.imwrite(fileName,img)
+      else:
+        raise RuntimeError ("Output filetype not understood")
+
+      # save figure of the image
+      plt.figure()
+      if switchChannels:
+        plt.imshow(switchBRChannels(img))
+      else:
+        plt.imshow(img)
+
+      outDict = inputs.dic['outputParams']
+      fileName = outDict['fileRoot']+'_output_figure.'+outDict['fileType']
+      plt.gcf().savefig(fileName,dpi=outDict['dpi'])
 
   elif inputs.dic['dimensions'] == 3:
     if fileName[-4:] != '.tif':
@@ -1109,7 +1154,7 @@ def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpola
   maxVal = np.max(A)
 
   if verbose:
-    print ("Original Filter Values\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(A[:,:,0]), np.max(A[:,:,0])))
+    print ("Original Filter Values\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(A), np.max(A)))
 
   ### 1. Interpolate and Form New Matrix with Homogeneous Coordinates
   ## Find zoom levels based on resolutions. We need to zoom in for all dimensions with resolutiosn lower than the maximum
@@ -1126,20 +1171,21 @@ def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpola
     zoomed[zoomed > maxVal] = maxVal
 
   if verbose:
-    print ("Filter Values After Zooming In\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomed[:,:,0]),np.max(zoomed[:,:,0])))
+    print ("Filter Values After Zooming In\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomed),np.max(zoomed)))
 
   ### 2. Rotate the Matrix Using Homogeneous Coordinate Rotation Routine
   ## Pad the zoomed in image first to ensure that rotation does not induce artifacts
-  padded = pad3DArray(zoomed)
+  # padded = pad3DArray(zoomed)
+  padded = zoomed # turns out I don't think this is necessary
 
   if verbose:
-    print ("Filter Values After Padding\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(padded[:,:,0]),np.max(padded[:,:,0])))
+    print ("Filter Values After Padding\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(padded),np.max(padded)))
 
   ## Rotate the matrix
   rotated = rotate3DArray_Homogeneous(padded, angles, clipOutput=clipValues, interpolationOrder=interpolationOrder)
 
   if verbose:
-    print ("Filter Values After Rotating\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(rotated[:,:,0]),np.max(rotated[:,:,0])))
+    print ("Filter Values After Rotating\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(rotated),np.max(rotated)))
 
   ### 3. Downsample by Zooming Out
   ## Find the amount we'll have to zoom out to return to previous levels
@@ -1151,8 +1197,14 @@ def rotate3DArray_Nonhomogeneous(A,angles,resolutions,clipValues=True, interpola
     zoomedOut[zoomedOut < minVal] = minVal
     zoomedOut[zoomedOut > maxVal] = maxVal
 
+    # we've got to do some additional thresholding since there's interpolation artifacts
+    minThresh = np.min(zoomedOut) + .35 * (np.max(zoomedOut) - np.min(zoomedOut))
+    zoomedOut[zoomedOut < minThresh] = minVal
+
   if verbose:
-    print ("Filter Values After Zooming Out\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomedOut[:,:,0]),np.max(zoomedOut[:,:,0])))
+    print ("Filter Values After Zooming Out\n\tFilter Min: {} \n\tFilter Max: {}".format(np.min(zoomedOut),np.max(zoomedOut)))
+
+  
 
   return zoomedOut
 
@@ -1191,7 +1243,7 @@ def pad3DArray(array,
 
   return padded
 
-def rotate3DArray_Homogeneous(array, angles, clipOutput=True, interpolationOrder=3):
+def rotate3DArray_Homogeneous(array, angles, clipOutput=True, interpolationOrder=3, eps=1e-14):
   '''
   Rotates an array in 3D space.
 
@@ -1223,24 +1275,24 @@ def rotate3DArray_Homogeneous(array, angles, clipOutput=True, interpolationOrder
 
   ### Clip rotation output if desired
   if clipOutput:
-    rot[rot < inputMin] = inputMin
-    rot[rot > inputMax] = inputMax
+    rot[rot < inputMin + eps] = inputMin
+    rot[rot > inputMax - eps] = inputMax
 
   ### Rotate about y axis (x,z plane)
   rot = ndimage.rotate(rot, angles[1], axes=(0,2), order=interpolationOrder)
 
   ### Clip rotation output if desired
   if clipOutput:
-    rot[rot < inputMin] = inputMin
-    rot[rot > inputMax] = inputMax
+    rot[rot < inputMin + eps] = inputMin
+    rot[rot > inputMax - eps] = inputMax
 
   ### Rotate about z axis (x,y plane)
   rot = ndimage.rotate(rot, angles[2], axes=(0,1), order=interpolationOrder)
 
   ### Clip rotation output if desired
   if clipOutput:
-    rot[rot < inputMin] = inputMin
-    rot[rot > inputMax] = inputMax
+    rot[rot < inputMin + eps] = inputMin
+    rot[rot > inputMax - eps] = inputMax
 
   return rot
 
@@ -1287,6 +1339,37 @@ def autoDepadArray(img, verbose=False):
   
   return newImg
 
+def trimFilter(filt, verbose=False, thresh_override=None):
+  '''Function to automatically depad an array for computational efficiency in the convolution step.'''
+  nonzero_filter_elements = np.count_nonzero(filt)
+
+  ## filter is loaded in and normalized s.t. sum of intensity is 1. So anything lower 
+  ##  than 1 / nonzero_filter_elements is almost certainly padding
+  if isinstance(thresh_override, (float,int)):
+    thresh = thresh_override
+  else:
+    if np.min(filt) == np.max(filt):
+      return filt
+    else:
+      thresh = 1. / float(nonzero_filter_elements) * (1./3.) + np.min(filt) # the 1/3 gives us a margin for error
+
+  _, paddingLocs = measureFilterDimensions(filt,True,verbose=verbose,epsilon = thresh)
+
+  if verbose:
+    print ("Locations of padding:",paddingLocs)
+
+  ## Change the padding locations into an indexable tuple of tuples
+  # print (paddingLocs)
+  paddingLocs = [[loc[0], filt.shape[i]] if loc[1] == 0 else loc for i,loc in enumerate(paddingLocs) ]
+  if verbose: print ("padding locs before correction:", paddingLocs)
+  paddingLocs = tuple([slice(loc[0],-loc[1],1) for loc in paddingLocs])
+  if verbose: print ("padding after before correction:", paddingLocs)
+
+  ## Make the depadded filter
+  newFilter = filt[paddingLocs]
+
+  return newFilter
+
 def lightlyPreprocess(img,filterTwoSarcomereSize,colorImg=None,maskImg=None):
   '''Function to lightly preprocess a given myocyte'''
   raise RuntimeError("Function is deprecated. This has been moved to matchedmyo.Inputs.autoPreprocess()")
@@ -1324,6 +1407,237 @@ def lightlyPreprocess(img,filterTwoSarcomereSize,colorImg=None,maskImg=None):
     return img, colorImg
   else:
     return img
+
+def decomposeFilter(kernel, verbose=False):
+  '''This function checks if a filter is linearly decomposable in all axes for the purpose of 
+  performing separable filtering (which is way quicker for large filters)'''
+  raise RuntimeError("Deprecated. Use decompose_2D and decompose_3D instead")
+
+  numDims = len(kernel.shape)
+  slice_locs = [slice(0, kernel.shape[i], 1) for i in range(len(kernel.shape))]
+
+  reshape_shape = [kernel.shape[i] for i in range(len(kernel.shape))]
+
+  # create a dictinoary to store the decomposed filters
+  filter_storage = dict()
+
+  for i in range(numDims):
+    # take slice of kernel for each dimension from the middle of the filter
+    this_slice = slice_locs.copy()
+    this_slice[i] = kernel.shape[i] // 2
+    this_slice = tuple(this_slice)
+    print ("Slice location:",this_slice[i])
+    #slice_of_kernel = np.expand_dims(kernel[this_slice],axis=i)
+    slice_of_kernel = kernel[this_slice].copy()
+    # slice_of_kernel[slice_of_kernel == 0] = 1e-13 # do this so division doesn't throw an error
+
+    plt.figure()
+    plt.title("Slice of the kernel")
+    plt.imshow(slice_of_kernel)
+    plt.colorbar()
+    
+    if verbose: 
+      print ("kernel slice size:", slice_of_kernel.shape)
+      print ("Kernel minimum:", np.min(kernel))
+      print ("Kernel slice minimum:", np.min(slice_of_kernel))
+    
+    
+    # figure out if each slice along this dimension is a scaled copy of the slice
+    slice_broadcast = [slice(0,kernel.shape[i],1) for i in range(len(kernel.shape))]
+    slice_broadcast[i] = None
+    slice_broadcast = tuple(slice_broadcast)
+    expanded_kernel = np.broadcast_to(slice_of_kernel[slice_broadcast],kernel.shape)
+    # expanded_kernel = slice_of_kernel[slice_broadcast]
+    # expanded_kernel = np.broadcast_to(slice_of_kernel,kernel.shape) # this implicitly handles the dimension to add and expand
+    plt.figure()
+    plt.title("Expanded kernel slice along ith dimension")
+    plt.imshow(expanded_kernel[this_slice])
+
+    # print ("Expanded kernel shape:",expanded_kernel.shape)
+    # if verbose: print("expanded kernel:", expanded_kernel)
+
+    # plt.figure()
+    # plt.imshow(expanded_kernel)
+    
+    #kernel_scales = np.divide(kernel, slice_of_kernel[slice_broadcast])
+    points_of_interest = np.greater(expanded_kernel, 1e-200)
+    kernel_scales = np.divide(kernel, expanded_kernel, where = points_of_interest)
+    # kernel_scales = kernel / expanded_kernel
+
+    plt.figure()
+    plt.title("Kernel scales along dimension of interest")
+    plt.imshow(kernel_scales[this_slice])
+    
+    # continue through this loop if there are any infinite numbers since this indicates the slice is not linearly separable
+    if np.any(np.equal(kernel_scales, np.inf)): 
+      if verbose: print ("Skipping {} dimension".format(i))
+      continue
+    else: kernel_scales = np.nan_to_num(kernel_scales)
+    
+    # create a boolean array to determine where to check the 1D vectors
+    # where_to_check_vecs = np.equal(slice_of_kernel, 1e-13)
+    # expanded_mask = np.broadcast_to(where_to_check_vecs, kernel.shape)
+    #kernel_scales[expanded_mask] = 0
+    # print ("Masked scales slice:", kernel_scales[this_slice])
+    axes_of_interest = tuple([k for k in range(numDims) if k != i])
+    # print ("axes_of_interest:", axes_of_interest)
+
+    # get 1D max along the ith dimension
+    max_1D = np.max(kernel_scales,axis=axes_of_interest)
+    if np.all(np.less(max_1D,1e-200)): continue # indicates that the filter slice is zero on non-decomposable
+    # print ("max_1D:",max_1D)
+
+    # fix weird numerical error where we're getting infintesimal numbers
+    max_1D[max_1D < 1e-30] = 0
+
+    dims_to_expand = tuple([np.newaxis if k != i else slice(0,kernel.shape[i]) for k in range(numDims)])
+    # max_1D = max_1D[:,np.newaxis, np.newaxis]
+    max_1D = max_1D[dims_to_expand]
+    expanded_max = np.broadcast_to(max_1D,kernel.shape)
+
+    # bool_decomposition_matrix = np.equal(expanded_max,kernel_scales,where=points_of_interest)
+
+    # plt.figure()
+    # plt.imshow(expanded_max[this_slice],cmap='gray')
+    # plt.colorbar()
+    # plt.title("Expanded max")
+
+    # plt.figure()
+    # plt.imshow(bool_decomposition_matrix[this_slice],cmap='gray')
+    # plt.title("Bool matrix")
+
+    decomposable = np.all(
+      np.logical_or(
+        np.equal(expanded_max,kernel_scales),
+        np.equal(kernel,0)
+      )
+    )
+
+    if decomposable:
+      if verbose: print ("Filter is linearly decomposable along {} axis!".format(i))
+      
+      # indicate that the filter is linearly separable for this axis and store the vector
+      filter_storage[i] = max_1D
+
+      # we also need to store the other filter
+      if len(kernel.shape) == 3:
+        # indicates we should store the 2D filter just in case it isn't entirely separable
+        this_key = "_".join([str(k) for k in range(numDims) if k != i])
+        print (this_key)
+
+        # we need to add in the ith dimension that we took out for the filter to be correctly 
+        #   oriented for convolution
+        filter_2D_slice = np.expand_dims(slice_of_kernel, axis = i)
+
+        filter_storage[this_key] = filter_2D_slice
+
+  if numDims == 3:
+    # check to see if there are three linear filters. If so, that means we can get rid of the 
+    #   intermediate 2D slice we saved
+    print ("Filter keys:",filter_storage.keys())
+    if 0 in filter_storage.keys() and 1 in filter_storage.keys() and 2 in filter_storage.keys():
+      keys_to_delete = [key for key in filter_storage.keys() if key not in [0, 1, 2]]
+      if verbose: print ("Keys deleted:",keys_to_delete)
+      for key in keys_to_delete:
+        del filter_storage[key]
+
+  if len(filter_storage.keys()) is 0:
+    return kernel
+  else:
+    return filter_storage
+
+def decompose_2D(kernel, axis_to_ignore, standard_dev_thresh, verbose=False):
+    '''Checks to see if the 2D kernel is decomposable.'''
+    # turn off NaN warnings
+    warnings.filterwarnings("ignore")
+
+    axes_to_check = [k for k in range(len(kernel.shape)) if k != axis_to_ignore]
+    
+    # take min along first axis
+    min_first = np.nanmin(kernel, axis = axes_to_check[0], keepdims=True)
+    
+    # divide out by the min 
+    div_out = np.divide(kernel,min_first)
+    
+    # check std along the second axis
+    st = np.nan_to_num(np.nanstd(div_out,axis=axes_to_check[1]))
+    
+    if verbose: print ("2D Standard Deviation:",st)
+
+    if np.all(np.less(st,standard_dev_thresh)):
+        if verbose: print("2D kernel is separable!")
+        second_array = np.nanmean(div_out, axis=axes_to_check[1], keepdims=True)
+        decomposable = True
+        arrays = [np.nan_to_num(min_first), np.nan_to_num(second_array)]
+    else: 
+        decomposable = False
+        arrays = None
+        
+    # turn warnings back on 
+    warnings.resetwarnings()
+
+    return decomposable, arrays
+
+def decompose_3D(Arr, verbose=False, standard_dev_thresh = 1e-14):
+    # turn off NaN warnings
+    warnings.filterwarnings("ignore")
+
+    masked_array = Arr.copy()
+    masked_array[masked_array == 0] = np.nan
+
+    numDims = len(Arr.shape)
+    
+    filtering_vectors = []
+
+    for i in range(numDims):
+        min_0th = np.nanmin(masked_array, axis=i, keepdims=True)
+
+        # divide out the masked array by the min_0th
+        divided_out = np.divide(masked_array,min_0th)
+
+        # if standard deviation along the other axes are 0, then it is decomposable along this axis
+        axes_to_check = tuple([k for k in range(numDims) if k != i])
+        st = np.nanstd(divided_out,axis=axes_to_check,keepdims=True)
+        if verbose: print ("Standard deviations along {} axis:".format(i),st)
+
+        # check to make sure that the st vector satisfies our criteria of zero everywhere
+        if np.all(np.less(np.nan_to_num(st),standard_dev_thresh)):
+            if verbose: print ("Decomposable along the {} axis!".format(i))
+
+            # find the values of the 1D decomposed vector
+            decomp_1D = np.nan_to_num(np.nanmean(divided_out,axis=axes_to_check,keepdims=True))
+            filtering_vectors.append(decomp_1D)
+
+            if verbose: print ("Decomposed {} axis vector:".format(i),decomp_1D)
+
+            # double check our matrix multiplication actually reproduces the 3D array
+            if np.all(np.equal(np.multiply(min_0th,decomp_1D), Arr)): assert("wtf")
+            else: 
+                if verbose: print("success!")
+
+            # check and see if the matrix we created (min_0th) is decomposable
+            decomposable, decomposed_arrays = decompose_2D(min_0th, i, standard_dev_thresh=standard_dev_thresh, verbose=verbose)
+
+            if decomposable:
+                # store all other 2 1D vectors
+                filtering_vectors += decomposed_arrays    
+            else:
+                # store non-decomposable 2D vector
+                filtering_vectors.append(np.nan_to_num(min_0th))
+            
+            break
+
+    # turn warnings back on
+    warnings.resetwarnings()
+
+    if len(filtering_vectors) == 0:
+      # indicates that the filter is not linearly separable at all and we need to return original array
+      decomposable = False
+      return decomposable, Arr
+
+    # exit the function since we decomposed as much as possible
+    decomposable = True
+    return decomposable, filtering_vectors
 
 ###################################################################################################
 ###

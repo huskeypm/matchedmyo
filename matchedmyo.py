@@ -354,9 +354,11 @@ class Inputs:
         raise RuntimeError("Preprocessing is not implemented for 3D images.")
       
       if self.maskImg is not None:
-        self.imgOrig, self.maskImg = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg)
+        self.imgOrig, self.maskImg = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg, inputs=self)
+      # pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg, inputs=self)
       else:  
-        self.imgOrig = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg)
+        self.imgOrig = pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg, inputs=self)
+      #  pp.preprocess(self.dic['imageName'], self.dic['filterTwoSarcomereSize'], self.maskImg, inputs=inputs)
       ## remake the color image
       eightBitImage = self.imgOrig.astype(np.float32).copy()
       eightBitImage = eightBitImage / np.max(eightBitImage) * 255. * 0.8 # 0.8 is to kill the brightness
@@ -509,12 +511,14 @@ class Inputs:
 class ClassificationResults:
   '''This class holds all of the results that we will need to store.'''
   def __init__(self,
+               inputs,
                markedImage=None,
                markedAngles=None,
                ttContent=None,
                ltContent=None,
                taContent=None,
-               angleCounts=None):
+               angleCounts=None
+               ):
     '''
     Inputs:
       markedImage -> Numpy array. The image with TT, LT, and TA hits superimposed on the original image.
@@ -527,30 +531,43 @@ class ClassificationResults:
     self.taContent = taContent
     self.angleCounts = angleCounts
   
+    ### Check to make sure the CSV file specified as output for the classification results actually
+    ###   exists and if it doesn't create it
+    fileExists = os.path.isfile(inputs.dic['outputParams']['csvFile'])
+    csv_output_dir = '/'.join(inputs.dic['outputParams']['csvFile'].split('/')[:-1])
+    csv_output_dir_exists = os.path.isdir(csv_output_dir)
+    ## Check to make sure the directory exists
+    if not csv_output_dir_exists:
+      msg = """
+      The directory, "{}/", with which you specified the classification results to be 
+      saved in the CSV file does not exist. Make sure to create this directory before 
+      you run this program. Alternatively, change the outputParams:csvFile option in
+      your input YAML file.""".format(csv_output_dir)
+      raise RuntimeError (msg)
+    else:
+      ## Check to make sure the CSV file exists. Write a CSV file if it doesn't
+      if not fileExists:
+        with open(inputs.dic['outputParams']['csvFile'], inputs.writeMode) as csvFile:
+          ## Create instance of writer object
+          dummyWriter = csv.writer(csvFile)
+
+          ## If the csv file did not already exists, we need to create headers for the output file
+          header = [
+            'Date of Classification',
+            'Time of Classification',
+            'Image Name',
+            'TT Content',
+            'LT Content',
+            'TA Content',
+            'Output Image Location and Root'
+          ]
+          dummyWriter.writerow(header)
+
+
+
   def writeToCSV(self, inputs):
     '''This function writes the results to a CSV file whose name is specified in the Inputs class 
     (Inputs.outputParams['csvFile'])'''
-
-    ### Check if the output csv file already exists
-    fileExists = os.path.isfile(inputs.dic['outputParams']['csvFile'])
-
-    ### If the file does not already exist, we need to create headers for it
-    if not fileExists:
-      with open(inputs.dic['outputParams']['csvFile'], inputs.writeMode) as csvFile:
-        ## Create instance of writer object
-        dummyWriter = csv.writer(csvFile)
-      
-        ## If the csv file did not already exists, we need to create headers for the output file
-        header = [
-          'Date of Classification',
-          'Time of Classification',
-          'Image Name',
-          'TT Content',
-          'LT Content',
-          'TA Content',
-          'Output Image Location and Root'
-        ]
-        dummyWriter.writerow(header)
 
     if sys.version_info[0] < 3:
       appendMode = 'ab'
@@ -563,6 +580,12 @@ class ClassificationResults:
       ## Get Date and Time
       now = datetime.datetime.now()
 
+      ## If the path specified for the output root is relative, get the absolute path
+      if inputs.dic['outputParams']['fileRoot'][0] == '.': # indicates relative path
+        real_path = root + inputs.dic['outputParams']['fileRoot'][1:]
+      else:
+        real_path = inputs.dic['outputParams']['fileRoot']
+
       ## Write the outputs of this classification to the csv file
       output = [
         now.strftime('%Y-%m-%d'),
@@ -571,7 +594,7 @@ class ClassificationResults:
         str(self.ttContent),
         str(self.ltContent),
         str(self.taContent),
-        inputs.dic['outputParams']['fileRoot']        
+        real_path
       ]
 
       ## Write outputs to csv file
@@ -771,7 +794,7 @@ def giveMarkedMyocyte(
   '''
   start = time.time()
   ### Create storage object for results
-  myResults = ClassificationResults()
+  myResults = ClassificationResults(inputs=inputs)
 
   ### Perform Filtering Routines
   ## Transverse Tubule Filtering
@@ -874,7 +897,8 @@ def giveMarkedMyocyte(
         img=lossMasked, 
         inputs=inputs, 
         switchChannels=False, 
-        fileName=outDict['fileRoot']+'_TA_hits'
+        fileName=outDict['fileRoot']+'_TA_hits',
+        just_save_array=True
       )
     
     if inputs.dic['filterTypes']['LT']:
@@ -882,7 +906,8 @@ def giveMarkedMyocyte(
         img=ltMasked,
         inputs=inputs,
         switchChannels=False,
-        fileName=outDict['fileRoot']+'_LT_hits'
+        fileName=outDict['fileRoot']+'_LT_hits',
+        just_save_array=True
       )
 
     if inputs.dic['filterTypes']['TT']:
@@ -890,7 +915,8 @@ def giveMarkedMyocyte(
         img=wtMasked,
         inputs=inputs,
         switchChannels=False,
-        fileName=outDict['fileRoot']+'_TT_hits'
+        fileName=outDict['fileRoot']+'_TT_hits',
+        just_save_array=True
       )
 
   if not inputs.dic['returnPastedFilter']:
@@ -1021,7 +1047,7 @@ def give3DMarkedMyocyte(
   start = time.time()
 
   ### Insantiate storage object for results
-  myResults = ClassificationResults()
+  myResults = ClassificationResults(inputs=inputs)
 
   ### Transverse Tubule Filtering
   if inputs.dic['filterTypes']['TT']:
@@ -1146,6 +1172,7 @@ def arbitraryFiltering(inputs):
   '''
   start = time.time()
   myResults = ClassificationResults(
+    inputs = inputs,
     markedImage = inputs.colorImage.copy()
   )
 
@@ -1155,6 +1182,7 @@ def arbitraryFiltering(inputs):
       print ("Performing {} classification".format(filterKey))
       ## Load in filter
       inputs.mfOrig = util.LoadFilter(inputs.paramDicts[filterKey]['filterName'])
+
       if inputs.paramDicts[filterKey]['filterMode'] == 'punishmentFilter':
         # We have to load in the punishment filter too
         inputs.paramDicts[filterKey]['mfPunishment'] = util.LoadFilter(
@@ -1203,14 +1231,15 @@ def arbitraryFiltering(inputs):
       ## Mark hits on the colored image
       if inputs.dic['returnPastedFilter']:
         ## Read in filter dimensions
-        filtDims = util.measureFilterDimensions(inputs.mfOrig)
+        # filtDims = util.measureFilterDimensions(inputs.mfOrig)
 
-        ## Perform dilation of hits based on filter dimensions
-        filterResults.stackedHits = painter.doLabel(
+        ## Trying new marking scheme based on filter dilation
+        filterResults.stackedHits = painter.doLabel_dilation(
           filterResults,
-          cellDimensions=filtDims,
-          thresh=0
+          inputs.mfOrig,
+          inputs
         )
+
       print("Marked image dims:", np.shape(myResults.markedImage))
       print("StackedHits image dims:", np.shape(filterResults.stackedHits))
       myResults.markedImage[..., channelIndex][filterResults.stackedHits != 0] = 255
@@ -1292,15 +1321,17 @@ def fullValidation(args):
   print ("Happy classifying!")
 
 def validate(args,
-             display=False
+             display=False,
+             capture_outputs = True
              ):
   '''This function serves as a validation routine for the 2D functionality of this repo.
   
   Inputs:
     display -> Bool. If True, display the marked image
   '''
-  ### Capture all print statements
-  sys.stdout = open('garbage.txt', 'w')
+  if capture_outputs:
+    ### Capture all print statements
+    sys.stdout = open('garbage.txt', 'w')
 
   ### Specify the yaml file NOTE: This will be done via command line for main classification routines
   yamlFile = './YAML_files/validate.yml'
@@ -1325,9 +1356,10 @@ def validate(args,
   ### Calculate TT, LT, and TA content  
   ttContent, ltContent, taContent = util.assessContent(myResults.markedImage)
 
-  sys.stdout.close()
-  sys.stdout = sys.__stdout__
-  subprocess.call(['rm', 'garbage.txt'])
+  if capture_outputs:
+    sys.stdout.close()
+    sys.stdout = sys.__stdout__
+    subprocess.call(['rm', 'garbage.txt'])
 
   assert(abs(ttContent - 103050) < 1), "TT validation failed."
   assert(abs(ltContent -  68068) < 1), "LT validation failed."
@@ -1340,14 +1372,15 @@ def validate(args,
 
   print ("\n2D Validation has PASSED!")
 
-def validate3D(args):
+def validate3D(args, capture_outputs=True):
   '''This function serves as a validation routine for the 3D functionality of this repo.
 
   Inputs:
     None
   '''
-  ### Capture all print statements
-  sys.stdout = open('garbage.txt', 'w')
+  if capture_outputs:
+    ### Capture all print statements
+    sys.stdout = open('garbage.txt', 'w')
 
   ### Specify the yaml file. NOTE: This will be done via command line for main classification routines
   yamlFile = './YAML_files/validate3D.yml'
@@ -1396,27 +1429,28 @@ def validate3D(args):
   ### Assess the amount of TT, LT, and TA content there is in the image 
   ttContent, ltContent, taContent = util.assessContent(myResults.markedImage)
 
-  sys.stdout.close()
-  sys.stdout = sys.__stdout__
-  subprocess.call(['rm', 'garbage.txt'])
+  if capture_outputs:
+    sys.stdout.close()
+    sys.stdout = sys.__stdout__
+    subprocess.call(['rm', 'garbage.txt'])
 
   ### Check to see that they are in close agreement with previous values
   ###   NOTE: We have to have a lot of wiggle room since we're generating a new cell for each validation
-  assert(abs(ttContent - 301215) < 1), "TT validation failed."
-  assert(abs(ltContent -  53293) < 1), "LT validation failed."
-  assert(abs(taContent - 409003) < 1), "TA validation failed."
+  assert(abs(ttContent - 305247) < 1), "TT validation failed."
+  assert(abs(ltContent -  48624) < 1), "LT validation failed."
+  assert(abs(taContent - 409161) < 1), "TA validation failed."
   print ("\n3D Validation has PASSED!")
 
-def validate3D_arbitrary(args):
+def validate3D_arbitrary(args, capture_outputs=True):
   '''This function serves as a validation routine for the arbitrary classification functionality of
   this repo.
 
   Inputs:
     None
   '''
-
-  ### Capture all print statements
-  sys.stdout = open('garbage.txt', 'w')
+  if capture_outputs:
+    ### Capture all print statements
+    sys.stdout = open('garbage.txt', 'w')
 
   ### Specify the yaml file. NOTE: This will be done via command line for main classification routines
   yamlFile = './YAML_files/validate3D_arbitrary.yml'
@@ -1462,16 +1496,17 @@ def validate3D_arbitrary(args):
   ### Assess the amount of TT, LT, and TA content there is in the image 
   filter1_Content, filter2_Content, filter3_Content = util.assessContent(myResults.markedImage)
 
-  sys.stdout.close()
-  sys.stdout = sys.__stdout__
-  subprocess.call(['rm', 'garbage.txt'])
+  if capture_outputs:
+    sys.stdout.close()
+    sys.stdout = sys.__stdout__
+    subprocess.call(['rm', 'garbage.txt'])
 
   ### Check to see that they are in close agreement with previous values
   # These values are different from the 3D validation case using give3DMarkedMyocyte() since we 
   # don't shift the results down one spot
-  assert(abs(filter1_Content - 361524) < 1), "Filter 1 validation failed."
-  assert(abs(filter2_Content -  55680) < 1), "Filter 2 validation failed."
-  assert(abs(filter3_Content - 412437) < 1), "Filter 3 validation failed."
+  assert(abs(filter1_Content - 242448) < 1), "Filter 1 validation failed."
+  assert(abs(filter2_Content -  50112) < 1), "Filter 2 validation failed."
+  assert(abs(filter3_Content - 412595) < 1), "Filter 3 validation failed."
   print ("\nArbitrary 3D Validation has PASSED!\n")
 
 ###################################################################################################
