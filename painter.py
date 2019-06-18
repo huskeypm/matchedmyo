@@ -12,6 +12,10 @@ import detection_protocols as dps
 import util
 
 
+## Shashank edit
+from gputools import OCLArray
+
+
 ##
 ## Performs matched filtering over desired angles
 ##
@@ -82,6 +86,12 @@ def correlateThresher(
       ## Store all 'hits' at each angle 
       correlated = []
 
+
+    ## Shashank edit
+    
+    if inputs.dic['useGPU']:
+      inputs.imgOrig = OCLArray.from_array(np.require(img,np.float32,"C"))
+    
     ### Iterate over all filter rotations desired
     for rotNum,i in enumerate(iters):
       ## Print progress of filtering if designated so
@@ -100,8 +110,20 @@ def correlateThresher(
         ## Check and see if we can decompose the rotated filter into a combo of 1D filters (much quicker)
         decomposable, decomp_arrays = util.decompose_3D(rFN,verbose=False)
         
+        ## Store in the inputs class
         inputs.mf = decomp_arrays
-        # inputs.mf = rFN
+
+        ## Shashank edit
+
+        if inputs.dic['useGPU']:
+          if not decomposable:
+              gpu_arrays = OCLArray.from_array(np.require(decomp_arrays,np.float32,"C"))
+          else:
+            gpu_arrays = []
+            for k in range(len(decomp_arrays)):
+              arr = decomp_arrays[k]
+              gpu_arrays.append(OCLArray.from_array(np.require(arr,np.float32,"C")))
+          inputs.mf = gpu_arrays 
 
         ## check to see if we need to rotate other matched filters for the detection
         if params['filterMode'] == 'punishmentFilter':
@@ -116,6 +138,10 @@ def correlateThresher(
         ## Depad the array to reduce computational expense
         rFN = util.trimFilter(rFN, thresh_override=1e-12)
         inputs.mf = rFN  
+        
+        ## Shashank edit
+        if inputs.dic['useGPU']:
+          inputs.mf = OCLArray.from_array(np.require(inputs.mF,np.float32,"C"))
 
         ## check for other matched filters
         if params['filterMode'] == 'punishmentFilter':
@@ -442,21 +468,3 @@ def doLabel_dilation(filterResults, thisFilter, inputs, eps = 1e-14):
 
   return labeled
   
-
-###################################################################################################
-###
-### Miscellaneous Routines
-###
-###################################################################################################
-
-def WT_SNR(Img, WTfilter, WTPunishmentFilter,C,gamma):
-  # calculates SNR of WT filter
-  
-  # get two responses
-  h = mF.matchedFilter(Img, WTfilter, demean=False)
-  h_star = mF.matchedFilter(Img,WTPunishmentFilter,demean=False)
-  
-  # calculate SNR
-  SNR = h / (C + gamma * h_star)
-
-  return SNR

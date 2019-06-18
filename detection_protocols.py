@@ -56,12 +56,12 @@ def lobeDetect(
     results = empty()
 
     ## get correlation plane w filter 
-    corr = mF.matchedFilter(img,mf,parsevals=False,demean=False)
+    corr = mF.matchedFilter(img,mf,parsevals=False,demean=False,useGPU=inputs.dic['useGPU'])
 
     ## integrate correlation plane over XxX interval
     smoothScale = paramDict['smoothScale']
     smoother = np.ones([smoothScale,smoothScale])
-    integrated =mF.matchedFilter(corr,smoother,parsevals=False,demean=False)
+    integrated =mF.matchedFilter(corr,smoother,parsevals=False,demean=False,useGPU=inputs.dic['useGPU'])
 
     ## get side lobe penalty
     if isinstance(lobemf,np.ndarray):
@@ -71,7 +71,7 @@ def lobeDetect(
         #out /= np.max(out)
         #corrlobe += s*out
         print ("Needs work - something awry (negative numbes etc) ")
-        corrlobe = mF.matchedFilter(corr,lobemf,parsevals=True,demean=False)
+        corrlobe = mF.matchedFilter(corr,lobemf,parsevals=True,demean=False,useGPU=inputs.dic['useGPU'])
         corrlobe = np.ones_like(corr)
         
     else:    
@@ -90,7 +90,7 @@ def lobeDetect(
     ## region can take before its no longer a considered a loss region 
     lossScale = paramDict['lossScale']
     lossFilter = np.ones([lossScale,lossScale])
-    losscorr = mF.matchedFilter(img,lossFilter,parsevals=False,demean=False)
+    losscorr = mF.matchedFilter(img,lossFilter,parsevals=False,demean=False,useGPU=inputs.dic['useGPU'])
     lossRegion = losscorr < paramDict['lossRegionCutoff']
     mask = 1-lossRegion
     results.lossFilter = mask
@@ -120,7 +120,7 @@ def CalcInvFilter(inputs,paramDict,corr):
       fInv = np.max(filterRef)- s*filterRef
       rFi = util.PadRotate(fInv,angle)
       rFiN = util.renorm(np.array(rFi,dtype=float),scale=1.)
-      yInv  = mF.matchedFilter(tN,rFiN,demean=False,parsevals=True)   
+      yInv  = mF.matchedFilter(tN,rFiN,demean=False,parsevals=True,useGPU=inputs.dic['useGPU'])   
       
       # spot check results
       #hit = np.max(yP) 
@@ -168,8 +168,8 @@ def punishmentFilter(
                           within paramDict")
 
     ## get correlation plane w filter 
-    corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF']) 
-    corrPunishment = mF.matchedFilter(img,mfPunishment,parsevals=False,demean=False)
+    corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF'],useGPU=inputs.dic['useGPU']) 
+    corrPunishment = mF.matchedFilter(img,mfPunishment,parsevals=False,demean=False,useGPU=inputs.dic['useGPU'])
 
     ######
     snr = corr / (cM + gamma * corrPunishment)
@@ -193,9 +193,9 @@ def simpleDetect(
   # get data 
   img = inputs.imgOrig # raw (preprocessed image) 
   mf  = inputs.mf  # raw (preprocessed image) 
-
+  
   ## get correlation plane w filter 
-  corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF']) 
+  corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF'],useGPU=inputs.dic['useGPU']) 
   
   if paramDict['useFilterInv']:
       snr = CalcInvFilter(inputs,paramDict, corr)
@@ -225,7 +225,7 @@ def regionalDeviation(inputs,paramDict):
   results = empty()
 
   if paramDict['useGPU'] == False:
-    corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF'])
+    corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF'],useGPU=inputs.dic['useGPU'])
   else:
     raise RuntimeError("GPU Use is Deprecated")
     # corr = sMF.MF(img,mf,useGPU=True)
@@ -243,12 +243,12 @@ def regionalDeviation(inputs,paramDict):
     kernel[mfStdIdxs] = 1.
 
   ### construct array that contains information on elements in each window
-  n = mF.matchedFilter(np.ones_like(img), kernel,parsevals=False,demean=paramDict['demeanMF'])
+  n = mF.matchedFilter(np.ones_like(img), kernel,parsevals=False,demean=paramDict['demeanMF'],useGPU=inputs.dic['useGPU'])
 
   ### Calculate Std Dev
-  s = mF.matchedFilter(img,kernel,parsevals=False,demean=paramDict['demeanMF'])
+  s = mF.matchedFilter(img,kernel,parsevals=False,demean=paramDict['demeanMF'],useGPU=inputs.dic['useGPU'])
   q = np.square(img)
-  q = mF.matchedFilter(q, kernel,parsevals=False,demean=paramDict['demeanMF'])
+  q = mF.matchedFilter(q, kernel,parsevals=False,demean=paramDict['demeanMF'],useGPU=inputs.dic['useGPU'])
   with warnings.catch_warnings() as w: # turn off errors due to NaNs cropping up (not an issue)
     warnings.simplefilter('ignore')
     stdDev = np.sqrt( np.divide((q-np.divide(np.square(s),n)),n-1)) 
@@ -287,8 +287,8 @@ def filterRatio(inputs,paramDict):
   ## get correlation plane w filter 
   results = empty()
   if paramDict['useGPU'] == False:
-    results.corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF'])
-    results.corrPunishment = mF.matchedFilter(img,mfPunish,parsevals=False,demean=paramDict['demeanMF'])
+    results.corr = mF.matchedFilter(img,mf,parsevals=False,demean=paramDict['demeanMF'],useGPU=inputs.dic['useGPU'])
+    results.corrPunishment = mF.matchedFilter(img,mfPunish,parsevals=False,demean=paramDict['demeanMF'],useGPU=inputs.dic['useGPU'])
     #results.corr = sMF.MF(img,mf,useGPU=False)
   elif paramDict['useGPU'] == True:
     raise RuntimeError("GPU Use is Deprecated")
