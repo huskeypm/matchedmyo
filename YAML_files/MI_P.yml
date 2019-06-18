@@ -1,4 +1,4 @@
-imageName: '/net/share/dfco222/data/TT/LouchData/processedWithIntelligentThresholding/MI_P_16_processed.png'
+imageName: /net/share/dfco222/data/TT/LouchData/processedWithIntelligentThresholding/MI_P_16_processed.png
 maskName: /net/share/dfco222/data/TT/LouchData/processedWithIntelligentThresholding/MI_P_16_processed_mask.png
 outputParams:
     fileRoot: ./results/MI_P

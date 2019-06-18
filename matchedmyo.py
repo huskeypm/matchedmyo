@@ -167,7 +167,6 @@ class Inputs:
     dic['returnAngles'] = False
     dic['returnPastedFilter'] = True
     dic['displayProgress'] = False
-    dic['useGPU'] = False
 
     if self.classificationType == 'arbitrary':
       ## We don't have a preprocessing routine defined for the arbitrary filtering case
@@ -727,7 +726,7 @@ def analyzeTT_Angles(testImageName,
   dim = 5
   kernel = np.ones((dim,dim),dtype=np.float32)
   kernel /= np.sum(kernel)
-  smoothed = mF.matchedFilter(inputs.imgOrig,kernel,demean=False,useGPU=inputs.dic['useGPU'])
+  smoothed = mF.matchedFilter(inputs.imgOrig,kernel,demean=False)
 
   ### make longer WT filter so more robust to striation angle deviation
   ttFilter = util.LoadFilter(ttFilterName)
