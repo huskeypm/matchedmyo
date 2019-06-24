@@ -173,12 +173,12 @@ def saveImg(img, inputs, switchChannels=True, fileName = None, just_save_array=F
       else:
         fileName += '.tif'
     ## this indicates 3D image (with color channels)
-    Save3DImg(img, fileName, switchChannels=switchChannels)
+    Save3DImg(img, fileName)
 
   else:
     raise RuntimeError("Invalid number of image dimensions to save image.")
 
-def Save3DImg(img, fileName, switchChannels=False):
+def Save3DImg(img, fileName):
   '''
   This function will roll the axis of img and save the image in the img variable to the fileName location.
     This is necessary since the convention that I have been using in the analysis scheme is to have:
@@ -192,7 +192,7 @@ def Save3DImg(img, fileName, switchChannels=False):
     switchChannels -> Bool. If True, switch the channels in index 0 and 2 of the last axis.
   '''
   ### Switch the color channels because tifffile has the same color convention as matplotlib
-  if switchChannels:
+  if len(img.shape) == 4:
     img = switchBRChannels(img)
 
   ### Roll the third axis to the first position
