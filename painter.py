@@ -180,12 +180,11 @@ def correlateThresher(
       ## Check to see what our storage scheme is and store accordingly
       if efficientRotationStorage:
         
-          ## TODO: Fix this when the problem with fancy indexing is solved
-        if not inputs.dic['useGPU']:
-            if params['inverseSNR']:
-                correlated['SNRArray'] = pyopencl.array.minimum(correlated['SNRArray'], result.snr)
-            else:
-                correlated['SNRArray'] = pyopencl.array.maximum(correlated['SNRArray'], result.snr)
+        if False:#inputs.dic['useGPU']:
+          if params['inverseSNR']:
+            correlated['SNRArray'] = pyopencl.array.minimum(correlated['SNRArray'], result.snr)
+          else:
+            correlated['SNRArray'] = pyopencl.array.maximum(correlated['SNRArray'], result.snr)
 
         else:
             ## Get element-wise comparison of this rotation's SNR to all previous SNRs

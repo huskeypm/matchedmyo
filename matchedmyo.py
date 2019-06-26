@@ -1059,7 +1059,7 @@ def give3DMarkedMyocyte(
     )
     TTstackedHits = TTresults.stackedHits
   else:
-    TTstackedHits = np.zeros(inputs.imgOrigs.shape)
+    TTstackedHits = np.zeros(inputs.imgOrig.shape)
 
   ### Longitudinal Tubule Filtering
   if inputs.dic['filterTypes']['LT']:
