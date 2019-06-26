@@ -621,7 +621,7 @@ def TT_Filtering(inputs,
   ttFilter = util.LoadFilter(inputs.paramDicts['TT']['filterName'])
   inputs.mfOrig = ttFilter
 
-  paramDict['covarianceMatrix'] = np.ones_like(inputs.imgOrig)
+  paramDict['covarianceMatrix'] = np.ones(inputs.imgOrig.shape)
   paramDict['mfPunishment'] = util.LoadFilter(inputs.paramDicts['TT']['punishFilterName'])
 
   ### Perform filtering
@@ -1059,7 +1059,7 @@ def give3DMarkedMyocyte(
     )
     TTstackedHits = TTresults.stackedHits
   else:
-    TTstackedHits = np.zeros_like(inputs.imgOrig)
+    TTstackedHits = np.zeros(inputs.imgOrigs.shape)
 
   ### Longitudinal Tubule Filtering
   if inputs.dic['filterTypes']['LT']:
@@ -1070,7 +1070,7 @@ def give3DMarkedMyocyte(
     )
     LTstackedHits = LTresults.stackedHits
   else:
-    LTstackedHits = np.zeros_like(inputs.imgOrig)
+    LTstackedHits = np.zeros(inputs.imgOrig.shape)
 
   ### Tubule Absence Filtering
   if inputs.dic['filterTypes']['TA']:
@@ -1084,7 +1084,7 @@ def give3DMarkedMyocyte(
     )
     TAstackedHits = TAresults.stackedHits
   else:
-    TAstackedHits = np.zeros_like(inputs.imgOrig)
+    TAstackedHits = np.zeros(inputs.imgOrig.shape)
 
   ### Mark Detections on the Image
   cImg = np.stack(
@@ -1183,19 +1183,18 @@ def arbitraryFiltering(inputs):
       print ("Performing {} classification".format(filterKey))
       ## Load in filter
       inputs.mfOrig = util.LoadFilter(inputs.paramDicts[filterKey]['filterName'])
-
+      
       if inputs.paramDicts[filterKey]['filterMode'] == 'punishmentFilter':
         # We have to load in the punishment filter too
         inputs.paramDicts[filterKey]['mfPunishment'] = util.LoadFilter(
           inputs.paramDicts[filterKey]['punishFilterName']
         )
-      ## Load punishment filter and covariance matrix if applicable
-      if inputs.paramDicts[filterKey]['filterMode'] == 'punishmentFilter':
+        # Load punishment filter and covariance matrix if applicable
         inputs.paramDicts[filterKey]['punishmentFilter'] = util.LoadFilter(
           inputs.paramDicts[filterKey]['punishFilterName']
         )
-        inputs.paramDicts[filterKey]['covarianceMatrix'] = np.ones_like(inputs.imgOrig)
-
+        inputs.paramDicts[filterKey]['covarianceMatrix'] = np.ones(inputs.imgOrig.shape)
+      
       ## Perform filtering
       filterResults = bD.DetectFilter(
         inputs = inputs,
