@@ -14,7 +14,9 @@ import util
 
 ## Shashank edit
 from gputools import OCLArray
-
+from six import iteritems
+import pyopencl
+import time
 
 ##
 ## Performs matched filtering over desired angles
@@ -66,22 +68,33 @@ def correlateThresher(
       if params['inverseSNR']:
         ## If we use inverse SNR (meaning the SNR must be below a certain value to signify a hit), 
         ##   we need to create an array that has arbitrarily high starting numbers
-        correlated['SNRArray'] = np.ones_like(img) * 5. * params['snrThresh']
+        #correlated['SNRArray'] = np.ones_like(img) * 5. * params['snrThresh']
+        correlated['SNRArray'] = np.ones(img.shape, np.float32) * 5. * params['snrThresh']
       else:
         ## Otherwise, we can just instantiate the SNRArray with zeros
-        correlated['SNRArray'] = np.zeros_like(img)
+        correlated['SNRArray'] = np.zeros(img.shape, np.float32)
+
+        #if inputs.dic['useGPU']:
+            #correlated['SNRArray'] = OCLArray.from_array(np.require(correlated['SNRArray'], np.float32, "C"))
 
       ## We also need to create a storage array for the rotation which the maximum SNR occurred.
       if len(np.shape(img)) == 3:
         ## This means that the image is 3D and we must store the rotation arrays in 3 different arrays
         ##   We use 361 because no one in their right mind would want to rotate a filter >= 360 degrees
         correlated['rotSNRArray'] = {}
-        correlated['rotSNRArray']['x'] = np.ones_like(img, dtype=np.int16) * 361
-        correlated['rotSNRArray']['y'] = np.ones_like(img, dtype=np.int16) * 361
-        correlated['rotSNRArray']['z'] = np.ones_like(img, dtype=np.int16) * 361
+        correlated['rotSNRArray']['x'] = np.ones(img.shape, np.int16) * 361
+        correlated['rotSNRArray']['y'] = np.ones(img.shape, np.int16) * 361
+        correlated['rotSNRArray']['z'] = np.ones(img.shape, np.int16) * 361
+
+        #if inputs.dic['useGPU']:
+            #for key, value in iteritems(correlated['rotSNRArray']):
+                #correlated['rotSNRArray'][key] = OCLArray.from_array(np.require(value, np.int16, "C"))
       else:
         ## Otherwise we only need one array to store the single rotation
-        correlated['rotSNRArray'] = np.ones_like(img,dtype=np.int16) * 361
+        correlated['rotSNRArray'] = np.ones(img.shape,np.int16) * 361
+
+        #if inputs.dic['useGPU']:
+            #correlated['rotSNRArray'] = OCLArray.from_array(np.require(correlated['rotSNRArray'], np.int16, "C"))
     else:
       ## Store all 'hits' at each angle 
       correlated = []
@@ -89,7 +102,7 @@ def correlateThresher(
 
     ## Shashank edit
     
-    if inputs.dic['useGPU']:
+    if inputs.dic['useGPU'] and not isinstance(img, pyopencl.array.Array):
       inputs.imgOrig = OCLArray.from_array(np.require(img,np.float32,"C"))
     
     ### Iterate over all filter rotations desired
@@ -114,7 +127,6 @@ def correlateThresher(
         inputs.mf = decomp_arrays
 
         ## Shashank edit
-
         if inputs.dic['useGPU']:
           if not decomposable:
               gpu_arrays = OCLArray.from_array(np.require(decomp_arrays,np.float32,"C"))
@@ -123,13 +135,25 @@ def correlateThresher(
             for k in range(len(decomp_arrays)):
               arr = decomp_arrays[k]
               gpu_arrays.append(OCLArray.from_array(np.require(arr,np.float32,"C")))
-          inputs.mf = gpu_arrays 
-
+          inputs.mf = gpu_arrays
+          
         ## check to see if we need to rotate other matched filters for the detection
         if params['filterMode'] == 'punishmentFilter':
           params['mfPunishmentRot'] = util.rotate3DArray_Nonhomogeneous(params['mfPunishment'].copy(),i,inputs.dic['scopeResolutions'])
           params['mfPunishmentRot'] = util.trimFilter(params['mfPunishmentRot'])
-          _,params['mfPunishmentRot'] = util.decompose_3D(params['mfPunishmentRot'])
+          deocomposable, params['mfPunishmentRot'] = util.decompose_3D(params['mfPunishmentRot'])
+
+          if inputs.dic['useGPU']:
+            if not decomposable:
+                punish_arrays = OCLArray.from_array(np.require(params['mfPunishmentRot'],np.float32,"C"))
+            else:
+              punish_arrays = []
+              for k in range(len(params['mfPunishmentRot'])):
+                arr = params['mfPunishmentRot'][k]
+                punish_arrays.append(OCLArray.from_array(np.require(arr,np.float32,"C")))
+            
+            params['mfPunishmentRot'] = punish_arrays
+
       else:
         ## This is 2D
         ## pad/rotate 
@@ -146,33 +170,51 @@ def correlateThresher(
         ## check for other matched filters
         if params['filterMode'] == 'punishmentFilter':
           params['mfPunishmentRot'] = util.PadRotate(params['mfPunishment'].copy(),i)
+
+          if inputs.dic['useGPU']:
+              params['mfPunishmentRot'] = OCL.from_array(np.require(params['mfPunishmentRot'], np.float32, "C"))
       
       ## Perform matched filtering 
       result = dps.FilterSingle(inputs,params)      
 
       ## Check to see what our storage scheme is and store accordingly
       if efficientRotationStorage:
-        ## Get element-wise comparison of this rotation's SNR to all previous SNRs
-        if params['inverseSNR']:
-          ## If we're using the inverseSNR scheme of hit detection, we need which SNRs are less
-          ##   at this rotation than previous SNRs at previous rotations 
-          SNRcomparison = np.less(result.snr, correlated['SNRArray'])
+        
+          ## TODO: Fix this when the problem with fancy indexing is solved
+        if not inputs.dic['useGPU']:
+            if params['inverseSNR']:
+                correlated['SNRArray'] = pyopencl.array.minimum(correlated['SNRArray'], result.snr)
+            else:
+                correlated['SNRArray'] = pyopencl.array.maximum(correlated['SNRArray'], result.snr)
+
         else:
-          ## Otherwise, we just pick out the SNRs which are greater at this rotation compared to
-          ##   previous rotations
-          SNRcomparison = np.greater(result.snr, correlated['SNRArray'])
+            ## Get element-wise comparison of this rotation's SNR to all previous SNRs
+            if params['inverseSNR']:
+                ## If we're using the inverseSNR scheme of hit detection, we need which SNRs are less
+                ##   at this rotation than previous SNRs at previous rotations 
+                #if inputs.dic['useGPU']:
+                #    SNRcomparison = result.snr.__lt__(correlated['SNRArray'])
+                #else:
+                    SNRcomparison = np.less(result.snr, correlated['SNRArray'])
+            else:
+                ## Otherwise, we just pick out the SNRs which are greater at this rotation compared to
+                ##   previous rotations
+                #if inputs.dic['useGPU']:
+                #    SNRcomparison = result.snr.__gt__(correlated['SNRArray'])
+                #else:
+                    SNRcomparison = np.greater(result.snr, correlated['SNRArray'])
+            
+            ## Pick out the greater SNRs and store in maxSNRArray
+            correlated['SNRArray'][SNRcomparison] = result.snr[SNRcomparison]
 
-        ## Pick out the greater SNRs and store in maxSNRArray
-        correlated['SNRArray'][SNRcomparison] = result.snr[SNRcomparison]
-
-        ## Pick out the rotations at which the maximum SNR is located at the current location and 
-        ##   store in the array
-        if len(np.shape(img)) == 3:
-          correlated['rotSNRArray']['x'][SNRcomparison] = i[0]
-          correlated['rotSNRArray']['y'][SNRcomparison] = i[1]
-          correlated['rotSNRArray']['z'][SNRcomparison] = i[2]
-        else:  
-          correlated['rotSNRArray'][SNRcomparison] = i
+            ## Pick out the rotations at which the maximum SNR is located at the current location and 
+            ##   store in the array
+            if len(np.shape(img)) == 3:
+              correlated['rotSNRArray']['x'][SNRcomparison] = i[0]
+              correlated['rotSNRArray']['y'][SNRcomparison] = i[1]
+              correlated['rotSNRArray']['z'][SNRcomparison] = i[2]
+            else:  
+              correlated['rotSNRArray'][SNRcomparison] = i
 
       else:
         ## Store results contain both correlation plane and snr
@@ -427,7 +469,7 @@ def doLabel_dilation(filterResults, thisFilter, inputs, eps = 1e-14):
     print ("Unique ys: {}".format(unique_y))    
     print ("Unique zs: {}".format(unique_z))
 
-    labeled = np.zeros_like(filterResults.stackedHits,dtype=bool)
+    labeled = np.zeros(filterResults.stackedHits.shape,dtype=bool)
 
     for x_rot in unique_x:
       these_unique_x_hits = np.equal(filterResults.correlated['rotSNRArray']['x'], x_rot)
