@@ -29,7 +29,7 @@ def matchedFilter(
         h = sequential_filtering(dimg, daFilter, useGPU)
     else:
         h = _convolve_buf(dimg, daFilter)
-  
+
     return h.get()
   
   else:
@@ -110,12 +110,10 @@ def sequential_filtering(dimg,daFilter_list,useGPU=False):
     
   #   elif isinstance(axis, str):
   #     dimg = ndimage.convolve(dimg, filt)
-  
   if useGPU:
       for filt in daFilter_list:
           dimg = _convolve_buf(dimg, filt)
   else:
       for filt in daFilter_list:
           dimg = ndimage.convolve(dimg, filt)
-
   return dimg
