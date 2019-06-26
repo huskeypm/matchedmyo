@@ -57,48 +57,36 @@ def DetectFilter(
     raise RuntimeError("PLACEHOLDER TO REMIND ONE TO USE INPUT/PARAMDICT OBJECTS")
 
   # do correlations across all iter
-  if paramDict['useGPU']:
-    raise RuntimeError("GPU use is DEPRECATED. Turn this flag off to run classification.")
-    # result,timeElapsed = tdt.doTFloop(
-    #         inputs,
-    #         paramDict,
-    #         ziters=iters
-    #         )
-    # # since routine gives correlated > 0 for snr > snrThresh then all nonzero correlated pixels are hits
-    # if paramDict['inverseSNR']:
-    #   result.stackedHits[result.stackedHits > paramDict['snrThresh']] = 0.
-    # else:
-    #   result.stackedHits[result.stackedHits < paramDict['snrThresh']] = 0.
-
-  else:
-    correlated = painter.correlateThresher(
-       inputs,
-       paramDict,
-       iters=iters,
-       printer=display,
-       filterMode=filterMode,
-       label=label,
-       efficientRotationStorage=inputs.efficientRotationStorage
-    )
-
-    # stack hits to form 'total field' of hits
-    if returnAngles:
-      stackedHits, stackedAngles = painter.StackHits(
+  correlated = painter.correlateThresher(
+    inputs,
+    paramDict,
+    iters=iters,
+    printer=display,
+    filterMode=filterMode,
+    label=label,
+    efficientRotationStorage=inputs.efficientRotationStorage
+  )
+  
+  # stack hits to form 'total field' of hits
+  if returnAngles:
+    stackedHits, stackedAngles = painter.StackHits(
                   correlated,
                   paramDict,
                   iters,
                   display=display,
                   returnAngles=returnAngles,
-                  efficientRotationStorage=inputs.efficientRotationStorage)
-    else:
-      stackedHits= painter.StackHits(
+                  efficientRotationStorage=inputs.efficientRotationStorage
+    )
+  
+  else:
+    stackedHits= painter.StackHits(
         correlated,
         paramDict,
         iters,
         display=display,
         efficientRotationStorage=inputs.efficientRotationStorage
-      )
-      stackedAngles = None
+    )
+    stackedAngles = None
 
   ### Store in ClassificationResults class
   result = ClassificationResults(
@@ -111,7 +99,7 @@ def DetectFilter(
 
 def GetHits(aboveThresholdPoints):
   ## idenfity hits (binary)  
-  mylocs =  np.zeros_like(aboveThresholdPoints.flatten())
+  mylocs =  np.zeros(aboveThresholdPoints.flatten().shape)
   hits = np.argwhere(aboveThresholdPoints.flatten()>0)
   mylocs[hits] = 1
   

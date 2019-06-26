@@ -9,9 +9,9 @@ scopeResolutions:
     y: 10
     z: 5 #voxels per micron
 iters:
-    x: [0]
-    y: [0]
-    z: [0]
+    x: [0,15,30]
+    y: [0,30,45]
+    z: [0,60]
 paramDicts:
     filter1:
         filterMode: punishmentFilter
