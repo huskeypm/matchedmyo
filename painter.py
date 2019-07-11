@@ -15,8 +15,10 @@ import util
 ## Shashank edit
 from gputools import OCLArray
 from six import iteritems
-import pyopencl
+import pyopencl as cl
 import time
+import skimage.morphology
+import cv2
 
 ##
 ## Performs matched filtering over desired angles
@@ -102,7 +104,7 @@ def correlateThresher(
 
     ## Shashank edit
     
-    if inputs.dic['useGPU'] and not isinstance(img, pyopencl.array.Array):
+    if inputs.dic['useGPU'] and not isinstance(img, cl.array.Array):
       inputs.imgOrig = OCLArray.from_array(np.require(img,np.float32,"C"))
     
     ### Iterate over all filter rotations desired
@@ -467,8 +469,54 @@ def doLabel_dilation(filterResults, thisFilter, inputs, eps = 1e-14):
     print ("Unique xs: {}".format(unique_x))    
     print ("Unique ys: {}".format(unique_y))    
     print ("Unique zs: {}".format(unique_z))
+    
+    labeled = np.zeros(filterResults.stackedHits.shape,dtype=bool).astype(bool)
+    
+    if inputs.dic['useGPU']:
+        platform = cl.get_platforms()[0]
+        devices = platform.get_devices()
+        context =  cl.Context([devices[1]])
+        queue = cl.CommandQueue(context, devices[1])
+        
+        mf = cl.mem_flags
+        labeled_g = cl.Buffer(context, mf.WRITE_ONLY, filterResults.stackedHits.nbytes)
 
-    labeled = np.zeros(filterResults.stackedHits.shape,dtype=bool)
+        program = cl.Program(context, """
+        __kernel void dilation(
+            __global bool* imageHits, __global int* filterCoords, __global int* coordDims, __global bool* result)
+        {
+            int i = get_global_id(0);
+            int j = get_global_id(1);
+            int k = get_global_id(2);
+
+            int Nx = get_global_size(0);
+            int Ny = get_global_size(1);
+            int Nz = get_global_size(2);
+
+            int index = i + j * Nx + k * Nx * Ny;
+            
+            if(imageHits[2*index]) {
+                for(int n = 0; n < 2*coordDims[0]*coordDims[2]; n += 2*coordDims[2]) {
+                    int x_off = filterCoords[n + 0];
+                    int y_off = filterCoords[n + 2];
+                    int z_off = filterCoords[n + 4];
+
+                    i += x_off;
+                    j += y_off;
+                    k += z_off;
+
+                    if(i >= 0 && i < Nx) {
+                        if(j >= 0 && j < Ny) {
+                            if(k >= 0 && k < Nz) {
+                                result[i + j * Nx + k * Nx * Ny] = true;
+                            }
+                        }
+                    }
+                }
+            }
+            
+        }
+        """).build()
 
     for x_rot in unique_x:
       these_unique_x_hits = np.equal(filterResults.correlated['rotSNRArray']['x'], x_rot)
@@ -487,7 +535,7 @@ def doLabel_dilation(filterResults, thisFilter, inputs, eps = 1e-14):
           rFN = thisFilter
 
           binary_filter = np.greater(rFN, np.min(rFN + eps))
-
+          
           # find the hits that correspond with this rotation angle exactly
           where_hits = np.logical_and(
             np.logical_and(
@@ -496,13 +544,43 @@ def doLabel_dilation(filterResults, thisFilter, inputs, eps = 1e-14):
             ),
             temp_binary_hits
           )
+          '''
+          hits = np.where(where_hits)
+          hlist = list(zip(hits[0], hits[1], hits[2]))
+          '''
+          bf_shape = binary_filter.shape
+          coords = np.where(binary_filter)
+          clist = list(zip(coords[0], coords[1], coords[2]))
+          for i in range(len(clist)):
+            c = clist[i]
+            clist[i] = (c[0] - int(bf_shape[0] / 2), c[1] - int(bf_shape[1] / 2), c[2] - int(bf_shape[2] / 2))
+          
+          #hits_array = np.asarray(hlist)
+          coords_array = np.asarray(clist)
 
-          # dilate this with the binarized rotated filter
-          new_dilation = ndimage.morphology.binary_dilation(where_hits, structure = binary_filter)
+          if inputs.dic['useGPU']:
+            if not where_hits.flags['C_CONTIGUOUS']:
+              where_hits = where_hits.copy(order='C')
+            #if not binary_filter.flags['C_CONTIGUOUS']:
+            #  binary_filter = binary_filter.copy(order='C')
+            
+            hits_g = cl.Buffer(context, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf = where_hits)
+            coords_g = cl.Buffer(context, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf = coords_array)
+            shape_g = cl.Buffer(context, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf = np.asarray(coords_array.shape))
+            
+            program.dilation(queue, where_hits.shape, None, hits_g, coords_g, shape_g, labeled_g)
+            result = np.zeros(labeled.shape, dtype=bool)
+            cl.enqueue_copy(queue, result, labeled_g)
+            
+            labeled = np.logical_or(labeled, result)
 
-          # store these new dilated hits in the storage array
-          labeled = np.logical_or(new_dilation, labeled)
-  
+          else:
+              # dilate this with the binarized rotated filter
+              new_dilation = ndimage.morphology.binary_dilation(where_hits, structure = binary_filter)
+
+              # store these new dilated hits in the storage array
+              labeled = np.logical_or(new_dilation, labeled)
+
   else: # this is 2D and much simpler
     # TODO
     labeled = ndimage.morphology.binary_dilation(filterResults.stackedHits, binary_filter)

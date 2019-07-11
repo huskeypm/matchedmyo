@@ -4,6 +4,7 @@ outputParams:
     fileRoot: "./results/3DValidationData_arbitrary_analysis"
     fileType: "tif"
 preprocess: False
+#useGPU: True
 scopeResolutions: 
     x: 10
     y: 10
