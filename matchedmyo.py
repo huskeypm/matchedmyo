@@ -1315,7 +1315,7 @@ def fullValidation(args):
 
   validate(args)
   validate3D(args)
-  validate3D_arbitrary(args, False)
+  validate3D_arbitrary(args)#, False)
 
   print ("All validation tests have PASSED! MatchedMyo is installed properly on this machine.")
   print ("Happy classifying!")
