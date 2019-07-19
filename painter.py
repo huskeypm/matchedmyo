@@ -473,58 +473,48 @@ def doLabel_dilation(filterResults, thisFilter, inputs, eps = 1e-14):
     labeled = np.zeros(filterResults.stackedHits.shape,dtype=bool).astype(bool)
     
     if inputs.dic['useGPU']:
+        #set up OpenCL GPU structures
         platform = cl.get_platforms()[0]
         devices = platform.get_devices()
         context =  cl.Context(devices)
         queue = cl.CommandQueue(context, devices[0])
         
+        #Create buffer for results
         mf = cl.mem_flags
         labeled_g = cl.Buffer(context, mf.WRITE_ONLY, filterResults.stackedHits.nbytes)
-
+        
+        #Create program that will perform the dilation
         program = cl.Program(context, """
         __kernel void dilation(
             __global int* imageHits, __global int* filterCoords, __global int* coordDims, __global bool* result)
         {
-            int i = get_global_id(0);
-            int j = get_global_id(1);
-            int k = get_global_id(2);
+            int x = get_global_id(0);
+            int y = get_global_id(1);
+            int z = get_global_id(2);
 
             int Nx = get_global_size(0);
             int Ny = get_global_size(1);
             int Nz = get_global_size(2);
             
-            //printf("(%d %d %d) ", Nx, Ny, Nz);
-            //printf("(%d %d %d) ", filterCoords[0], filterCoords[1], filterCoords[2]);
-            //printf("(%d %d) ", coordDims[0], coordDims[1]);
-            //printf("%d ", sizeof(float));
-            //printf("(%d %d %d) ", imageHits[24], imageHits[28], imageHits[32]);
+            int index = x + y * Nx + z * Nx * Ny;
 
-            int index = i + j * Nx + k * Nx * Ny;
-            
-            if(index == 0 && imageHits[0]) {
-                //printf("(%d %d %d) ", imageHits[21], imageHits[22], imageHits[23]);
-            }
+            for(int n = 0; n < coordDims[0]*coordDims[1]; n += coordDims[1]) {
+                int x_off = filterCoords[n + 0];
+                int y_off = filterCoords[n + 1];
+                int z_off = filterCoords[n + 2];
+                
+                int new_x = x + x_off;
+                int new_y = y + y_off;
+                int new_z = z + z_off;
 
-            if(imageHits[index]) {
-                for(int n = 0; n < coordDims[0]*coordDims[1]; n += coordDims[1]) {
-                    int x_off = filterCoords[n + 0];
-                    int y_off = filterCoords[n + 1];
-                    int z_off = filterCoords[n + 2];
+                if(new_x >= 0 && new_x < Nx) {
+                    if(new_y >= 0 && new_y < Ny) {
+                        if(new_z >= 0 && new_z < Nz) {
+                            int new_index = new_x + new_y * Nx + new_z * Nx * Ny;
 
-                    if(n == 0) {
-                        //printf("(%d %d %d) ", x_off, y_off, z_off);
-                    }
-                    
-                    i += x_off;
-                    j += y_off;
-                    k += z_off;
-
-                    if(i >= 0 && i < Nx) {
-                        if(j >= 0 && j < Ny) {
-                            if(k >= 0 && k < Nz) {
-                                //printf("(%d %d %d) ", i, j , k);
-                                int new_index = i + j * Nx + k * Nx * Ny;
-                                result[new_index] = true;
+                            if(imageHits[new_index]) {
+                                result[index] = true;
+                                break;
                             }
                         }
                     }
@@ -560,64 +550,36 @@ def doLabel_dilation(filterResults, thisFilter, inputs, eps = 1e-14):
             temp_binary_hits
           )
           
-          bf_shape = binary_filter.shape
-          coords = np.where(binary_filter)
-          clist = list(zip(coords[0], coords[1], coords[2]))
-          for i in range(len(clist)):
-            c = clist[i]
-            clist[i] = (c[0] - int(bf_shape[0] / 2), c[1] - int(bf_shape[1] / 2), c[2] - int(bf_shape[2] / 2))
-          
-          hits_array = where_hits.astype(np.int32)
-          coords_array = np.asarray(clist).astype(np.int32)
-          shape_array = np.asarray(coords_array.shape).astype(np.int32)
-
           if inputs.dic['useGPU']:
-            if not where_hits.flags['C_CONTIGUOUS']:
-              where_hits = where_hits.copy(order='C')
+            #Find coordinates of hits in binary filter and recenter them to the center of the filter
+            bf_shape = binary_filter.shape
+            coords = np.where(binary_filter)
+            clist = list(zip(coords[0], coords[1], coords[2]))
+            for i in range(len(clist)):
+                c = clist[i]
+                clist[i] = (int(bf_shape[2] / 2) - c[2], int(bf_shape[1] / 2) - c[1], int(bf_shape[0] / 2) - c[0])
             
+            #convert to numpy ndarrays
+            hits_array = where_hits.astype(np.int32, order='C')
+            coords_array = np.asarray(clist, dtype=np.int32)
+            shape_array = np.asarray(coords_array.shape, dtype=np.int32)
+            
+            #create buffers for GPU acccess of data
             hits_g = cl.Buffer(context, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf = hits_array)
             coords_g = cl.Buffer(context, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf = coords_array)
             shape_g = cl.Buffer(context, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf = shape_array)
             
+            #perform dilation on GPU and pull out results
             program.dilation(queue, where_hits.shape, None, hits_g, coords_g, shape_g, labeled_g)
             result = np.zeros(labeled.shape, dtype=bool)
-            #result = where_hits.copy()
             cl.enqueue_copy(queue, result, labeled_g)
-            
-            #print(result.sum())
             
             labeled = np.logical_or(labeled, result)
 
           else:
             # dilate this with the binarized rotated filter
-            '''
-            shape = binary_filter.shape
-            coords = np.where(binary_filter)
-            clist = list(zip(coords[0], coords[1], coords[2]))
-            for i in range(len(clist)):
-                c = clist[i]
-                clist[i] = (c[0] - int(shape[0] / 2), c[1] - int(shape[1] / 2), c[2] - int(shape[2] / 2))
-          
-            hits = np.where(where_hits)
-            hlist = list(zip(hits[0], hits[1], hits[2]))
-          
-            new_dilation = np.zeros(where_hits.shape, dtype=bool)
-
-            for h in hlist:
-                x, y, z = h[0], h[1], h[2]
-
-                for c in clist:
-                    i, j, k = c[0], c[1], c[2]
-
-                    if x+i >= 0 and x+i < new_dilation.shape[0]:
-                        if y+j >= 0 and y+j < new_dilation.shape[1]:
-                            if z+k >= 0 and z+k < new_dilation.shape[2]:
-                                new_dilation[x+i, y+j, z+k] = True
-            '''
-            
             new_dilation = ndimage.morphology.binary_dilation(where_hits, structure = binary_filter)
-            print(new_dilation.sum())
-            print("\n")
+            
             # store these new dilated hits in the storage array
             labeled = np.logical_or(new_dilation, labeled)
 
