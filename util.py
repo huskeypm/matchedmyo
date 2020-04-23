@@ -93,8 +93,8 @@ def ReadImg(fileName,cvtColor=True,renorm=False,bound=False, dataType = np.float
         raise RuntimeError(fileName+" likely doesn't exist")
 
     ## Convert to grayscale
-    if cvtColor:
-      img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    #if cvtColor:
+    #  img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
     ## Check if the image is bounded
     if bound != False:
